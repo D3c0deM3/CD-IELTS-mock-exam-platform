@@ -1,24 +1,36 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import ThemeToggle from "../components/ThemeToggle";
 import "./StartScreen.css";
 
-function StartScreen({ onStart }) {
+function StartScreen() {
+  const navigate = useNavigate();
   const [idCode, setIdCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isFocused, setIsFocused] = useState(false);
 
+  // Add theme effect from localStorage
+  useEffect(() => {
+    const storedTheme = localStorage.getItem("ielts_mock_theme");
+    if (storedTheme) {
+      document.documentElement.setAttribute("data-theme", storedTheme);
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!idCode.trim()) {
-      setError("Please enter your ID code");
+      setError("Please enter your candidate ID");
       return;
     }
 
     // Validate ID format (example: AD12345678)
-    const idPattern = /^[A-Z]{2}\d{7}$/;
+    const idPattern = /^AD\d{7}$/;
     if (!idPattern.test(idCode.trim().toUpperCase())) {
-      setError("Please enter a valid ID format (e.g., AD12345678)");
+      setError("Please enter a valid ID format (e.g., AD1234567)");
       return;
     }
 
@@ -33,9 +45,12 @@ function StartScreen({ onStart }) {
       localStorage.setItem("ielts_mock_user_id", idCode.trim().toUpperCase());
       localStorage.setItem("ielts_mock_start_time", new Date().toISOString());
 
-      // Call parent handler to proceed
-      if (onStart) {
-        onStart(idCode.trim().toUpperCase());
+      // Check if user is logged in
+      const isLoggedIn = localStorage.getItem("accessToken");
+      if (isLoggedIn) {
+        navigate("/dashboard");
+      } else {
+        navigate("/login", { state: { idCode: idCode.trim().toUpperCase() } });
       }
 
       console.log("IELTS Mock Test started for:", idCode.trim().toUpperCase());
@@ -55,6 +70,9 @@ function StartScreen({ onStart }) {
 
   return (
     <div className="start-screen">
+      <Navbar />
+      <ThemeToggle />
+
       <div className="background-overlay"></div>
 
       <div className="start-container">
@@ -139,8 +157,8 @@ function StartScreen({ onStart }) {
                     onChange={handleInputChange}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder="AD12345678"
-                    maxLength="10"
+                    placeholder="AD1234567"
+                    maxLength="9"
                     autoComplete="off"
                     disabled={isLoading}
                   />

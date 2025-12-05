@@ -233,11 +233,12 @@
   color: var(--start-text);
   opacity: 0.5;
   pointer-events: none;
+  z-index: 2; /* Added */
 }
 
 .input-wrapper input {
   width: 100%;
-  padding: 14px 14px 14px 40px;
+  padding: 14px 14px 14px 46px; /* Changed from 40px to 46px */
   font-size: 16px;
   font-weight: 500;
   color: var(--start-text);
@@ -245,11 +246,14 @@
   border: none;
   outline: none;
   letter-spacing: 0.05em;
+  position: relative; /* Added */
+  z-index: 1; /* Added */
 }
 
 .input-wrapper input::placeholder {
   color: var(--start-text);
   opacity: 0.4;
+  padding-left: 0; /* Added */
 }
 
 .input-wrapper input:disabled {
@@ -427,6 +431,17 @@
   .submit-btn {
     padding: 14px 20px;
     font-size: 15px;
+  }
+
+  .input-wrapper input {
+    padding: 14px 14px 14px 46px; /* Updated */
+    font-size: 15px;
+  }
+
+  .input-icon {
+    left: 14px;
+    width: 16px;
+    height: 16px;
   }
 }
 

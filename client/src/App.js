@@ -1,13 +1,21 @@
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import StartScreen from "./pages/StartScreen";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import "./App.css";
-import StartScreen from "./components/StartScreen";
-import ThemeToggle from "./components/ThemeToggle";
 
 function App() {
   return (
-    <div className="App">
-      <ThemeToggle />
-      <StartScreen />
-    </div>
+    <Router>
+      <div className="App">
+        <Routes>
+          <Route path="/" element={<StartScreen />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
