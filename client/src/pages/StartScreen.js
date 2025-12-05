@@ -127,7 +127,7 @@ function StartScreen() {
                     error ? "error" : ""
                   }`}
                 >
-                  <div className="input-icon">
+                  {/* <div className="input-icon">
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -148,7 +148,7 @@ function StartScreen() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                  </div>
+                  </div> */}
 
                   <input
                     id="idCode"
