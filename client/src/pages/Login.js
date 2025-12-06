@@ -7,7 +7,7 @@ import "./AuthPages.css";
 const Login = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    identifier: "", // Can be phone or candidate_id
+    phone_number: "",
     password: "",
   });
   const [loading, setLoading] = useState(false);
@@ -26,8 +26,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
-    if (!formData.identifier.trim() || !formData.password) {
+    if (!formData.phone_number.trim() || !formData.password) {
       setError("Please enter your credentials");
       return;
     }
@@ -36,17 +35,11 @@ const Login = () => {
     setError("");
 
     try {
-      // Use service layer
       const response = await authService.login({
-        identifier: formData.identifier.trim(),
+        phone_number: formData.phone_number.trim(),
         password: formData.password,
       });
 
-      // Store tokens
-      localStorage.setItem("accessToken", response.accessToken);
-      localStorage.setItem("refreshToken", response.refreshToken);
-
-      // Navigate based on user role
       const userRole = response.user?.role || "student";
       if (userRole === "admin") {
         navigate("/admin/dashboard");
@@ -69,20 +62,19 @@ const Login = () => {
     >
       <form className="auth-form" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="identifier">Phone Number</label>
+          <label htmlFor="phone_number">Phone Number</label>
           <div className="input-wrapper">
             <input
-              id="identifier"
-              name="identifier"
-              type="text"
-              value={formData.identifier}
+              id="phone_number"
+              name="phone_number"
+              type="tel"
+              value={formData.phone_number}
               onChange={handleChange}
-              placeholder="+919876543210"
+              placeholder="Enter your phone number"
               required
               disabled={loading}
             />
           </div>
-          <div className="field-hint">Enter your registered phone number</div>
         </div>
 
         <div className="form-group">

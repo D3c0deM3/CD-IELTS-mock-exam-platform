@@ -7,8 +7,8 @@ import "./AuthPages.css";
 const Register = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    phone_num: "",
     full_name: "",
+    phone_number: "",
     password: "",
     confirmPassword: "",
   });
@@ -29,15 +29,15 @@ const Register = () => {
   const validateForm = () => {
     const errors = [];
 
-    // Validate phone number
-    const phoneRegex = /^\+?[1-9]\d{9,14}$/;
-    if (!phoneRegex.test(formData.phone_num)) {
-      errors.push("Please enter a valid phone number");
-    }
-
     // Validate full name
     if (formData.full_name.trim().length < 2) {
       errors.push("Please enter your full name");
+    }
+
+    //validate phone number
+    const phoneRegex = /^\+?[1-9]\d{9,14}$/;
+    if (!phoneRegex.test(formData.phone_number)) {
+      errors.push("Please enter a valid phone number");
     }
 
     // Validate password
@@ -69,20 +69,16 @@ const Register = () => {
     try {
       // Prepare registration data
       const registrationData = {
-        phone_num: formData.phone_num,
         full_name: formData.full_name.trim(),
+        phone_number: formData.phone_number.trim(),
         password: formData.password,
       };
 
       // Use service layer
-      const response = await authService.register(registrationData);
+      await authService.register(registrationData);
 
-      // Store tokens
-      localStorage.setItem("accessToken", response.accessToken);
-      localStorage.setItem("refreshToken", response.refreshToken);
-
-      // Navigate to dashboard
-      navigate("/dashboard");
+      // Navigate to login page
+      navigate("/login", { state: { message: "Registration successful! Please log in." } });
     } catch (err) {
       const errorMessage =
         err.response?.data?.error || err.message || "Registration failed";
@@ -99,22 +95,6 @@ const Register = () => {
     >
       <form className="auth-form" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="phone_num">Phone Number *</label>
-          <div className="input-wrapper">
-            <input
-              id="phone_num"
-              name="phone_num"
-              type="tel"
-              value={formData.phone_num}
-              onChange={handleChange}
-              placeholder="+919876543210"
-              required
-              disabled={loading}
-            />
-          </div>
-        </div>
-
-        <div className="form-group">
           <label htmlFor="full_name">Full Name *</label>
           <div className="input-wrapper">
             <input
@@ -124,6 +104,22 @@ const Register = () => {
               value={formData.full_name}
               onChange={handleChange}
               placeholder="As per your ID document"
+              required
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="phone_number">Phone Number *</label>
+          <div className="input-wrapper">
+            <input
+              id="phone_number"
+              name="phone_number"
+              type="tel"
+              value={formData.phone_number}
+              onChange={handleChange}
+              placeholder="Enter your phone number"
               required
               disabled={loading}
             />
