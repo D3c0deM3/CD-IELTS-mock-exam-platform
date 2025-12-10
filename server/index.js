@@ -1,18 +1,17 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-const usersRoute = require('./routes/users');
-const adminRoute = require('./routes/admin');
-const testsRoute = require('./routes/tests');
-const setupDatabase = require('./db/setup');
-require('dotenv').config();
+const usersRoute = require("./routes/users");
+const adminRoute = require("./routes/admin");
+const testsRoute = require("./routes/tests");
+require("dotenv").config();
 
 // Setup database on startup
 setupDatabase();
 
 app.use(express.json());
-app.use('/api/users', usersRoute);
-app.use('/api/admin', adminRoute);
-app.use('/api/tests', testsRoute);
+app.use("/api/users", usersRoute);
+app.use("/api/admin", adminRoute);
+app.use("/api/tests", testsRoute);
 
 const port = process.env.PORT || 4000;
 app.listen(port, () => {
