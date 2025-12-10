@@ -5,6 +5,9 @@ const adminRoute = require("./routes/admin");
 const testsRoute = require("./routes/tests");
 require("dotenv").config();
 
+// Setup database on startup
+setupDatabase();
+
 app.use(express.json());
 app.use("/api/users", usersRoute);
 app.use("/api/admin", adminRoute);
