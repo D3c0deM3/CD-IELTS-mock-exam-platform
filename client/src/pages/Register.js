@@ -16,6 +16,7 @@ const Register = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -59,7 +60,11 @@ const Register = () => {
     // Validate form
     const errors = validateForm();
     if (errors.length > 0) {
-      setError(errors[0]);
+      setError({
+        title: "Validation Error",
+        message: errors[0],
+        type: "validation",
+      });
       return;
     }
 
@@ -75,18 +80,91 @@ const Register = () => {
       };
 
       // Use service layer
-      await authService.register(registrationData);
+      const response = await authService.register(registrationData);
+      console.log("Registration response:", response);
+      console.log("Response keys:", Object.keys(response));
+      console.log("Token in response:", response.token);
+      console.log(
+        "Token after registration:",
+        localStorage.getItem("accessToken")
+      );
+      console.log("User after registration:", localStorage.getItem("user"));
 
-      // Navigate to login page
-      navigate("/login", { state: { message: "Registration successful! Please log in." } });
+      // Verify token was actually saved
+      const savedToken = localStorage.getItem("accessToken");
+      if (!savedToken) {
+        console.error("CRITICAL: Token was not saved to localStorage!");
+        setError({
+          title: "Login Error",
+          message: "Failed to save authentication token. Please try again.",
+          type: "error",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Show success animation
+      setShowSuccess(true);
+
+      // Redirect to dashboard after 2 seconds
+      setTimeout(() => {
+        console.log("Navigating to dashboard...");
+        console.log(
+          "Token before navigation:",
+          localStorage.getItem("accessToken")
+        );
+        navigate("/dashboard");
+      }, 2000);
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.error || err.message || "Registration failed";
-      setError(errorMessage);
+      // Handle different error types
+      console.error("Registration error:", err);
+      let errorData = {
+        title: "Registration Failed",
+        message: "An error occurred. Please try again.",
+        type: "error",
+      };
+
+      if (err.response?.status === 409) {
+        // Conflict - phone number already exists
+        errorData = {
+          title: "Account Already Exists",
+          message:
+            "An account with this phone number already exists. Please log in instead.",
+          type: "conflict",
+          action: "login",
+        };
+      } else if (err.response?.data?.error) {
+        errorData.message = err.response.data.error;
+      } else if (err.message) {
+        errorData.message = err.message;
+      }
+
+      setError(errorData);
     } finally {
       setLoading(false);
     }
   };
+
+  if (showSuccess) {
+    return (
+      <AuthLayout
+        title="Account Created Successfully!"
+        subtitle="Welcome to IELTS Mock Test platform"
+      >
+        <div className="success-container">
+          <div className="success-animation">
+            <div className="success-checkmark">✓</div>
+          </div>
+          <h2 className="success-title">Account Created!</h2>
+          <p className="success-message">
+            Your account has been successfully created. Redirecting you to
+            dashboard...
+          </p>
+          <div className="success-spinner"></div>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout
@@ -174,7 +252,25 @@ const Register = () => {
           </div>
         </div>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && (
+          <div className="error-message">
+            <div className="error-message-text">
+              <span className="error-message-title">{error.title}</span>
+              <span className="error-message-detail">{error.message}</span>
+              {error.action === "login" && (
+                <div style={{ marginTop: "8px" }}>
+                  <Link
+                    to="/login"
+                    className="auth-link"
+                    style={{ marginLeft: 0 }}
+                  >
+                    Go to Login →
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <button
           type="submit"

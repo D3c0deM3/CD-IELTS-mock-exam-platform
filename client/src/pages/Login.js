@@ -27,7 +27,11 @@ const Login = () => {
     e.preventDefault();
 
     if (!formData.phone_number.trim() || !formData.password) {
-      setError("Please enter your credentials");
+      setError({
+        title: "Missing Credentials",
+        message: "Please enter both phone number and password.",
+        type: "validation",
+      });
       return;
     }
 
@@ -47,9 +51,36 @@ const Login = () => {
         navigate("/dashboard");
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.error || err.message || "Login failed";
-      setError(errorMessage);
+      // Handle different error types
+      let errorData = {
+        title: "Login Failed",
+        message: "An error occurred. Please try again.",
+        type: "error",
+      };
+
+      console.error("Login error:", err); // Debug log
+
+      if (err.response?.status === 401) {
+        // Unauthorized - invalid credentials
+        errorData = {
+          title: "Invalid Credentials",
+          message: "Phone number or password is incorrect. Please try again.",
+          type: "auth",
+        };
+      } else if (err.response?.data?.error) {
+        errorData.message = err.response.data.error;
+      } else if (err.message && err.message !== "Network Error") {
+        errorData.message = err.message;
+      } else {
+        errorData = {
+          title: "Connection Error",
+          message:
+            "Unable to connect to the server. Please check your internet connection.",
+          type: "network",
+        };
+      }
+
+      setError(errorData);
     } finally {
       setLoading(false);
     }
@@ -101,7 +132,25 @@ const Login = () => {
           </div>
         </div>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && (
+          <div className="error-message">
+            <div className="error-message-text">
+              <span className="error-message-title">{error.title}</span>
+              <span className="error-message-detail">{error.message}</span>
+              {error.type === "auth" && (
+                <div style={{ marginTop: "8px", fontSize: "12px" }}>
+                  <Link
+                    to="/register"
+                    className="auth-link"
+                    style={{ marginLeft: 0 }}
+                  >
+                    Create an account instead →
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="form-options">
           <Link to="/forgot-password" className="forgot-link">

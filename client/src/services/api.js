@@ -29,11 +29,16 @@ apiClient.interceptors.response.use(
   (response) => response.data,
   async (error) => {
     // Handle 401 errors (token expired/invalid)
+    // Only redirect if user is authenticated and on a protected page
     if (error.response?.status === 401) {
-      // Clear storage and redirect to login
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+      const token = localStorage.getItem("accessToken");
+      // If user has a token, they were authenticated but it expired
+      // Clear storage and redirect to login (but not during login attempt)
+      if (token && !window.location.pathname.includes("/login")) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
     }
 
     return Promise.reject(error);
@@ -56,10 +61,21 @@ export const authService = {
   },
 
   register: async (userData) => {
+    console.log("Starting registration with data:", userData);
     const response = await apiClient.post(
       API_CONFIG.ENDPOINTS.AUTH.REGISTER,
       userData
     );
+    console.log("Register response from server:", response);
+    // Backend now returns { token, user: { role } } on successful registration
+    if (response.token) {
+      console.log("Token found in response, saving to localStorage");
+      localStorage.setItem("accessToken", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+      console.log("Token and user saved to localStorage");
+    } else {
+      console.log("WARNING: No token in response!");
+    }
     return response;
   },
 

@@ -39,6 +39,19 @@ router.post("/register", async (req, res) => {
   }
 
   try {
+    // Check if phone number already exists (prevents duplicate entry error)
+    const [existingUser] = await db.execute(
+      "SELECT id FROM users WHERE phone_number = ?",
+      [phone_number]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({
+        error:
+          "An account with this phone number already exists. Please log in instead.",
+      });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -47,9 +60,27 @@ router.post("/register", async (req, res) => {
       [full_name, phone_number, hashedPassword]
     );
 
+    const userId = result.insertId;
+
+    // Generate JWT token for auto-login after registration
+    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    // Create session for the new user
+    await db.execute(
+      "INSERT INTO user_sessions (user_id, token) VALUES (?, ?)",
+      [userId, token]
+    );
+
     res
       .status(201)
-      .json({ message: "User created successfully", userId: result.insertId });
+      .json({
+        message: "User created successfully",
+        userId,
+        token,
+        user: { role: "student" },
+      });
   } catch (err) {
     console.error("DB error:", err);
     res.status(500).json({ error: "Internal server error" });
