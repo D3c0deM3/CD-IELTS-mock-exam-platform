@@ -90,6 +90,30 @@ const setupDatabase = async () => {
       )
     `);
 
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS results (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        test_id INT NOT NULL,
+        reading_score DECIMAL(5, 2),
+        listening_score DECIMAL(5, 2),
+        writing_score DECIMAL(5, 2),
+        speaking_score DECIMAL(5, 2),
+        total_score DECIMAL(5, 2),
+        reading_completed BOOLEAN DEFAULT 0,
+        listening_completed BOOLEAN DEFAULT 0,
+        writing_completed BOOLEAN DEFAULT 0,
+        speaking_completed BOOLEAN DEFAULT 0,
+        is_writing_scored BOOLEAN DEFAULT 0,
+        is_speaking_scored BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_student_test (student_id, test_id)
+      )
+    `);
+
     console.log("Database tables created successfully.");
   } catch (err) {
     console.error("Error creating database tables:", err);

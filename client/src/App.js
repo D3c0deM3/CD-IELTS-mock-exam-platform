@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import StartScreen from "./pages/StartScreen";
 import Login from "./pages/Login";
@@ -10,6 +10,18 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
 function App() {
+  // Initialize theme from localStorage on app load
+  useEffect(() => {
+    const storedTheme = localStorage.getItem("ielts_mock_theme");
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
+    const theme = storedTheme || (prefersDark ? "dark" : "light");
+
+    // Apply theme to document root
+    document.documentElement.setAttribute("data-theme", theme);
+  }, []);
+
   return (
     <Router>
       <div className="App">
