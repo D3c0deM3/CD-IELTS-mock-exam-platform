@@ -1,13 +1,13 @@
 // Centralized API configuration
 const API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_URL || "http://localhost:5000",
+  BASE_URL: process.env.REACT_APP_API_URL || "http://localhost:4000",
   ENDPOINTS: {
     AUTH: {
-      LOGIN: "/api/auth/login",
-      REGISTER: "/api/auth/register",
-      LOGOUT: "/api/auth/logout",
-      REFRESH: "/api/auth/refresh",
-      ME: "/api/auth/me",
+      LOGIN: "/api/users/login",
+      REGISTER: "/api/users/register",
+      LOGOUT: "/api/users/logout",
+      REFRESH: "/api/users/refresh",
+      ME: "/api/users/me",
     },
     TESTS: {
       LIST: "/api/tests",

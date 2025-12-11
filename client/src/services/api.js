@@ -28,36 +28,12 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response.data,
   async (error) => {
-    const originalRequest = error.config;
-
-    // Handle 401 errors (token expired)
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!refreshToken) {
-          throw new Error("No refresh token available");
-        }
-
-        const response = await axios.post(
-          API_CONFIG.buildUrl(API_CONFIG.ENDPOINTS.AUTH.REFRESH),
-          { refreshToken }
-        );
-
-        const { accessToken } = response.data;
-        localStorage.setItem("accessToken", accessToken);
-
-        // Retry original request with new token
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        return axios(originalRequest);
-      } catch (refreshError) {
-        // Clear storage and redirect to login on refresh failure
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
-        return Promise.reject(refreshError);
-      }
+    // Handle 401 errors (token expired/invalid)
+    if (error.response?.status === 401) {
+      // Clear storage and redirect to login
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
     }
 
     return Promise.reject(error);
@@ -71,6 +47,11 @@ export const authService = {
       API_CONFIG.ENDPOINTS.AUTH.LOGIN,
       credentials
     );
+    // Backend returns { token, user: { role } }
+    if (response.token) {
+      localStorage.setItem("accessToken", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+    }
     return response;
   },
 
@@ -83,12 +64,8 @@ export const authService = {
   },
 
   logout: async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
-    if (refreshToken) {
-      await apiClient.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT, { refreshToken });
-    }
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
   },
 
   getCurrentUser: async () => {
