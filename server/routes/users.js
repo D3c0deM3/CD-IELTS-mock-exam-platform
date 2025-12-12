@@ -64,23 +64,22 @@ router.post("/register", async (req, res) => {
 
     // Generate JWT token for auto-login after registration
     const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
+      expiresIn: "24h",
     });
 
-    // Create session for the new user
+    // Create session for the new user with 24-hour expiration
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
     await db.execute(
-      "INSERT INTO user_sessions (user_id, token) VALUES (?, ?)",
-      [userId, token]
+      "INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+      [userId, token, expiresAt]
     );
 
-    res
-      .status(201)
-      .json({
-        message: "User created successfully",
-        userId,
-        token,
-        user: { role: "student" },
-      });
+    res.status(201).json({
+      message: "User created successfully",
+      userId,
+      token,
+      user: { role: "student" },
+    });
   } catch (err) {
     console.error("DB error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -112,12 +111,14 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
+      expiresIn: "24h",
     });
 
+    // Create session with 24-hour expiration
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
     await db.execute(
-      "INSERT INTO user_sessions (user_id, token) VALUES (?, ?)",
-      [user.id, token]
+      "INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+      [user.id, token, expiresAt]
     );
 
     res.json({ token, user: { role: user.role } });

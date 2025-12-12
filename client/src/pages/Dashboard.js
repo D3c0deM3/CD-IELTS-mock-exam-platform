@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
-import testService from "../services/testService";
+import dashboardService from "../services/dashboardService";
+import TestRegistrationModal from "../components/TestRegistrationModal";
+import Navbar from "../components/Navbar";
+import ThemeToggle from "../components/ThemeToggle";
 import { Link } from "react-router-dom";
-import {
-  FiCalendar,
-  FiClock,
-  FiChevronRight,
-  FiUser,
-  FiDownload,
-} from "react-icons/fi";
+import { FiCalendar, FiChevronRight, FiUser, FiDownload } from "react-icons/fi";
 import "./Dashboard.css";
 
 /* -------------------------
@@ -153,29 +150,36 @@ const Donut = ({ band }) => {
    Main Dashboard component
    ------------------------- */
 const Dashboard = () => {
+  const [profile, setProfile] = useState(null);
   const [tests, setTests] = useState([]);
   const [results, setResults] = useState([]); // raw backend objects
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [selectedTestForModal, setSelectedTestForModal] = useState(null);
+
+  // Admin contact info
+  const ADMIN_EMAIL = "https://t.me/cdimock_test";
+  const ADMIN_PHONE = "+99891581-77-11";
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       setLoading(true);
       try {
-        const [tR, rR, uR] = await Promise.allSettled([
-          testService.getAllTests?.() ?? Promise.resolve({ data: [] }),
-          testService.getUserResults?.() ?? Promise.resolve({ data: [] }),
-          testService.getUpcomingTests?.() ?? Promise.resolve({ data: [] }),
-        ]);
+        // Use the batch fetch from dashboard service for better performance
+        const dashboardData = await dashboardService.getDashboardData();
+
         if (!mounted) return;
-        setTests(tR.status === "fulfilled" ? tR.value.data : []);
-        setResults(rR.status === "fulfilled" ? rR.value.data : []);
-        setUpcoming(uR.status === "fulfilled" ? uR.value.data : []);
+
+        setProfile(dashboardData.profile);
+        setResults(dashboardData.results || []);
+        setTests(dashboardData.tests || []);
+        setUpcoming(dashboardData.stats?.recentResults || []);
       } catch (e) {
-        console.error(e);
+        console.error("Error loading dashboard data:", e);
         if (mounted) setError("Failed to load dashboard data.");
       } finally {
         if (mounted) setLoading(false);
@@ -188,28 +192,36 @@ const Dashboard = () => {
   // map backend raw -> normalized bands
   const normalized = (results || []).map((r) => {
     const listening =
-      r.listening_band != null
+      r.listening_score != null
+        ? toNearestHalf(Number(r.listening_score))
+        : r.listening_band != null
         ? toNearestHalf(Number(r.listening_band))
         : r.listening_raw != null
         ? rawToBandFromTable(r.listening_raw, listeningAcademicTable)
         : null;
 
     const reading =
-      r.reading_band != null
+      r.reading_score != null
+        ? toNearestHalf(Number(r.reading_score))
+        : r.reading_band != null
         ? toNearestHalf(Number(r.reading_band))
         : r.reading_raw != null
         ? rawToBandFromTable(r.reading_raw, readingAcademicTable)
         : null;
 
     const writing =
-      r.writing_band != null
+      r.writing_score != null
+        ? toNearestHalf(Number(r.writing_score))
+        : r.writing_band != null
         ? toNearestHalf(Number(r.writing_band))
         : r.writing_raw != null
         ? normalizeWritingOrSpeaking(r.writing_raw)
         : normalizeWritingOrSpeaking(r.writing);
 
     const speaking =
-      r.speaking_band != null
+      r.speaking_score != null
+        ? toNearestHalf(Number(r.speaking_score))
+        : r.speaking_band != null
         ? toNearestHalf(Number(r.speaking_band))
         : r.speaking_raw != null
         ? normalizeWritingOrSpeaking(r.speaking_raw)
@@ -224,6 +236,13 @@ const Dashboard = () => {
   });
 
   const latest = normalized.length ? normalized[0] : null;
+
+  // Filter out expired tests
+  const availableTests = (tests || []).filter((t) => {
+    if (!t.expiration_date) return true; // Show tests with no expiration
+    const expirationDate = new Date(t.expiration_date);
+    return expirationDate > new Date(); // Only show if expiration is in the future
+  });
 
   const formatDT = (iso) => {
     if (!iso) return "—";
@@ -260,280 +279,309 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="bc-db">
-      <div className="bc-container">
-        {/* breadcrumb header */}
-        <div className="page-head">
-          <div className="page-title">
-            <h2>Dashboard</h2>
-            <div className="breadcrumb">
-              <span className="crumb">Home</span>
-              <FiChevronRight className="crumb-sep" />
-              <span className="crumb current">Dashboard</span>
+    <div className="dashboard-wrapper">
+      <Navbar />
+      <ThemeToggle />
+      <div className="bc-db">
+        <div className="bc-container">
+          {/* breadcrumb header */}
+          <div className="page-head">
+            <div className="page-title">
+              <h2>Dashboard</h2>
+              <div className="breadcrumb">
+                <span className="crumb">Home</span>
+                <FiChevronRight className="crumb-sep" />
+                <span className="crumb current">Dashboard</span>
+              </div>
+            </div>
+
+            <div className="page-actions">
+              <Link to="/account" className="action-ghost">
+                <FiUser />
+                <span>{profile?.full_name || "Account"}</span>
+              </Link>
             </div>
           </div>
 
-          <div className="page-actions">
-            <Link to="/account" className="action-ghost">
-              <FiUser />
-              <span>Account</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Main layout: large top-left performance + right column */}
-        <div className="bc-grid">
-          <main className="left-col">
-            {/* Latest Performance card */}
-            <section
-              className="card report-card"
-              aria-labelledby="latestPerformance"
-            >
-              <div className="card-head">
-                <div>
-                  <h3 id="latestPerformance">Latest Performance</h3>
-                  <p className="muted">
-                    Official-style report card — component bands & overall
-                  </p>
-                </div>
-                <div className="report-actions">
-                  <button className="btn-export" title="Download PDF (client)">
-                    <FiDownload /> Export
-                  </button>
-                </div>
-              </div>
-
-              <div className="report-body">
-                <div className="report-left">
-                  <div className="report-meta">
-                    <div className="report-meta-row">
-                      <div className="meta-label">Test</div>
-                      <div className="meta-value">
-                        {latest?.test_name ?? "—"}
-                      </div>
-                    </div>
-                    <div className="report-meta-row">
-                      <div className="meta-label">Date</div>
-                      <div className="meta-value">
-                        {latest ? formatDT(latest.taken_at) : "—"}
-                      </div>
-                    </div>
-                    <div className="report-meta-row">
-                      <div className="meta-label">Centre</div>
-                      <div className="meta-value">
-                        {latest?.center ?? "Online"}
-                      </div>
-                    </div>
+          {/* Main layout: large top-left performance + right column */}
+          <div className="bc-grid">
+            <main className="left-col">
+              {/* Latest Performance card */}
+              <section
+                className="card report-card"
+                aria-labelledby="latestPerformance"
+              >
+                <div className="card-head">
+                  <div>
+                    <h3 id="latestPerformance">Latest Performance</h3>
+                    <p className="muted">
+                      Official-style report card — component bands & overall
+                    </p>
                   </div>
-
-                  <div className="score-tiles">
-                    {/* official rectangular score tiles */}
-                    {["listening", "reading", "writing", "speaking"].map(
-                      (k) => {
-                        const val = latest?._norm?.[k] ?? "—";
-                        return (
-                          <div className="tile" key={k}>
-                            <div className="tile-title">
-                              {k.charAt(0).toUpperCase() + k.slice(1)}
-                            </div>
-                            <div className="tile-score">{val}</div>
-                          </div>
-                        );
-                      }
-                    )}
-                  </div>
-
-                  <div className="report-legend">
-                    <div className="legend-note">
-                      Overall is the average of the four component bands,
-                      rounded to the nearest 0.5.
-                    </div>
+                  <div className="report-actions">
+                    <button
+                      className="btn-export"
+                      title="Download PDF (client)"
+                    >
+                      <FiDownload /> Export
+                    </button>
                   </div>
                 </div>
 
-                <div className="report-right">
-                  <Donut band={latest?._norm?.overall} />
-                </div>
-              </div>
-            </section>
-
-            {/* Available Tests */}
-            <section className="card small-card">
-              <div className="card-head">
-                <h4>Available Mock Tests</h4>
-                <p className="muted">Practice anytime — timed mocks</p>
-              </div>
-
-              <ul className="compact-list">
-                {tests && tests.length > 0 ? (
-                  tests.map((t) => (
-                    <li key={t.id}>
-                      <div className="compact-left">
-                        <div className="compact-name">{t.name}</div>
-                        <div className="muted small">{t.description}</div>
-                      </div>
-                      <div className="compact-right">
-                        <Link to={`/tests/${t.id}`} className="btn small">
-                          Start
-                        </Link>
-                      </div>
-                    </li>
-                  ))
-                ) : (
-                  <li className="empty">No available tests</li>
-                )}
-              </ul>
-            </section>
-
-            {/* Results History (expanded list) */}
-            <section
-              className="card history-panel"
-              aria-labelledby="historyPanel"
-            >
-              <div className="card-head">
-                <h4 id="historyPanel">Results History</h4>
-                <p className="muted">
-                  All past mocks with quick access to detailed reports
-                </p>
-              </div>
-
-              {normalized && normalized.length > 0 ? (
-                <ol className="history-ol">
-                  {normalized.map((r) => (
-                    <li key={r.id} className="history-row">
-                      <div className="history-main">
-                        <div>
-                          <div className="history-name">
-                            {r.test_name ?? "Mock Test"}
-                          </div>
-                          <div className="muted small">
-                            {formatDT(r.taken_at)}
-                          </div>
+                <div className="report-body">
+                  <div className="report-left">
+                    <div className="report-meta">
+                      <div className="report-meta-row">
+                        <div className="meta-label">Test</div>
+                        <div className="meta-value">
+                          {latest?.test_name ?? "—"}
                         </div>
+                      </div>
+                      <div className="report-meta-row">
+                        <div className="meta-label">Date</div>
+                        <div className="meta-value">
+                          {latest
+                            ? formatDT(latest.created_at || latest.taken_at)
+                            : "—"}
+                        </div>
+                      </div>
+                      <div className="report-meta-row">
+                        <div className="meta-label">Centre</div>
+                        <div className="meta-value">
+                          {latest?.center ?? "Online"}
+                        </div>
+                      </div>
+                    </div>
 
-                        <div className="history-right">
-                          <div className="history-overall">
-                            {r._norm?.overall ?? "–"}
-                          </div>
+                    <div className="score-tiles">
+                      {/* official rectangular score tiles */}
+                      {["listening", "reading", "writing", "speaking"].map(
+                        (k) => {
+                          const val = latest?._norm?.[k] ?? "—";
+                          return (
+                            <div className="tile" key={k}>
+                              <div className="tile-title">
+                                {k.charAt(0).toUpperCase() + k.slice(1)}
+                              </div>
+                              <div className="tile-score">{val}</div>
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
+
+                    <div className="report-legend">
+                      <div className="legend-note">
+                        Overall is the average of the four component bands,
+                        rounded to the nearest 0.5.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="report-right">
+                    <Donut band={latest?._norm?.overall} />
+                  </div>
+                </div>
+              </section>
+
+              {/* Available Tests */}
+              <section className="card small-card">
+                <div className="card-head">
+                  <h4>Available Mock Tests</h4>
+                  <p className="muted">Register for scheduled sessions</p>
+                </div>
+
+                <ul className="compact-list">
+                  {availableTests && availableTests.length > 0 ? (
+                    availableTests.map((t) => (
+                      <li key={t.id}>
+                        <div className="compact-left">
+                          <div className="compact-name">{t.name}</div>
+                          <div className="muted small">{t.description}</div>
+                          {t.expiration_date && (
+                            <div className="test-expiration">
+                              <small>
+                                Expires: {formatDT(t.expiration_date)}
+                              </small>
+                            </div>
+                          )}
+                        </div>
+                        <div className="compact-right">
                           <button
-                            className="link small"
-                            onClick={() =>
-                              setExpandedId((p) => (p === r.id ? null : r.id))
-                            }
-                            aria-expanded={expandedId === r.id}
+                            className="btn small"
+                            onClick={() => {
+                              setSelectedTestForModal(t);
+                              setShowRegistrationModal(true);
+                            }}
                           >
-                            {expandedId === r.id ? "Hide details" : "Details"}
+                            Register
                           </button>
                         </div>
-                      </div>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="empty">No available tests</li>
+                  )}
+                </ul>
+              </section>
 
-                      {expandedId === r.id && (
-                        <div className="history-details">
-                          <div className="detail-grid">
-                            {[
-                              "listening",
-                              "reading",
-                              "writing",
-                              "speaking",
-                            ].map((k) => (
-                              <div className="detail" key={k}>
-                                <div className="detail-head">
-                                  {k.charAt(0).toUpperCase() + k.slice(1)}
-                                </div>
-                                <div className="detail-val">
-                                  {r._norm?.[k] ?? "–"}
-                                </div>
-                              </div>
-                            ))}
+              {/* Test Registration Modal */}
+              <TestRegistrationModal
+                isOpen={showRegistrationModal}
+                onClose={() => setShowRegistrationModal(false)}
+                testName={selectedTestForModal?.name || ""}
+                adminEmail={ADMIN_EMAIL}
+                adminPhone={ADMIN_PHONE}
+              />
+
+              {/* Results History (expanded list) */}
+              <section
+                className="card history-panel"
+                aria-labelledby="historyPanel"
+              >
+                <div className="card-head">
+                  <h4 id="historyPanel">Results History</h4>
+                  <p className="muted">
+                    All past mocks with quick access to detailed reports
+                  </p>
+                </div>
+
+                {normalized && normalized.length > 0 ? (
+                  <ol className="history-ol">
+                    {normalized.map((r) => (
+                      <li key={r.id} className="history-row">
+                        <div className="history-main">
+                          <div>
+                            <div className="history-name">
+                              {r.test_name ?? "Mock Test"}
+                            </div>
+                            <div className="muted small">
+                              {formatDT(r.created_at || r.taken_at)}
+                            </div>
                           </div>
 
-                          <div className="detail-actions">
-                            <Link to={`/results/${r.id}`} className="btn small">
-                              View full report
-                            </Link>
+                          <div className="history-right">
+                            <div className="history-overall">
+                              {r._norm?.overall ?? "–"}
+                            </div>
+                            <button
+                              className="link small"
+                              onClick={() =>
+                                setExpandedId((p) => (p === r.id ? null : r.id))
+                              }
+                              aria-expanded={expandedId === r.id}
+                            >
+                              {expandedId === r.id ? "Hide details" : "Details"}
+                            </button>
                           </div>
                         </div>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <div className="empty">You have no past results yet.</div>
-              )}
-            </section>
-          </main>
 
-          {/* Right column: upcoming tests & quick summary */}
-          <aside className="right-col">
-            <div className="card upcoming-card" aria-labelledby="upcoming">
-              <div className="card-head">
-                <h4 id="upcoming">Upcoming Tests</h4>
-                <p className="muted">Your next scheduled mocks & bookings</p>
-              </div>
+                        {expandedId === r.id && (
+                          <div className="history-details">
+                            <div className="detail-grid">
+                              {[
+                                "listening",
+                                "reading",
+                                "writing",
+                                "speaking",
+                              ].map((k) => (
+                                <div className="detail" key={k}>
+                                  <div className="detail-head">
+                                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                                  </div>
+                                  <div className="detail-val">
+                                    {r._norm?.[k] ?? "–"}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
 
-              <ul className="upcoming-list">
-                {upcoming && upcoming.length > 0 ? (
-                  upcoming.map((u) => (
-                    <li key={u.id} className="upcoming-row">
-                      <div className="up-left">
-                        <div className="up-title">{u.name ?? "Mock Test"}</div>
-                        <div className="muted small">
-                          <FiCalendar /> {formatDT(u.start_at)}
-                        </div>
-                      </div>
-
-                      <div className="up-right">
-                        <div
-                          className={`status ${u.booked ? "booked" : "open"}`}
-                        >
-                          {u.booked ? "Booked" : "Open"}
-                        </div>
-                        <Link to={`/tests/${u.id}`} className="link small">
-                          Details
-                        </Link>
-                      </div>
-                    </li>
-                  ))
+                            <div className="detail-actions">
+                              <Link
+                                to={`/results/${r.id}`}
+                                className="btn small"
+                              >
+                                View full report
+                              </Link>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
                 ) : (
-                  <li className="empty">No upcoming tests</li>
+                  <div className="empty">You have no past results yet.</div>
                 )}
-              </ul>
-            </div>
+              </section>
+            </main>
 
-            {/* Quick progress snapshot */}
-            <div className="card snapshot">
-              <div className="snap-head">
-                <h4>My Progress</h4>
-                <p className="muted small">Quick glance at overall band</p>
-              </div>
-
-              <div className="snap-body">
-                <div className="snap-donut">
-                  <Donut band={latest?._norm?.overall} />
+            {/* Right column: upcoming tests & quick summary */}
+            <aside className="right-col">
+              <div className="card upcoming-card" aria-labelledby="upcoming">
+                <div className="card-head">
+                  <h4 id="upcoming">Upcoming Tests</h4>
+                  <p className="muted">Your next scheduled mocks & bookings</p>
                 </div>
 
-                <div className="snap-text">
-                  <div className="snap-number">
-                    {latest?._norm?.overall ?? "–"}
+                <ul className="upcoming-list">
+                  {upcoming && upcoming.length > 0 ? (
+                    upcoming.map((u) => (
+                      <li key={u.id} className="upcoming-row">
+                        <div className="up-left">
+                          <div className="up-title">
+                            {u.name ?? "Mock Test"}
+                          </div>
+                          <div className="muted small">
+                            <FiCalendar /> {formatDT(u.start_at)}
+                          </div>
+                        </div>
+
+                        <div className="up-right">
+                          <div
+                            className={`status ${u.booked ? "booked" : "open"}`}
+                          >
+                            {u.booked ? "Booked" : "Open"}
+                          </div>
+                          <Link to={`/tests/${u.id}`} className="link small">
+                            Details
+                          </Link>
+                        </div>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="empty">No upcoming tests</li>
+                  )}
+                </ul>
+              </div>
+
+              {/* Quick progress snapshot */}
+              <div className="card snapshot">
+                <div className="snap-head">
+                  <h4>My Progress</h4>
+                  <p className="muted small">Quick glance at overall band</p>
+                </div>
+
+                <div className="snap-body">
+                  <div className="snap-donut">
+                    <Donut band={latest?._norm?.overall} />
                   </div>
-                  <div className="muted small">Latest overall band</div>
+                </div>
+
+                <div className="card-footer">
+                  <Link to="/progress" className="link small">
+                    Full progress report
+                  </Link>
                 </div>
               </div>
+            </aside>
+          </div>
 
-              <div className="card-footer">
-                <Link to="/progress" className="link small">
-                  Full progress report
-                </Link>
-              </div>
-            </div>
-          </aside>
-        </div>
-
-        {/* Footer note */}
-        <div className="legal-note">
-          Results shown are mock conversions using Cambridge-like thresholds for
-          Listening & Reading. Writing & Speaking are treated as bands where
-          provided.
+          {/* Footer note */}
+          <div className="legal-note">
+            Results shown are mock conversions using Cambridge-like thresholds
+            for Listening & Reading. Writing & Speaking are treated as bands
+            where provided.
+          </div>
         </div>
       </div>
     </div>

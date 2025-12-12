@@ -4,6 +4,8 @@ const app = express();
 const usersRoute = require("./routes/users");
 const adminRoute = require("./routes/admin");
 const testsRoute = require("./routes/tests");
+const dashboardRoute = require("./routes/dashboard");
+const testSessionsRoute = require("./routes/testSessions");
 require("dotenv").config();
 
 const setupDatabase = require("./db/setup");
@@ -24,6 +26,8 @@ async function start() {
     app.use("/api/users", usersRoute);
     app.use("/api/admin", adminRoute);
     app.use("/api/tests", testsRoute);
+    app.use("/api/dashboard", dashboardRoute);
+    app.use("/api/test-sessions", testSessionsRoute);
 
     const port = process.env.PORT || 4000;
     app.listen(port, () => {

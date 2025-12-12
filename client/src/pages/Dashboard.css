@@ -27,12 +27,31 @@ html[data-theme="dark"] {
   --soft-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
+/* Smooth appear animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Page container */
+.dashboard-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 .bc-db {
   background: var(--bg);
-  min-height: 100vh;
+  flex: 1;
   color: var(--text);
-  padding: 28px 18px;
+  padding: 100px 18px 28px 18px;
+  animation: fadeInUp 0.7s ease-out 0.1s backwards;
 }
 
 .bc-container {
@@ -195,12 +214,12 @@ html[data-theme="dark"] {
 }
 
 .tile {
-  background: linear-gradient(180deg, #ffffff, #fbfdff);
-  border: 1px solid #eef6ff;
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  border: 1px solid #1e40af;
   padding: 10px;
   border-radius: 8px;
   text-align: center;
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
 }
 
 html[data-theme="dark"] .tile {
@@ -211,12 +230,22 @@ html[data-theme="dark"] .tile {
 
 .tile-title {
   font-size: 13px;
-  color: var(--muted);
+  color: #ffffff;
   margin-bottom: 6px;
 }
+
+html[data-theme="dark"] .tile-title {
+  color: var(--muted);
+}
+
 .tile-score {
   font-size: 18px;
   font-weight: 800;
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .tile-score {
+  color: inherit;
 }
 
 /* donut */
@@ -289,6 +318,15 @@ html[data-theme="dark"] .compact-list li:hover {
 
 .compact-name {
   font-weight: 700;
+}
+
+.test-expiration {
+  margin-top: 4px;
+  color: #dc2626;
+}
+
+html[data-theme="dark"] .test-expiration {
+  color: #f87171;
 }
 
 /* history */

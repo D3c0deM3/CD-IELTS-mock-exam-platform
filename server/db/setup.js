@@ -114,6 +114,37 @@ const setupDatabase = async () => {
       )
     `);
 
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_sessions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        test_id INT NOT NULL,
+        session_date DATETIME NOT NULL,
+        location VARCHAR(255) NOT NULL,
+        max_capacity INT,
+        status ENUM('scheduled', 'ongoing', 'completed', 'cancelled') DEFAULT 'scheduled',
+        admin_notes TEXT,
+        created_by INT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+      )
+    `);
+
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_registrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        session_id INT NOT NULL,
+        registration_status ENUM('registered', 'attended', 'absent', 'cancelled') DEFAULT 'registered',
+        registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (session_id) REFERENCES test_sessions(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_student_session (student_id, session_id)
+      )
+    `);
+
     console.log("Database tables created successfully.");
   } catch (err) {
     console.error("Error creating database tables:", err);
