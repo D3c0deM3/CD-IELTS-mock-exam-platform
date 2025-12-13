@@ -145,6 +145,26 @@ const setupDatabase = async () => {
       )
     `);
 
+    // Table for test participants with assigned IDs and speaking/listening scores
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_participants (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        session_id INT NOT NULL,
+        participant_id_code VARCHAR(50) NOT NULL UNIQUE,
+        full_name VARCHAR(255) NOT NULL,
+        phone_number VARCHAR(255),
+        listening_score DECIMAL(5, 2),
+        speaking_score DECIMAL(5, 2),
+        has_entered_startscreen BOOLEAN DEFAULT 0,
+        entered_at DATETIME,
+        test_started BOOLEAN DEFAULT 0,
+        test_started_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES test_sessions(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log("Database tables created successfully.");
   } catch (err) {
     console.error("Error creating database tables:", err);

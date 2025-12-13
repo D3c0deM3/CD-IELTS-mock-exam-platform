@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import StartScreen from "./pages/StartScreen";
+import PendingScreen from "./pages/PendingScreen";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -27,6 +28,7 @@ function App() {
       <div className="App">
         <Routes>
           <Route path="/" element={<StartScreen />} />
+          <Route path="/pending" element={<PendingScreen />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route

@@ -8,21 +8,27 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const isLoggedIn = localStorage.getItem("accessToken");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isAdmin = user?.role === "admin";
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const handleCheckResults = () => {
+  const handleDashboard = () => {
     if (isLoggedIn) {
-      navigate("/dashboard");
+      const route = isAdmin ? "/admin/dashboard" : "/dashboard";
+      navigate(route);
     } else {
       navigate("/login");
     }
     setIsMenuOpen(false);
   };
 
-  const getCheckResultsClass = () => {
+  const getDashboardClass = () => {
+    if (isAdmin) {
+      return location.pathname === "/admin/dashboard" ? "active" : "";
+    }
     return location.pathname === "/dashboard" ? "active" : "";
   };
 
@@ -89,8 +95,8 @@ const Navbar = () => {
             </Link>
 
             <button
-              className={`nav-link ${getCheckResultsClass()}`}
-              onClick={handleCheckResults}
+              className={`nav-link ${getDashboardClass()}`}
+              onClick={handleDashboard}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -118,7 +124,7 @@ const Navbar = () => {
                   strokeLinecap="round"
                 />
               </svg>
-              <span>Check Results</span>
+              <span>Dashboard</span>
             </button>
           </div>
         </div>

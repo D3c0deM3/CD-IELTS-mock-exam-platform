@@ -143,11 +143,9 @@ router.post("/create", authMiddleware, async (req, res) => {
   }
 
   if (!test_id || !session_date || !location) {
-    return res
-      .status(400)
-      .json({
-        error: "Missing required fields: test_id, session_date, location",
-      });
+    return res.status(400).json({
+      error: "Missing required fields: test_id, session_date, location",
+    });
   }
 
   try {
@@ -192,11 +190,9 @@ router.patch("/:id/status", authMiddleware, async (req, res) => {
 
   const validStatuses = ["scheduled", "ongoing", "completed", "cancelled"];
   if (!validStatuses.includes(status)) {
-    return res
-      .status(400)
-      .json({
-        error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-      });
+    return res.status(400).json({
+      error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+    });
   }
 
   try {
@@ -246,6 +242,94 @@ router.get("/:id", authMiddleware, async (req, res) => {
     res.json({ session: sessions[0] });
   } catch (err) {
     console.error("Error fetching test session:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /api/test-sessions/check-in-participant
+ * Participant enters their ID code on the start screen
+ */
+router.post("/check-in-participant", async (req, res) => {
+  const { participant_id_code } = req.body;
+
+  if (!participant_id_code) {
+    return res.status(400).json({ error: "participant_id_code is required" });
+  }
+
+  try {
+    // Find participant and update their check-in status
+    const [participantRows] = await db.execute(
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.speaking_score, ts.test_id, t.name as test_name
+       FROM test_participants tp
+       JOIN test_sessions ts ON tp.session_id = ts.id
+       JOIN tests t ON ts.test_id = t.id
+       WHERE tp.participant_id_code = ?`,
+      [participant_id_code]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant ID code not found" });
+    }
+
+    const participant = participantRows[0];
+
+    // Update check-in status
+    await db.execute(
+      "UPDATE test_participants SET has_entered_startscreen = 1, entered_at = NOW() WHERE id = ?",
+      [participant.id]
+    );
+
+    res.json({
+      message: "Check-in successful",
+      participant: {
+        id: participant.id,
+        participant_id_code: participant.participant_id_code,
+        full_name: participant.full_name,
+        session_id: participant.session_id,
+        test_id: participant.test_id,
+        test_name: participant.test_name,
+        listening_score: participant.listening_score,
+        speaking_score: participant.speaking_score,
+      },
+    });
+  } catch (err) {
+    console.error("Check-in error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/test-sessions/participant/:id_code/can-start
+ * Check if participant can start the test
+ */
+router.get("/participant/:id_code/can-start", async (req, res) => {
+  const { id_code } = req.params;
+
+  try {
+    const [participantRows] = await db.execute(
+      `SELECT tp.id, tp.test_started, tp.listening_score, tp.speaking_score, tp.session_id
+       FROM test_participants tp
+       WHERE tp.participant_id_code = ?`,
+      [id_code]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = participantRows[0];
+
+    res.json({
+      can_start:
+        participant.test_started === 1 || participant.test_started === true,
+      listening_score: participant.listening_score,
+      speaking_score: participant.speaking_score,
+      test_started:
+        participant.test_started === 1 || participant.test_started === true,
+    });
+  } catch (err) {
+    console.error("Error checking start status:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

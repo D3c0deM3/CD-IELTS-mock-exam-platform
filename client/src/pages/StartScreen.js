@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import ThemeToggle from "../components/ThemeToggle";
+import testSessionService from "../services/testSessionService";
 import "./StartScreen.css";
 
 function StartScreen() {
@@ -27,43 +28,34 @@ function StartScreen() {
       return;
     }
 
-    // Validate ID format (example: AD12345678)
-    const idPattern = /^AD\d{7}$/;
-    if (!idPattern.test(idCode.trim().toUpperCase())) {
-      setError("Please enter a valid ID format (e.g., AD1234567)");
-      return;
-    }
-
     setIsLoading(true);
     setError("");
 
-    // Simulate API call
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      // Call backend to validate and check-in participant
+      await testSessionService.checkInParticipant(idCode.trim());
 
       // Store ID in localStorage
-      localStorage.setItem("ielts_mock_user_id", idCode.trim().toUpperCase());
+      localStorage.setItem("ielts_mock_user_id", idCode.trim());
       localStorage.setItem("ielts_mock_start_time", new Date().toISOString());
 
-      // Check if user is logged in
-      const isLoggedIn = localStorage.getItem("accessToken");
-      if (isLoggedIn) {
-        navigate("/dashboard");
-      } else {
-        navigate("/login", { state: { idCode: idCode.trim().toUpperCase() } });
-      }
+      // Redirect to pending screen where rules and test start is controlled by admin
+      navigate("/pending", { state: { idCode: idCode.trim() } });
 
-      console.log("IELTS Mock Test started for:", idCode.trim().toUpperCase());
+      console.log("Participant checked in:", idCode.trim());
     } catch (err) {
-      setError("Failed to start test. Please try again.");
-      console.error("Start error:", err);
+      // Display backend error message
+      const errorMessage =
+        err.response?.data?.error || "Failed to check in. Please try again.";
+      setError(errorMessage);
+      console.error("Check-in error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleInputChange = (e) => {
-    const value = e.target.value.toUpperCase();
+    const value = e.target.value;
     setIdCode(value);
     if (error) setError("");
   };
@@ -119,7 +111,9 @@ function StartScreen() {
               <div className="input-group">
                 <label htmlFor="idCode">
                   Candidate ID
-                  <span className="label-hint">(e.g., AD1234567)</span>
+                  <span className="label-hint">
+                    (as provided by the test center)
+                  </span>
                 </label>
 
                 <div
@@ -157,8 +151,7 @@ function StartScreen() {
                     onChange={handleInputChange}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder="AD1234567"
-                    maxLength="9"
+                    placeholder="Enter your candidate ID"
                     autoComplete="off"
                     disabled={isLoading}
                   />

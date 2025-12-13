@@ -128,4 +128,88 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// POST /api/users/make-admin - Make a user an admin (by phone number)
+router.post("/make-admin", async (req, res) => {
+  const { phone_number } = req.body;
+
+  if (!phone_number) {
+    return res.status(400).json({ error: "phone_number is required" });
+  }
+
+  try {
+    const [result] = await db.execute(
+      "UPDATE users SET role = 'admin' WHERE phone_number = ?",
+      [phone_number]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: `User with phone number ${phone_number} is now an admin`,
+      phone_number,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/users/create-admin - Create a new admin user
+router.post("/create-admin", async (req, res) => {
+  const { full_name, phone_number, password } = req.body;
+
+  if (!full_name || !phone_number || !password) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    // Check if phone number already exists
+    const [existingUser] = await db.execute(
+      "SELECT id FROM users WHERE phone_number = ?",
+      [phone_number]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({
+        error:
+          "An account with this phone number already exists. Use /make-admin to promote it.",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const [result] = await db.execute(
+      "INSERT INTO users (full_name, phone_number, password, role) VALUES (?, ?, ?, 'admin')",
+      [full_name, phone_number, hashedPassword]
+    );
+
+    const userId = result.insertId;
+
+    // Generate JWT token
+    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+      expiresIn: "24h",
+    });
+
+    // Create session with 24-hour expiration
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.execute(
+      "INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+      [userId, token, expiresAt]
+    );
+
+    res.status(201).json({
+      message: "Admin user created successfully",
+      userId,
+      token,
+      user: { role: "admin", full_name, phone_number },
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;
