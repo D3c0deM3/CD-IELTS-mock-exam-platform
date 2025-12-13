@@ -1,6 +1,7 @@
 /* Admin Dashboard Styling */
 :root {
   --bg: #f4f7fb;
+  --bg-secondary: #e8eef8;
   --paper: #ffffff;
   --muted: #6b7280;
   --text: #0b1220;
@@ -8,18 +9,25 @@
   --accent-2: #7c3aed;
   --border: #e6eef8;
   --soft-shadow: 0 6px 20px rgba(11, 18, 32, 0.06);
+  --error: #dc2626;
+  --success: #16a34a;
+  --info: #0ea5e9;
   --radius: 12px;
   --gap: 20px;
 }
 
 html[data-theme="dark"] {
   --bg: #0f172a;
+  --bg-secondary: #1e293b;
   --paper: #1e293b;
   --muted: #94a3b8;
   --text: #f1f5f9;
   --accent: #3b82f6;
   --accent-2: #8b5cf6;
   --border: #334155;
+  --error: #ef4444;
+  --success: #22c55e;
+  --info: #06b6d4;
   --soft-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
@@ -171,6 +179,24 @@ html[data-theme="dark"] {
 
 .btn-success:hover {
   background: #059669;
+}
+
+.btn-warning {
+  background: #f97316;
+  color: white;
+}
+
+.btn-warning:hover {
+  background: #ea580c;
+}
+
+.btn-info {
+  background: #0ea5e9;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #0284c7;
 }
 
 .btn-small {
@@ -443,6 +469,14 @@ html[data-theme="dark"] .session-item.active {
   background: #f59e0b;
 }
 
+.status-dot.paused {
+  background: #f97316;
+}
+
+.status-dot.completed {
+  background: #8b5cf6;
+}
+
 .status-dot.inactive {
   background: #6b7280;
 }
@@ -489,4 +523,34 @@ html[data-theme="dark"] .session-item.active {
   .tab-navigation {
     justify-content: flex-start;
   }
+}
+
+/* Smooth Timer Animation */
+@keyframes timerPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes timerFlash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Timer Card Styles */
+.card[style*="borderLeft: 4px solid var(--error)"] {
+  animation: timerFlash 1s ease-in-out infinite;
+}
+
+.card p[style*="fontSize: 28px"] {
+  animation: timerPulse 1s ease-in-out infinite;
 }

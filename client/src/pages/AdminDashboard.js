@@ -19,6 +19,14 @@ const AdminDashboard = () => {
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [showIncompleteScoresModal, setShowIncompleteScoresModal] =
+    useState(false);
+  const [incompleteScoresData, setIncompleteScoresData] = useState([]);
+  const [showDeleteSessionModal, setShowDeleteSessionModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [timerActive, setTimerActive] = useState(false);
 
   // Form states
   const [testForm, setTestForm] = useState({ name: "", description: "" });
@@ -29,9 +37,12 @@ const AdminDashboard = () => {
     max_capacity: "",
     admin_notes: "",
   });
-  const [participantsForm, setParticipantsForm] = useState("");
+  const [participantsForm, setParticipantsForm] = useState({
+    full_name: "",
+    phone_number: "",
+  });
   const [scoresForm, setScoresForm] = useState({
-    listening_score: "",
+    writing_score: "",
     speaking_score: "",
   });
 
@@ -58,6 +69,65 @@ const AdminDashboard = () => {
       return () => clearInterval(interval);
     }
   }, [selectedSession, activeTab]);
+
+  // Smooth timer countdown
+  useEffect(() => {
+    if (!dashboardStats?.session.test_started_at || !timerActive) {
+      setTimeRemaining(null);
+      return;
+    }
+
+    // Check if test has ended
+    if (dashboardStats.session.test_end_at) {
+      const endTime = new Date(dashboardStats.session.test_end_at).getTime();
+      const now = Date.now();
+
+      if (now >= endTime) {
+        setTimeRemaining(0);
+        setTimerActive(false);
+        return;
+      }
+    }
+
+    // Update timer every 100ms for smooth animation
+    const timer = setInterval(() => {
+      const endTime = new Date(dashboardStats.session.test_end_at).getTime();
+      const now = Date.now();
+      const msRemaining = endTime - now;
+
+      if (msRemaining <= 0) {
+        setTimeRemaining(0);
+        setTimerActive(false);
+      } else {
+        setTimeRemaining(Math.ceil(msRemaining / 1000));
+      }
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, [
+    dashboardStats?.session.test_started_at,
+    dashboardStats?.session.test_end_at,
+    timerActive,
+  ]);
+
+  // Start timer when test begins
+  useEffect(() => {
+    if (dashboardStats?.session.test_started_at && !timerActive) {
+      setTimerActive(true);
+    }
+  }, [dashboardStats?.session.test_started_at, timerActive]);
+
+  // Stop timer when test ends (end all tests)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (
+      dashboardStats?.stats.test_completed === dashboardStats?.stats.total &&
+      dashboardStats?.stats.total > 0
+    ) {
+      setTimerActive(false);
+      setTimeRemaining(null);
+    }
+  }, [dashboardStats?.stats]);
 
   const fetchSessions = async () => {
     try {
@@ -162,34 +232,80 @@ const AdminDashboard = () => {
     }
   };
 
-  // Register Participants
-  const handleRegisterParticipants = async (e) => {
-    e.preventDefault();
-    if (!participantsForm.trim()) {
-      setError("Please enter participant names (one per line)");
+  // Delete Session
+  const handleDeleteSession = async () => {
+    if (deleteConfirmationText.trim() !== "Yes delete this session") {
+      alert(
+        "Please type exactly 'Yes delete this session' to confirm deletion"
+      );
       return;
     }
 
-    const names = participantsForm
-      .split("\n")
-      .filter((name) => name.trim())
-      .map((name) => ({ full_name: name.trim() }));
+    try {
+      setLoading(true);
+      await adminService.deleteSession(sessionToDelete.id);
+      setShowDeleteSessionModal(false);
+      setDeleteConfirmationText("");
+      setSessionToDelete(null);
+      setSelectedSession(null);
+      fetchSessions();
+      alert("Session deleted successfully");
+      setError("");
+    } catch (err) {
+      setError("Failed to delete session");
+      console.error(err);
+      alert("Failed to delete session");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Register Single Participant
+  const handleRegisterParticipant = async (e) => {
+    e.preventDefault();
+    if (
+      !participantsForm.full_name.trim() ||
+      !participantsForm.phone_number.trim()
+    ) {
+      setError("Please enter both name and phone number");
+      return;
+    }
 
     try {
       setLoading(true);
-      const response = await adminService.registerParticipants(
-        selectedSession.id,
-        names
-      );
-      setParticipantsForm("");
-      setShowRegisterParticipantsModal(false);
-      fetchSessionParticipants(selectedSession.id);
       setError("");
-      alert(
-        `Successfully registered ${response.registered_count} participants!`
+      const response = await adminService.registerParticipant(
+        selectedSession.id,
+        participantsForm.full_name,
+        participantsForm.phone_number
       );
+      setParticipantsForm({ full_name: "", phone_number: "" });
+      setShowRegisterParticipantsModal(false);
+      alert(
+        `Participant registered! ID Code: ${response.participant.participant_id_code}`
+      );
+      fetchSessionParticipants(selectedSession.id);
     } catch (err) {
-      setError("Failed to register participants");
+      const errorMessage =
+        err.response?.data?.error || "Failed to register participant";
+
+      // Check for specific error scenarios
+      if (errorMessage.includes("already registered")) {
+        setError(
+          "❌ This participant is already registered for this session. Please try another participant."
+        );
+      } else if (errorMessage.includes("not registered in system")) {
+        setError(
+          "❌ Phone number not found in system. Please ensure the phone number is registered first."
+        );
+      } else if (
+        errorMessage.includes("Phone number required") ||
+        errorMessage.includes("name required")
+      ) {
+        setError("❌ Both name and phone number are required.");
+      } else {
+        setError(`❌ ${errorMessage}`);
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -199,7 +315,7 @@ const AdminDashboard = () => {
   // Update Participant Scores
   const handleUpdateScores = async (e) => {
     e.preventDefault();
-    if (scoresForm.listening_score === "" || scoresForm.speaking_score === "") {
+    if (scoresForm.writing_score === "" || scoresForm.speaking_score === "") {
       setError("Both scores are required");
       return;
     }
@@ -208,10 +324,10 @@ const AdminDashboard = () => {
       setLoading(true);
       await adminService.updateParticipantScores(
         selectedParticipant.id,
-        parseFloat(scoresForm.listening_score),
+        parseFloat(scoresForm.writing_score),
         parseFloat(scoresForm.speaking_score)
       );
-      setScoresForm({ listening_score: "", speaking_score: "" });
+      setScoresForm({ writing_score: "", speaking_score: "" });
       setShowScoresModal(false);
       setSelectedParticipant(null);
       fetchSessionParticipants(selectedSession.id);
@@ -229,7 +345,7 @@ const AdminDashboard = () => {
   const handleStartAllTests = async () => {
     if (
       !window.confirm(
-        "Are you sure you want to start the test for all entered participants?"
+        "Are you sure you want to start the test for all entered participants? This action cannot be undone."
       )
     ) {
       return;
@@ -239,7 +355,13 @@ const AdminDashboard = () => {
       setLoading(true);
       const response = await adminService.startAllTests(selectedSession.id);
       fetchSessionDashboard(selectedSession.id);
-      alert(`Test started for ${response.updated_count} participants!`);
+      alert(
+        `Test started for ${
+          response.updated_count
+        } participants!\nTest will expire at: ${new Date(
+          response.test_end_at
+        ).toLocaleTimeString()}`
+      );
       setError("");
     } catch (err) {
       setError("Failed to start tests");
@@ -249,10 +371,209 @@ const AdminDashboard = () => {
     }
   };
 
+  // Pause test for individual participant
+  const handlePauseParticipant = async (participant_id) => {
+    if (!window.confirm("Pause test for this participant?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adminService.pauseParticipantTest(
+        selectedSession.id,
+        participant_id
+      );
+      fetchSessionDashboard(selectedSession.id);
+      setError("");
+    } catch (err) {
+      setError("Failed to pause test");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Restart test for individual participant
+  const handleRestartParticipant = async (participant_id) => {
+    if (!window.confirm("Restart test for this participant?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adminService.restartParticipantTest(
+        selectedSession.id,
+        participant_id
+      );
+      fetchSessionDashboard(selectedSession.id);
+      setError("");
+    } catch (err) {
+      setError("Failed to restart test");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // End test for individual participant
+  const handleEndParticipant = async (participant_id) => {
+    if (
+      !window.confirm(
+        "End test for this participant? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adminService.endParticipantTest(selectedSession.id, participant_id);
+      fetchSessionDashboard(selectedSession.id);
+      setError("");
+    } catch (err) {
+      setError("Failed to end test");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Pause all tests
+  const handlePauseAll = async () => {
+    if (!window.confirm("Pause all active tests in this session?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await adminService.pauseAllTests(selectedSession.id);
+      fetchSessionDashboard(selectedSession.id);
+      alert(`${response.paused_count} tests paused successfully!`);
+      setError("");
+    } catch (err) {
+      setError("Failed to pause tests");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Restart all tests
+  const handleRestartAll = async () => {
+    if (!window.confirm("Restart all paused tests in this session?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await adminService.restartAllTests(selectedSession.id);
+      fetchSessionDashboard(selectedSession.id);
+      alert(`${response.restarted_count} tests restarted successfully!`);
+      setError("");
+    } catch (err) {
+      setError("Failed to restart tests");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // End all tests
+  const handleEndAll = async () => {
+    if (
+      !window.confirm(
+        "End all active/paused tests in this session? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setTimerActive(false);
+      setTimeRemaining(null);
+      const response = await adminService.endAllTests(selectedSession.id);
+      fetchSessionDashboard(selectedSession.id);
+      alert(`${response.ended_count} tests ended successfully!`);
+      setError("");
+    } catch (err) {
+      setError("Failed to end tests");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save and End Session
+  const handleSaveAndEndSession = async () => {
+    // Check if all completed participants have all four scores
+    const completedParticipants = participants.filter(
+      (p) => p.test_status === "completed"
+    );
+
+    console.log("🔍 Save & End Session - Validation Check");
+    console.log("Completed Participants:", completedParticipants);
+    console.log("Number of completed:", completedParticipants.length);
+    if (completedParticipants.length === 0) {
+      setIncompleteScoresData([]);
+      setShowIncompleteScoresModal(true);
+      return;
+    }
+
+    const incompleteScores = completedParticipants.filter(
+      (p) =>
+        p.listening_score === null ||
+        p.reading_score === null ||
+        p.writing_score === null ||
+        p.speaking_score === null
+    );
+
+    if (incompleteScores.length > 0) {
+      const incompleteList = incompleteScores.map((p) => {
+        const missing = [];
+        if (p.listening_score === null) missing.push("Listening");
+        if (p.reading_score === null) missing.push("Reading");
+        if (p.writing_score === null) missing.push("Writing");
+        if (p.speaking_score === null) missing.push("Speaking");
+        return { name: p.full_name, missing: missing.join(", ") };
+      });
+
+      setIncompleteScoresData(incompleteList);
+      setShowIncompleteScoresModal(true);
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Save all results and end this session? This will finalize all scores and add them to user dashboards."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await adminService.saveAndEndSession(selectedSession.id);
+      fetchSessionDashboard(selectedSession.id);
+      alert(
+        `Session completed! ${response.saved_count} results saved to user dashboards.`
+      );
+      setError("");
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.error || "Failed to save and end session";
+      setError(errorMsg);
+      alert(errorMsg);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openScoresModal = (participant) => {
     setSelectedParticipant(participant);
     setScoresForm({
-      listening_score: participant.listening_score || "",
+      writing_score: participant.writing_score || "",
       speaking_score: participant.speaking_score || "",
     });
     setShowScoresModal(true);
@@ -338,21 +659,46 @@ const AdminDashboard = () => {
                         className={`session-item ${
                           selectedSession?.id === session.id ? "active" : ""
                         }`}
-                        onClick={() => setSelectedSession(session)}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
                       >
-                        <div className="session-title">{session.test_name}</div>
-                        <div className="session-meta">
-                          <span>
-                            📅 {new Date(session.session_date).toLocaleString()}
-                          </span>
-                          <span>📍 {session.location}</span>
-                          <span>
-                            👥 {session.registered_count} participants
-                          </span>
-                          <span className="badge badge-info">
-                            {session.status}
-                          </span>
+                        <div
+                          onClick={() => setSelectedSession(session)}
+                          style={{ flex: 1, cursor: "pointer" }}
+                        >
+                          <div className="session-title">
+                            {session.test_name}
+                          </div>
+                          <div className="session-meta">
+                            <span>
+                              📅{" "}
+                              {new Date(session.session_date).toLocaleString()}
+                            </span>
+                            <span>📍 {session.location}</span>
+                            <span>
+                              👥 {session.registered_count} participants
+                            </span>
+                            <span className="badge badge-info">
+                              {session.status}
+                            </span>
+                          </div>
                         </div>
+                        <button
+                          className="btn btn-danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSessionToDelete(session);
+                            setShowDeleteSessionModal(true);
+                            setDeleteConfirmationText("");
+                          }}
+                          style={{ marginLeft: "12px" }}
+                          title="Delete this session"
+                        >
+                          🗑️ Delete
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -387,6 +733,30 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <div className="stat-card">
+                    <div className="stat-label">Currently Active</div>
+                    <div className="stat-value">
+                      {dashboardStats.stats.currently_active}
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Paused Tests</div>
+                    <div className="stat-value">
+                      {dashboardStats.stats.paused}
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Offline/Disconnected</div>
+                    <div className="stat-value">
+                      {dashboardStats.stats.offline_or_disconnected}
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-label">Completed</div>
+                    <div className="stat-value">
+                      {dashboardStats.stats.test_completed}
+                    </div>
+                  </div>
+                  <div className="stat-card">
                     <div className="stat-label">Pending Scores</div>
                     <div className="stat-value">
                       {dashboardStats.stats.scores_pending}
@@ -394,15 +764,187 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
+                {/* Test Timer Info */}
+                {dashboardStats.session.test_started_at &&
+                  timerActive &&
+                  timeRemaining !== null && (
+                    <div
+                      className="card"
+                      style={{
+                        borderLeft:
+                          timeRemaining <= 300
+                            ? "4px solid var(--error)"
+                            : "4px solid var(--success)",
+                        boxShadow:
+                          timeRemaining <= 300
+                            ? "0 0 10px rgba(239, 68, 68, 0.3)"
+                            : "none",
+                        transition: "all 0.3s ease",
+                      }}
+                    >
+                      <div className="card-header">
+                        <h3>⏱️ Test Timer</h3>
+                      </div>
+                      <div style={{ padding: "12px 16px", fontSize: "14px" }}>
+                        <p>
+                          <strong>Started at:</strong>{" "}
+                          {new Date(
+                            dashboardStats.session.test_started_at
+                          ).toLocaleTimeString()}
+                        </p>
+                        <p>
+                          <strong>Expires at:</strong>{" "}
+                          {new Date(
+                            dashboardStats.session.test_end_at
+                          ).toLocaleTimeString()}
+                        </p>
+                        <div
+                          style={{
+                            backgroundColor:
+                              timeRemaining <= 300
+                                ? "rgba(239, 68, 68, 0.1)"
+                                : "rgba(34, 197, 94, 0.1)",
+                            padding: "12px",
+                            borderRadius: "6px",
+                            textAlign: "center",
+                            transition: "all 0.3s ease",
+                          }}
+                        >
+                          <p
+                            style={{
+                              color:
+                                timeRemaining <= 300
+                                  ? "var(--error)"
+                                  : "var(--success)",
+                              margin: "0 0 8px 0",
+                              fontSize: "12px",
+                            }}
+                          >
+                            <strong>Time Remaining</strong>
+                          </p>
+                          <p
+                            style={{
+                              fontSize: "28px",
+                              fontWeight: "bold",
+                              color:
+                                timeRemaining <= 300
+                                  ? "var(--error)"
+                                  : "var(--success)",
+                              margin: "0",
+                              fontFamily: "monospace",
+                              letterSpacing: "2px",
+                            }}
+                          >
+                            {String(Math.floor(timeRemaining / 3600)).padStart(
+                              2,
+                              "0"
+                            )}
+                            :
+                            {String(
+                              Math.floor((timeRemaining % 3600) / 60)
+                            ).padStart(2, "0")}
+                            :{String(timeRemaining % 60).padStart(2, "0")}
+                          </p>
+                          <p
+                            style={{
+                              color:
+                                timeRemaining <= 300
+                                  ? "var(--error)"
+                                  : "var(--info)",
+                              margin: "8px 0 0 0",
+                              fontSize: "12px",
+                            }}
+                          >
+                            {timeRemaining <= 300 &&
+                              "⚠️ Less than 5 minutes remaining"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                {dashboardStats.session.test_started_at &&
+                  !timerActive &&
+                  timeRemaining === null && (
+                    <div
+                      className="card"
+                      style={{
+                        borderLeft: "4px solid var(--success)",
+                        backgroundColor: "rgba(34, 197, 94, 0.05)",
+                      }}
+                    >
+                      <div className="card-header">
+                        <h3>✓ Test Completed</h3>
+                      </div>
+                      <div
+                        style={{
+                          padding: "12px 16px",
+                          fontSize: "14px",
+                          textAlign: "center",
+                        }}
+                      >
+                        <p
+                          style={{
+                            color: "var(--success)",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          All tests have been ended or expired
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                 {/* Control Buttons */}
                 <div className="card">
                   <div className="card-header">
                     <h3>Session Controls</h3>
+                  </div>
+                  <div
+                    style={{
+                      padding: "12px 16px",
+                      display: "flex",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <button
                       className="btn btn-success"
                       onClick={handleStartAllTests}
+                      disabled={dashboardStats.session.test_started_at}
                     >
                       ▶️ Start All Tests
+                    </button>
+                    <button
+                      className="btn btn-warning"
+                      onClick={handlePauseAll}
+                      disabled={!dashboardStats.session.test_started_at}
+                    >
+                      ⏸️ Pause All
+                    </button>
+                    <button
+                      className="btn btn-info"
+                      onClick={handleRestartAll}
+                      disabled={!dashboardStats.session.test_started_at}
+                    >
+                      ▶️ Restart All
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleEndAll}
+                      disabled={!dashboardStats.session.test_started_at}
+                    >
+                      ⏹️ End All Tests
+                    </button>
+                    <button
+                      className="btn btn-success"
+                      onClick={handleSaveAndEndSession}
+                      disabled={
+                        !dashboardStats.session.test_started_at ||
+                        dashboardStats.session.status === "completed"
+                      }
+                      style={{ marginLeft: "auto" }}
+                    >
+                      💾 Save & End Session
                     </button>
                   </div>
                 </div>
@@ -415,7 +957,7 @@ const AdminDashboard = () => {
                       className="btn btn-primary"
                       onClick={() => setShowRegisterParticipantsModal(true)}
                     >
-                      + Register Participants
+                      + Register Participant
                     </button>
                   </div>
 
@@ -426,9 +968,13 @@ const AdminDashboard = () => {
                           <th>ID Code</th>
                           <th>Name</th>
                           <th>Phone</th>
-                          <th>Listening Score</th>
-                          <th>Speaking Score</th>
-                          <th>Status</th>
+                          <th>Listening</th>
+                          <th>Reading</th>
+                          <th>Writing</th>
+                          <th>Speaking</th>
+                          <th>Current Screen</th>
+                          <th>Test Status</th>
+                          <th>Last Activity</th>
                           <th>Actions</th>
                         </tr>
                       </thead>
@@ -441,32 +987,90 @@ const AdminDashboard = () => {
                             <td>{participant.full_name}</td>
                             <td>{participant.phone_number || "—"}</td>
                             <td>{participant.listening_score || "—"}</td>
+                            <td>{participant.reading_score || "—"}</td>
+                            <td>{participant.writing_score || "—"}</td>
                             <td>{participant.speaking_score || "—"}</td>
                             <td>
-                              {participant.test_started ? (
-                                <span className="status-indicator">
-                                  <span className="status-dot active"></span>
-                                  Started
-                                </span>
-                              ) : participant.has_entered_startscreen ? (
-                                <span className="status-indicator">
-                                  <span className="status-dot pending"></span>
-                                  Entered
-                                </span>
-                              ) : (
-                                <span className="status-indicator">
-                                  <span className="status-dot inactive"></span>
-                                  Pending
-                                </span>
-                              )}
+                              <span
+                                style={{
+                                  fontSize: "12px",
+                                  padding: "4px 8px",
+                                  background: "var(--bg-secondary)",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                {participant.current_screen || "not_started"}
+                              </span>
                             </td>
                             <td>
-                              <button
-                                className="btn btn-small btn-secondary"
-                                onClick={() => openScoresModal(participant)}
+                              <span className="status-indicator">
+                                <span
+                                  className={`status-dot ${
+                                    participant.test_status === "completed"
+                                      ? "completed"
+                                      : participant.test_status ===
+                                        "in_progress"
+                                      ? "active"
+                                      : participant.test_status === "paused"
+                                      ? "paused"
+                                      : "inactive"
+                                  }`}
+                                ></span>
+                                {participant.test_status || "not_started"}
+                              </span>
+                            </td>
+                            <td>
+                              {participant.last_activity_at
+                                ? new Date(
+                                    participant.last_activity_at
+                                  ).toLocaleTimeString()
+                                : "—"}
+                            </td>
+                            <td style={{ minWidth: "200px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "4px",
+                                  flexWrap: "wrap",
+                                }}
                               >
-                                Set Scores
-                              </button>
+                                <button
+                                  className="btn btn-small btn-secondary"
+                                  onClick={() => openScoresModal(participant)}
+                                >
+                                  Scores
+                                </button>
+                                {participant.test_status === "in_progress" && (
+                                  <>
+                                    <button
+                                      className="btn btn-small btn-warning"
+                                      onClick={() =>
+                                        handlePauseParticipant(participant.id)
+                                      }
+                                    >
+                                      Pause
+                                    </button>
+                                    <button
+                                      className="btn btn-small btn-danger"
+                                      onClick={() =>
+                                        handleEndParticipant(participant.id)
+                                      }
+                                    >
+                                      End
+                                    </button>
+                                  </>
+                                )}
+                                {participant.test_status === "paused" && (
+                                  <button
+                                    className="btn btn-small btn-info"
+                                    onClick={() =>
+                                      handleRestartParticipant(participant.id)
+                                    }
+                                  >
+                                    Restart
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -689,7 +1293,7 @@ const AdminDashboard = () => {
           onClick={() => setShowRegisterParticipantsModal(false)}
         >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">Register Participants</div>
+            <div className="modal-header">Register Participant</div>
             <p
               style={{
                 fontSize: "13px",
@@ -697,35 +1301,85 @@ const AdminDashboard = () => {
                 marginBottom: "12px",
               }}
             >
-              Enter participant names (one per line). Each will be assigned a
-              unique ID code.
+              Register one participant at a time. They will be assigned a unique
+              ID code.
             </p>
-            <form onSubmit={handleRegisterParticipants}>
-              <div className="form-group">
-                <label className="form-label">Participant Names *</label>
-                <textarea
-                  className="form-textarea"
-                  value={participantsForm}
-                  onChange={(e) => setParticipantsForm(e.target.value)}
-                  placeholder="John Doe&#10;Jane Smith&#10;Ahmed Khan"
-                  rows="8"
-                  required
-                ></textarea>
+            {error && (
+              <div
+                style={{
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid var(--error)",
+                  borderRadius: "6px",
+                  padding: "12px",
+                  marginBottom: "16px",
+                  color: "var(--error)",
+                  fontSize: "13px",
+                  lineHeight: "1.4",
+                }}
+              >
+                {error}
               </div>
+            )}
+            <form onSubmit={handleRegisterParticipant}>
+              <div className="form-group">
+                <label className="form-label">Full Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={participantsForm.full_name}
+                  onChange={(e) =>
+                    setParticipantsForm({
+                      ...participantsForm,
+                      full_name: e.target.value,
+                    })
+                  }
+                  placeholder="e.g., Ahmed Khan"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Phone Number *</label>
+                <input
+                  type="tel"
+                  className="form-input"
+                  value={participantsForm.phone_number}
+                  onChange={(e) =>
+                    setParticipantsForm({
+                      ...participantsForm,
+                      phone_number: e.target.value,
+                    })
+                  }
+                  placeholder="e.g., +1 234 567 8900"
+                  required
+                />
+              </div>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--muted)",
+                  marginBottom: "12px",
+                }}
+              >
+                Phone number must be registered in the system.
+              </p>
               <div className="modal-footer">
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setShowRegisterParticipantsModal(false)}
+                  onClick={() => {
+                    setShowRegisterParticipantsModal(false);
+                    setParticipantsForm({ full_name: "", phone_number: "" });
+                    setError("");
+                  }}
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
                   disabled={loading}
                 >
-                  Register
+                  Register Participant
                 </button>
               </div>
             </form>
@@ -755,18 +1409,18 @@ const AdminDashboard = () => {
             </p>
             <form onSubmit={handleUpdateScores}>
               <div className="form-group">
-                <label className="form-label">Listening Score (0-9) *</label>
+                <label className="form-label">Writing Score (0-9) *</label>
                 <input
                   type="number"
                   className="form-input"
                   min="0"
                   max="9"
                   step="0.5"
-                  value={scoresForm.listening_score}
+                  value={scoresForm.writing_score}
                   onChange={(e) =>
                     setScoresForm({
                       ...scoresForm,
-                      listening_score: e.target.value,
+                      writing_score: e.target.value,
                     })
                   }
                   required
@@ -807,6 +1461,187 @@ const AdminDashboard = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showIncompleteScoresModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowIncompleteScoresModal(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="modal-header"
+              style={{ borderColor: "var(--error)" }}
+            >
+              ⚠️ Cannot Save Session - Incomplete Scores
+            </div>
+            <div style={{ marginBottom: "16px" }}>
+              <p
+                style={{
+                  color: "var(--error)",
+                  marginBottom: "12px",
+                  fontWeight: "500",
+                }}
+              >
+                {incompleteScoresData.length === 0
+                  ? "No completed tests found. Please ensure all participants complete their tests first."
+                  : `The following participants are missing required scores and cannot be saved:`}
+              </p>
+              {incompleteScoresData.length > 0 && (
+                <div
+                  style={{
+                    backgroundColor: "rgba(231, 76, 60, 0.1)",
+                    border: "1px solid var(--error)",
+                    borderRadius: "4px",
+                    padding: "12px",
+                    maxHeight: "300px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {incompleteScoresData.map((item, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: "8px",
+                        borderBottom:
+                          index < incompleteScoresData.length - 1
+                            ? "1px solid rgba(231, 76, 60, 0.2)"
+                            : "none",
+                      }}
+                    >
+                      <strong>{item.name}</strong>
+                      <br />
+                      <span style={{ fontSize: "13px", color: "var(--error)" }}>
+                        Missing: {item.missing}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div
+                style={{
+                  marginTop: "12px",
+                  fontSize: "13px",
+                  color: "var(--muted)",
+                }}
+              >
+                <p>Please ensure:</p>
+                <ul style={{ marginLeft: "16px", marginTop: "8px" }}>
+                  <li>All participants complete their tests</li>
+                  <li>
+                    Listening and Reading scores are calculated by the system
+                  </li>
+                  <li>Writing and Speaking scores are entered by admin</li>
+                </ul>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowIncompleteScoresModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteSessionModal && sessionToDelete && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDeleteSessionModal(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="modal-header"
+              style={{ borderColor: "var(--error)" }}
+            >
+              ⚠️ Delete Session - Permanent Action
+            </div>
+            <div style={{ marginBottom: "16px" }}>
+              <p
+                style={{
+                  color: "var(--error)",
+                  marginBottom: "16px",
+                  fontWeight: "500",
+                }}
+              >
+                You are about to permanently delete this session:
+              </p>
+              <div
+                style={{
+                  backgroundColor: "rgba(231, 76, 60, 0.1)",
+                  border: "1px solid var(--error)",
+                  borderRadius: "4px",
+                  padding: "12px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div style={{ fontWeight: "600" }}>
+                  {sessionToDelete.test_name}
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--muted)" }}>
+                  📅 {new Date(sessionToDelete.session_date).toLocaleString()}
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--muted)" }}>
+                  📍 {sessionToDelete.location}
+                </div>
+              </div>
+
+              <p style={{ marginBottom: "12px", fontSize: "13px" }}>
+                This action will <strong>remove everything</strong> related to
+                this session, including:
+              </p>
+              <ul
+                style={{
+                  marginLeft: "16px",
+                  fontSize: "13px",
+                  color: "var(--muted)",
+                }}
+              >
+                <li>All registered participants</li>
+                <li>All test data and scores</li>
+                <li>All session records</li>
+              </ul>
+
+              <div style={{ marginTop: "16px" }}>
+                <label className="form-label">
+                  Type <strong>"Yes delete this session"</strong> to confirm:
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder='Type "Yes delete this session"'
+                  style={{ marginTop: "8px" }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowDeleteSessionModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteSession}
+                disabled={
+                  loading ||
+                  deleteConfirmationText.trim() !== "Yes delete this session"
+                }
+              >
+                🗑️ Delete Session Permanently
+              </button>
+            </div>
           </div>
         </div>
       )}

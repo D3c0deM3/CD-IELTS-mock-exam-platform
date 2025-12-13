@@ -122,6 +122,96 @@ router.get("/tests", async (req, res) => {
   }
 });
 
+// ==================== TEST CONFIG MANAGEMENT ====================
+
+// POST /api/admin/tests/:id/config - Set test section durations
+router.post("/tests/:id/config", async (req, res) => {
+  const { id: test_id } = req.params;
+  const {
+    listening_minutes,
+    reading_minutes,
+    writing_minutes,
+    speaking_minutes,
+  } = req.body;
+
+  // Validate inputs
+  const listening = listening_minutes || 40;
+  const reading = reading_minutes || 60;
+  const writing = writing_minutes || 60;
+  const speaking = speaking_minutes || 15;
+
+  if (listening < 0 || reading < 0 || writing < 0 || speaking < 0) {
+    return res.status(400).json({ error: "All durations must be positive" });
+  }
+
+  try {
+    // Check if test exists
+    const [testRows] = await db.execute("SELECT id FROM tests WHERE id = ?", [
+      test_id,
+    ]);
+    if (testRows.length === 0) {
+      return res.status(404).json({ error: "Test not found" });
+    }
+
+    // Insert or update config
+    await db.execute(
+      `INSERT INTO test_config (test_id, listening_minutes, reading_minutes, writing_minutes, speaking_minutes)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+       listening_minutes = VALUES(listening_minutes),
+       reading_minutes = VALUES(reading_minutes),
+       writing_minutes = VALUES(writing_minutes),
+       speaking_minutes = VALUES(speaking_minutes),
+       updated_at = NOW()`,
+      [test_id, listening, reading, writing, speaking]
+    );
+
+    res.json({
+      message: "Test configuration updated successfully",
+      config: {
+        test_id,
+        listening_minutes: listening,
+        reading_minutes: reading,
+        writing_minutes: writing,
+        speaking_minutes: speaking,
+        total_minutes: listening + reading + writing + 60,
+      },
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/admin/tests/:id/config - Get test configuration
+router.get("/tests/:id/config", async (req, res) => {
+  const { id: test_id } = req.params;
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT test_id, listening_minutes, reading_minutes, writing_minutes, speaking_minutes, total_minutes
+       FROM test_config WHERE test_id = ?`,
+      [test_id]
+    );
+
+    if (rows.length === 0) {
+      return res.json({
+        test_id,
+        listening_minutes: 40,
+        reading_minutes: 60,
+        writing_minutes: 60,
+        speaking_minutes: 15,
+        total_minutes: 235,
+      });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ==================== TEST SESSION MANAGEMENT ====================
 
 // POST /api/admin/sessions - Create a test session
@@ -212,9 +302,117 @@ router.patch("/sessions/:id/status", async (req, res) => {
   }
 });
 
+// DELETE /api/admin/sessions/:id - Delete a test session and all related data
+router.delete("/sessions/:id", async (req, res) => {
+  const { id: session_id } = req.params;
+
+  try {
+    // Check if session exists
+    const [sessionCheck] = await db.execute(
+      "SELECT id FROM test_sessions WHERE id = ?",
+      [session_id]
+    );
+
+    if (sessionCheck.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Delete all test_participants for this session
+    await db.execute("DELETE FROM test_participants WHERE session_id = ?", [
+      session_id,
+    ]);
+
+    // Delete the session itself
+    await db.execute("DELETE FROM test_sessions WHERE id = ?", [session_id]);
+
+    res.json({
+      message: "Session and all related data deleted successfully",
+      deleted_session_id: session_id,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ==================== TEST PARTICIPANT MANAGEMENT ====================
 
-// POST /api/admin/sessions/:id/register-participants - Register multiple participants for a session
+// POST /api/admin/sessions/:id/register-participant - Register single participant for a session
+router.post("/sessions/:id/register-participant", async (req, res) => {
+  const { id: session_id } = req.params;
+  const { full_name, phone_number } = req.body;
+
+  if (!full_name || !phone_number) {
+    return res
+      .status(400)
+      .json({ error: "full_name and phone_number are required" });
+  }
+
+  try {
+    // Verify session exists
+    const [sessionRows] = await db.execute(
+      "SELECT id FROM test_sessions WHERE id = ?",
+      [session_id]
+    );
+
+    if (sessionRows.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Verify phone number exists in users table
+    const [userRows] = await db.execute(
+      "SELECT id FROM users WHERE phone_number = ?",
+      [phone_number]
+    );
+
+    if (userRows.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Phone number not registered in system" });
+    }
+
+    // Check if participant with this phone already registered for this session
+    const [existingParticipant] = await db.execute(
+      "SELECT id FROM test_participants WHERE session_id = ? AND phone_number = ?",
+      [session_id, phone_number]
+    );
+
+    if (existingParticipant.length > 0) {
+      return res.status(400).json({
+        error: "This participant is already registered for this session",
+      });
+    }
+
+    // Generate unique participant ID code
+    const [existingCount] = await db.execute(
+      "SELECT COUNT(*) as count FROM test_participants WHERE session_id = ?",
+      [session_id]
+    );
+
+    const nextNumber = (existingCount[0].count + 1).toString().padStart(3, "0");
+    const participant_id_code = `P${session_id}${nextNumber}`;
+
+    const [result] = await db.execute(
+      "INSERT INTO test_participants (session_id, participant_id_code, full_name, phone_number) VALUES (?, ?, ?, ?)",
+      [session_id, participant_id_code, full_name, phone_number]
+    );
+
+    res.status(201).json({
+      message: "Participant registered successfully",
+      participant: {
+        id: result.insertId,
+        participant_id_code,
+        full_name,
+        phone_number,
+      },
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/admin/sessions/:id/register-participants - Register multiple participants for a session (bulk)
 router.post("/sessions/:id/register-participants", async (req, res) => {
   const { id: session_id } = req.params;
   const { participants } = req.body;
@@ -304,11 +502,16 @@ router.get("/sessions/:id/participants", async (req, res) => {
         full_name,
         phone_number,
         listening_score,
+        reading_score,
+        writing_score,
         speaking_score,
         has_entered_startscreen,
         entered_at,
         test_started,
         test_started_at,
+        current_screen,
+        test_status,
+        last_activity_at,
         created_at
       FROM test_participants
       WHERE session_id = ?
@@ -323,26 +526,26 @@ router.get("/sessions/:id/participants", async (req, res) => {
   }
 });
 
-// PUT /api/admin/participants/:id/scores - Set listening and speaking scores
+// PUT /api/admin/participants/:id/scores - Set writing and speaking scores
 router.put("/participants/:id/scores", async (req, res) => {
   const { id } = req.params;
-  const { listening_score, speaking_score } = req.body;
+  const { writing_score, speaking_score } = req.body;
 
   if (
-    listening_score === undefined ||
+    writing_score === undefined ||
     speaking_score === undefined ||
-    listening_score === null ||
+    writing_score === null ||
     speaking_score === null
   ) {
     return res
       .status(400)
-      .json({ error: "listening_score and speaking_score are required" });
+      .json({ error: "writing_score and speaking_score are required" });
   }
 
-  if (listening_score < 0 || listening_score > 9) {
+  if (writing_score < 0 || writing_score > 9) {
     return res
       .status(400)
-      .json({ error: "listening_score must be between 0 and 9" });
+      .json({ error: "writing_score must be between 0 and 9" });
   }
 
   if (speaking_score < 0 || speaking_score > 9) {
@@ -353,8 +556,8 @@ router.put("/participants/:id/scores", async (req, res) => {
 
   try {
     const [result] = await db.execute(
-      "UPDATE test_participants SET listening_score = ?, speaking_score = ? WHERE id = ?",
-      [listening_score, speaking_score, id]
+      "UPDATE test_participants SET writing_score = ?, speaking_score = ? WHERE id = ?",
+      [writing_score, speaking_score, id]
     );
 
     if (result.affectedRows === 0) {
@@ -363,7 +566,7 @@ router.put("/participants/:id/scores", async (req, res) => {
 
     res.json({
       message: "Scores updated successfully",
-      listening_score,
+      writing_score,
       speaking_score,
     });
   } catch (err) {
@@ -372,14 +575,14 @@ router.put("/participants/:id/scores", async (req, res) => {
   }
 });
 
-// PATCH /api/admin/sessions/:id/start-all - Start test for all entered participants
+// PATCH /api/admin/sessions/:id/start-all - Start test for all entered participants with timer
 router.patch("/sessions/:id/start-all", async (req, res) => {
   const { id: session_id } = req.params;
 
   try {
-    // Verify session exists
+    // Verify session exists and get test config
     const [sessionRows] = await db.execute(
-      "SELECT id FROM test_sessions WHERE id = ?",
+      "SELECT ts.id, ts.test_id FROM test_sessions ts WHERE ts.id = ?",
       [session_id]
     );
 
@@ -387,17 +590,241 @@ router.patch("/sessions/:id/start-all", async (req, res) => {
       return res.status(404).json({ error: "Session not found" });
     }
 
-    // Update status for all participants who have entered the start screen
+    const test_id = sessionRows[0].test_id;
+
+    // Get test config (with defaults if not configured)
+    const [configRows] = await db.execute(
+      "SELECT listening_minutes, reading_minutes, writing_minutes FROM test_config WHERE test_id = ?",
+      [test_id]
+    );
+
+    let listening = 40,
+      reading = 60,
+      writing = 60;
+    if (configRows.length > 0) {
+      listening = configRows[0].listening_minutes;
+      reading = configRows[0].reading_minutes;
+      writing = configRows[0].writing_minutes;
+    }
+
+    // Calculate total test duration (in minutes)
+    const totalMinutes = listening + reading + writing + 60; // +60 for 1 hour buffer
+
+    // Set test_started_at and test_end_at
+    const startedAt = new Date();
+    const endAt = new Date(startedAt.getTime() + totalMinutes * 60 * 1000);
+
+    // Update session
+    await db.execute(
+      "UPDATE test_sessions SET test_started_at = ?, test_end_at = ? WHERE id = ?",
+      [startedAt, endAt, session_id]
+    );
+
+    // Update participants
     const [result] = await db.execute(
       `UPDATE test_participants 
-       SET test_started = 1, test_started_at = NOW() 
+       SET test_started = 1, test_started_at = ?, test_status = 'in_progress', current_screen = 'listening'
        WHERE session_id = ? AND has_entered_startscreen = 1`,
-      [session_id]
+      [startedAt, session_id]
     );
 
     res.json({
       message: "Test started for all entered participants",
       updated_count: result.affectedRows,
+      test_started_at: startedAt.toISOString(),
+      test_end_at: endAt.toISOString(),
+      total_minutes: totalMinutes,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/sessions/:id/participants/:pid/pause - Pause test for individual participant
+router.patch("/sessions/:id/participants/:pid/pause", async (req, res) => {
+  const { id: session_id, pid: participant_id } = req.params;
+
+  try {
+    // Verify participant exists and belongs to session
+    const [participantRows] = await db.execute(
+      "SELECT id, test_status FROM test_participants WHERE id = ? AND session_id = ?",
+      [participant_id, session_id]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    if (participantRows[0].test_status === "paused") {
+      return res.status(400).json({ error: "Test is already paused" });
+    }
+
+    const pausedAt = new Date();
+    await db.execute(
+      "UPDATE test_participants SET test_status = 'paused', paused_at = ? WHERE id = ?",
+      [pausedAt, participant_id]
+    );
+
+    res.json({
+      message: "Test paused successfully",
+      participant_id,
+      paused_at: pausedAt,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/sessions/:id/participants/:pid/restart - Restart paused test
+router.patch("/sessions/:id/participants/:pid/restart", async (req, res) => {
+  const { id: session_id, pid: participant_id } = req.params;
+
+  try {
+    // Verify participant exists
+    const [participantRows] = await db.execute(
+      "SELECT id, paused_at, total_pause_duration FROM test_participants WHERE id = ? AND session_id = ?",
+      [participant_id, session_id]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = participantRows[0];
+    if (!participant.paused_at) {
+      return res.status(400).json({ error: "Test is not paused" });
+    }
+
+    // Calculate pause duration
+    const pauseDuration = Math.round(
+      (new Date() - participant.paused_at) / 1000 / 60
+    ); // in minutes
+    const newTotalPauseDuration =
+      (participant.total_pause_duration || 0) + pauseDuration;
+
+    await db.execute(
+      "UPDATE test_participants SET test_status = 'in_progress', paused_at = NULL, total_pause_duration = ? WHERE id = ?",
+      [newTotalPauseDuration, participant_id]
+    );
+
+    res.json({
+      message: "Test restarted successfully",
+      participant_id,
+      pause_duration_added: pauseDuration,
+      total_pause_duration: newTotalPauseDuration,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/sessions/:id/participants/:pid/end - End test for participant
+router.patch("/sessions/:id/participants/:pid/end", async (req, res) => {
+  const { id: session_id, pid: participant_id } = req.params;
+
+  try {
+    // Verify participant exists
+    const [participantRows] = await db.execute(
+      "SELECT id FROM test_participants WHERE id = ? AND session_id = ?",
+      [participant_id, session_id]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const completedAt = new Date();
+    await db.execute(
+      "UPDATE test_participants SET test_status = 'completed', test_completed_at = ?, current_screen = 'results' WHERE id = ?",
+      [completedAt, participant_id]
+    );
+
+    res.json({
+      message: "Test ended successfully",
+      participant_id,
+      test_completed_at: completedAt,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/sessions/:id/pause-all - Pause all active tests in session
+router.patch("/sessions/:id/pause-all", async (req, res) => {
+  const { id: session_id } = req.params;
+
+  try {
+    const pausedAt = new Date();
+    const [result] = await db.execute(
+      "UPDATE test_participants SET test_status = 'paused', paused_at = ? WHERE session_id = ? AND test_status = 'in_progress'",
+      [pausedAt, session_id]
+    );
+
+    res.json({
+      message: "All tests paused successfully",
+      paused_count: result.affectedRows,
+      paused_at: pausedAt,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/sessions/:id/restart-all - Restart all paused tests in session
+router.patch("/sessions/:id/restart-all", async (req, res) => {
+  const { id: session_id } = req.params;
+
+  try {
+    // Get all paused participants and calculate their pause duration
+    const [pausedParticipants] = await db.execute(
+      "SELECT id, paused_at, total_pause_duration FROM test_participants WHERE session_id = ? AND test_status = 'paused'",
+      [session_id]
+    );
+
+    // Update each participant's pause duration
+    for (const participant of pausedParticipants) {
+      const pauseDuration = Math.round(
+        (new Date() - participant.paused_at) / 1000 / 60
+      );
+      const newTotalPauseDuration =
+        (participant.total_pause_duration || 0) + pauseDuration;
+
+      await db.execute(
+        "UPDATE test_participants SET test_status = 'in_progress', paused_at = NULL, total_pause_duration = ? WHERE id = ?",
+        [newTotalPauseDuration, participant.id]
+      );
+    }
+
+    res.json({
+      message: "All tests restarted successfully",
+      restarted_count: pausedParticipants.length,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/sessions/:id/end-all - End all active/paused tests in session
+router.patch("/sessions/:id/end-all", async (req, res) => {
+  const { id: session_id } = req.params;
+
+  try {
+    const completedAt = new Date();
+    const [result] = await db.execute(
+      "UPDATE test_participants SET test_status = 'completed', test_completed_at = ?, current_screen = 'results' WHERE session_id = ? AND test_status IN ('in_progress', 'paused')",
+      [completedAt, session_id]
+    );
+
+    res.json({
+      message: "All tests ended successfully",
+      ended_count: result.affectedRows,
+      test_completed_at: completedAt,
     });
   } catch (err) {
     console.error("DB error:", err);
@@ -410,7 +837,7 @@ router.get("/sessions/:id/dashboard", async (req, res) => {
   const { id: session_id } = req.params;
 
   try {
-    // Get session info
+    // Get session info with test config
     const [sessionData] = await db.execute(
       `SELECT 
         ts.id,
@@ -419,7 +846,9 @@ router.get("/sessions/:id/dashboard", async (req, res) => {
         ts.session_date,
         ts.location,
         ts.status,
-        ts.max_capacity
+        ts.max_capacity,
+        ts.test_started_at,
+        ts.test_end_at
       FROM test_sessions ts
       JOIN tests t ON ts.test_id = t.id
       WHERE ts.id = ?`,
@@ -430,38 +859,251 @@ router.get("/sessions/:id/dashboard", async (req, res) => {
       return res.status(404).json({ error: "Session not found" });
     }
 
+    const session = sessionData[0];
+
+    // Get test config
+    const [configRows] = await db.execute(
+      "SELECT listening_minutes, reading_minutes, writing_minutes FROM test_config WHERE test_id = ?",
+      [session.test_id]
+    );
+
+    const config =
+      configRows.length > 0
+        ? configRows[0]
+        : {
+            listening_minutes: 40,
+            reading_minutes: 60,
+            writing_minutes: 60,
+          };
+
     // Get participants with their status
     const [participants] = await db.execute(
       `SELECT 
         id,
         participant_id_code,
         full_name,
+        phone_number,
         has_entered_startscreen,
         entered_at,
         test_started,
         test_started_at,
+        current_screen,
+        test_status,
+        last_activity_at,
         listening_score,
-        speaking_score
+        reading_score,
+        writing_score,
+        speaking_score,
+        test_completed_at
       FROM test_participants
       WHERE session_id = ?
       ORDER BY created_at ASC`,
       [session_id]
     );
 
+    // Calculate dynamic stats
+    const now = new Date();
+    const OFFLINE_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
+
     const stats = {
       total: participants.length,
       entered_startscreen: participants.filter((p) => p.has_entered_startscreen)
         .length,
-      test_started: participants.filter((p) => p.test_started).length,
-      scores_pending: participants.filter(
-        (p) => p.listening_score === null || p.speaking_score === null
+      test_started: participants.filter(
+        (p) => p.test_started && p.test_status !== "completed"
       ).length,
+      test_completed: participants.filter((p) => p.test_status === "completed")
+        .length,
+      scores_pending: participants.filter(
+        (p) =>
+          p.test_completed &&
+          (p.writing_score === null || p.speaking_score === null)
+      ).length,
+      currently_active: participants.filter((p) => {
+        if (p.test_status !== "in_progress" && p.test_status !== "paused")
+          return false;
+        if (!p.last_activity_at) return false;
+        const timeSinceActivity = now - new Date(p.last_activity_at);
+        return timeSinceActivity < OFFLINE_THRESHOLD;
+      }).length,
+      offline_or_disconnected: participants.filter((p) => {
+        if (p.test_status === "completed" || p.test_status === "not_started")
+          return false;
+        if (!p.last_activity_at) return true;
+        const timeSinceActivity = now - new Date(p.last_activity_at);
+        return timeSinceActivity >= OFFLINE_THRESHOLD;
+      }).length,
+      paused: participants.filter((p) => p.test_status === "paused").length,
+      left_test: participants.filter((p) => p.test_status === "abandoned")
+        .length,
     };
 
     res.json({
-      session: sessionData[0],
+      session: {
+        ...session,
+        test_started_at: session.test_started_at
+          ? new Date(session.test_started_at).toISOString()
+          : null,
+        test_end_at: session.test_end_at
+          ? new Date(session.test_end_at).toISOString()
+          : null,
+      },
+      test_config: config,
       participants,
       stats,
+      time_info: {
+        now: now.toISOString(),
+        test_started_at: session.test_started_at
+          ? new Date(session.test_started_at).toISOString()
+          : null,
+        test_end_at: session.test_end_at
+          ? new Date(session.test_end_at).toISOString()
+          : null,
+      },
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/admin/sessions/:id/save-and-end - Save all participant results and end session
+router.post("/sessions/:id/save-and-end", async (req, res) => {
+  const { id: session_id } = req.params;
+
+  try {
+    // Get session info
+    const [sessionData] = await db.execute(
+      "SELECT id, test_id, status FROM test_sessions WHERE id = ?",
+      [session_id]
+    );
+
+    if (sessionData.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const session = sessionData[0];
+
+    // Get all participants with all their scores (listening, reading, writing, speaking)
+    const [participants] = await db.execute(
+      `SELECT 
+        tp.id,
+        tp.full_name,
+        tp.phone_number,
+        tp.listening_score,
+        tp.reading_score,
+        tp.writing_score,
+        tp.speaking_score,
+        tp.test_status
+      FROM test_participants tp
+      WHERE tp.session_id = ? AND tp.test_status = 'completed'`,
+      [session_id]
+    );
+
+    if (participants.length === 0) {
+      return res.status(400).json({
+        error:
+          "No completed tests to save. Please ensure all participants have completed all test sections (listening, reading, writing, speaking) first.",
+      });
+    }
+
+    // Check if all participants have all scores (listening, reading, writing, speaking)
+    const incompleteParticipants = participants.filter(
+      (p) =>
+        p.listening_score === null ||
+        p.reading_score === null ||
+        p.writing_score === null ||
+        p.speaking_score === null
+    );
+
+    if (incompleteParticipants.length > 0) {
+      const incompleteNames = incompleteParticipants
+        .map((p) => p.full_name)
+        .join(", ");
+      return res.status(400).json({
+        error: `Cannot save session. The following participants are missing scores: ${incompleteNames}. Ensure all test sections (listening, reading, writing, speaking) are completed and scored.`,
+      });
+    }
+
+    let savedCount = 0;
+    const errors = [];
+
+    // Save results for each participant with all four scores
+    for (const participant of participants) {
+      try {
+        // Get user_id from phone number
+        const [userRows] = await db.execute(
+          "SELECT id FROM users WHERE phone_number = ?",
+          [participant.phone_number]
+        );
+
+        if (userRows.length === 0) {
+          errors.push(`User with phone ${participant.phone_number} not found`);
+          continue;
+        }
+
+        const user_id = userRows[0].id;
+
+        // Check if result already exists for this user and test
+        const [existingResult] = await db.execute(
+          "SELECT id FROM results WHERE student_id = ? AND test_id = ?",
+          [user_id, session.test_id]
+        );
+
+        if (existingResult.length > 0) {
+          // Update existing result with all four scores
+          await db.execute(
+            `UPDATE results 
+             SET listening_score = ?, reading_score = ?, writing_score = ?, speaking_score = ?, 
+                 is_writing_scored = 1, is_speaking_scored = 1,
+                 updated_at = NOW()
+             WHERE student_id = ? AND test_id = ?`,
+            [
+              participant.listening_score,
+              participant.reading_score,
+              participant.writing_score,
+              participant.speaking_score,
+              user_id,
+              session.test_id,
+            ]
+          );
+        } else {
+          // Create new result with all four scores
+          await db.execute(
+            `INSERT INTO results 
+             (student_id, test_id, listening_score, reading_score, writing_score, speaking_score, 
+              is_writing_scored, is_speaking_scored, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, 1, 1, NOW(), NOW())`,
+            [
+              user_id,
+              session.test_id,
+              participant.listening_score,
+              participant.reading_score,
+              participant.writing_score,
+              participant.speaking_score,
+            ]
+          );
+        }
+
+        savedCount++;
+      } catch (err) {
+        errors.push(
+          `Error saving result for ${participant.full_name}: ${err.message}`
+        );
+      }
+    }
+
+    // Update session status to completed
+    await db.execute(
+      "UPDATE test_sessions SET status = 'completed', updated_at = NOW() WHERE id = ?",
+      [session_id]
+    );
+
+    res.json({
+      message: "Session saved and ended successfully",
+      saved_count: savedCount,
+      total_participants: participants.length,
+      errors: errors.length > 0 ? errors : undefined,
     });
   } catch (err) {
     console.error("DB error:", err);

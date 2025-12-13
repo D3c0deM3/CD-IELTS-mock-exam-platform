@@ -260,7 +260,7 @@ router.post("/check-in-participant", async (req, res) => {
   try {
     // Find participant and update their check-in status
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.speaking_score, ts.test_id, t.name as test_name
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, ts.test_id, t.name as test_name
        FROM test_participants tp
        JOIN test_sessions ts ON tp.session_id = ts.id
        JOIN tests t ON ts.test_id = t.id
@@ -290,6 +290,8 @@ router.post("/check-in-participant", async (req, res) => {
         test_id: participant.test_id,
         test_name: participant.test_name,
         listening_score: participant.listening_score,
+        reading_score: participant.reading_score,
+        writing_score: participant.writing_score,
         speaking_score: participant.speaking_score,
       },
     });
@@ -308,7 +310,7 @@ router.get("/participant/:id_code/can-start", async (req, res) => {
 
   try {
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.test_started, tp.listening_score, tp.speaking_score, tp.session_id
+      `SELECT tp.id, tp.test_started, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.session_id
        FROM test_participants tp
        WHERE tp.participant_id_code = ?`,
       [id_code]
@@ -324,6 +326,8 @@ router.get("/participant/:id_code/can-start", async (req, res) => {
       can_start:
         participant.test_started === 1 || participant.test_started === true,
       listening_score: participant.listening_score,
+      reading_score: participant.reading_score,
+      writing_score: participant.writing_score,
       speaking_score: participant.speaking_score,
       test_started:
         participant.test_started === 1 || participant.test_started === true,

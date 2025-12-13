@@ -145,7 +145,7 @@ const setupDatabase = async () => {
       )
     `);
 
-    // Table for test participants with assigned IDs and speaking/listening scores
+    // Table for test participants with assigned IDs and score tracking
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS test_participants (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -154,14 +154,93 @@ const setupDatabase = async () => {
         full_name VARCHAR(255) NOT NULL,
         phone_number VARCHAR(255),
         listening_score DECIMAL(5, 2),
+        reading_score DECIMAL(5, 2),
+        writing_score DECIMAL(5, 2),
         speaking_score DECIMAL(5, 2),
         has_entered_startscreen BOOLEAN DEFAULT 0,
         entered_at DATETIME,
         test_started BOOLEAN DEFAULT 0,
         test_started_at DATETIME,
+        current_screen VARCHAR(50) DEFAULT 'not_started',
+        test_status VARCHAR(50) DEFAULT 'not_started',
+        last_activity_at DATETIME,
+        test_completed_at DATETIME,
+        total_pause_duration INT DEFAULT 0,
+        paused_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (session_id) REFERENCES test_sessions(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Add new timing fields to test_sessions if they don't exist
+    try {
+      await connection.execute(`
+        ALTER TABLE test_sessions ADD COLUMN test_started_at DATETIME
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        throw err;
+      }
+    }
+
+    try {
+      await connection.execute(`
+        ALTER TABLE test_sessions ADD COLUMN test_end_at DATETIME
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        throw err;
+      }
+    }
+
+    try {
+      await connection.execute(`
+        ALTER TABLE test_sessions ADD COLUMN test_paused_at DATETIME
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        throw err;
+      }
+    }
+
+    // Add missing columns to test_participants if they don't exist
+    const missingColumns = [
+      { name: "listening_score", type: "DECIMAL(5, 2)" },
+      { name: "reading_score", type: "DECIMAL(5, 2)" },
+      { name: "current_screen", type: "VARCHAR(50) DEFAULT 'not_started'" },
+      { name: "test_status", type: "VARCHAR(50) DEFAULT 'not_started'" },
+      { name: "last_activity_at", type: "DATETIME" },
+      { name: "test_completed_at", type: "DATETIME" },
+      { name: "total_pause_duration", type: "INT DEFAULT 0" },
+      { name: "paused_at", type: "DATETIME" },
+    ];
+
+    for (const column of missingColumns) {
+      try {
+        await connection.execute(`
+          ALTER TABLE test_participants ADD COLUMN ${column.name} ${column.type}
+        `);
+      } catch (err) {
+        if (err.code !== "ER_DUP_FIELDNAME") {
+          throw err;
+        }
+      }
+    }
+
+    // Table for test configuration with section timings (IELTS standard durations)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_config (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        test_id INT NOT NULL UNIQUE,
+        listening_minutes INT DEFAULT 40,
+        reading_minutes INT DEFAULT 60,
+        writing_minutes INT DEFAULT 60,
+        speaking_minutes INT DEFAULT 15,
+        total_minutes INT GENERATED ALWAYS AS (listening_minutes + reading_minutes + writing_minutes + 60) STORED,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
       )
     `);
 
