@@ -13,6 +13,7 @@ function ListeningStarter() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [videoEnded, setVideoEnded] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
 
   // Format time MM:SS
@@ -36,11 +37,23 @@ function ListeningStarter() {
       videoRef.current.volume = 0.75;
     }
   }, []);
+
+  // Fullscreen lock and exit prevention
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" || e.key === "F11") {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
-          navigate("/test/listening", {
+          navigate("/test/listening/dashboard", {
             state: { startTime: new Date().toISOString() },
           });
           return 0;
@@ -52,9 +65,14 @@ function ListeningStarter() {
     return () => clearInterval(timer);
   }, [navigate]);
 
+  // Handle video ended
+  const handleVideoEnded = () => {
+    setVideoEnded(true);
+  };
+
   // Handle start test button
   const handleStartTest = () => {
-    navigate("/test/listening", {
+    navigate("/test/listening/dashboard", {
       state: { startTime: new Date().toISOString() },
     });
   };
@@ -168,13 +186,8 @@ function ListeningStarter() {
       {/* Top Navigation Bar */}
       <div className="top-navigation">
         <div className="nav-left">
-          <div className="ielts-logo">
-            <div className="logo-icon">CD</div>
-          </div>
-
           <div className="timer-section">
             <span className="timer-icon">⏱</span>
-            <span className="timer-text">Time Remaining:</span>
             <span className="timer-time">{formatTimer(timeRemaining)}</span>
           </div>
         </div>
@@ -205,6 +218,10 @@ function ListeningStarter() {
             only once. Make sure your headphones are working properly before
             starting.
           </p>
+          <p style={{ fontSize: "13px", color: "#64748b", marginTop: "8px" }}>
+            <strong>Tip:</strong> You can adjust the audio volume using the
+            volume slider located in the top-right corner of your screen.
+          </p>
         </div>
 
         {/* Content Section */}
@@ -226,6 +243,7 @@ function ListeningStarter() {
                 onClick={handleVideoClick}
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
+                onEnded={handleVideoEnded}
               >
                 <source src={listeningVideo} type="video/mp4" />
                 Your browser does not support the video element.
@@ -278,14 +296,20 @@ function ListeningStarter() {
             </div>
 
             <p className="video-desc">
-              <strong>Important:</strong> Watch the entire video before
-              proceeding to the test.
+              <strong>Important:</strong> Watch the complete video. The start
+              button will enable after you finish.
             </p>
 
             <div className="action-buttons-center">
               <button
                 className="primary-button-center"
                 onClick={handleStartTest}
+                disabled={!videoEnded}
+                title={
+                  videoEnded
+                    ? "Start Test"
+                    : "Please watch the video completely first"
+                }
               >
                 <span>Start Test Now</span>
                 <span>▶</span>

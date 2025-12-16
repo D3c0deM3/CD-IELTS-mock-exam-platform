@@ -48,9 +48,10 @@ function PendingScreen() {
   // Security: Prevent keyboard shortcuts (F12, Ctrl+Shift+I, etc.)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+Shift+J
+      // F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+Shift+J, Escape
       if (
         e.key === "F12" ||
+        e.key === "Escape" ||
         (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i")) ||
         (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) ||
         (e.ctrlKey && e.shiftKey && (e.key === "J" || e.key === "j"))
