@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import StartScreen from "./pages/StartScreen";
 import PendingScreen from "./pages/PendingScreen";
 import Login from "./pages/Login";
