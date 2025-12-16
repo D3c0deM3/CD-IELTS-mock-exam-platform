@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from "react";
-import axios from "axios";
 import { apiClient } from "../services/api";
 import "./MaterialUpload.css";
 

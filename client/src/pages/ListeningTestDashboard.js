@@ -5,86 +5,87 @@ import "./ListeningTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
 // ==================== COMPONENT IMPORTS ====================
-const TableRenderer = ({
-  tableData,
-  questions,
-  answers,
-  onAnswerChange,
-  partNumber,
-}) => {
+const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
   if (!tableData) return null;
+
+  const columns = [
+    { header: "House or flat", key: "house_or_flat" },
+    { header: "Details", key: "details" },
+    { header: "Rent per month", key: "rent" },
+    { header: "Address", key: "address" },
+    { header: "Location", key: "location" },
+  ];
 
   return (
     <div className="visual-table">
       {tableData.title && <h3 className="table-title">{tableData.title}</h3>}
+
       <table className="ielts-table">
         <thead>
           <tr>
-            {tableData.headers.map((header, idx) => (
-              <th
-                key={idx}
-                className={`header-${header.toLowerCase().replace(" ", "-")}`}
-              >
-                {header}
-              </th>
+            {columns.map((col, idx) => (
+              <th key={idx}>{col.header}</th>
             ))}
           </tr>
         </thead>
+
         <tbody>
           {tableData.rows.map((row, rowIndex) => (
             <tr key={rowIndex}>
-              {tableData.headers.map((header, colIndex) => {
-                const headerKey = header.toLowerCase().replace(" ", "_");
-                const cellContent = row[headerKey];
+              {columns.map((col, colIndex) => {
+                const cellContent = row[col.key] ?? "";
+                const parts = cellContent.split(/(\d+\s*(?:\.{2,}|…+))/);
 
-                // Check if this cell contains a gap fill
-                const gapMatch = cellContent?.match(/\d+……+/);
-                if (gapMatch) {
-                  // Extract question number from gap (e.g., "1………..")
-                  const questionNum = parseInt(cellContent.match(/\d+/)[0]);
-                  const question = questions.find((q) => q.id === questionNum);
+                return (
+                  <td key={`${rowIndex}-${colIndex}`}>
+                    {parts.map((part, i) => {
+                      const gapMatch = part.match(/(\d+)\s*(?:\.{2,}|…+)/);
 
-                  if (question) {
-                    const parts = cellContent.split(/(\d+……+)/);
-                    return (
-                      <td
-                        key={`${rowIndex}-${colIndex}`}
-                        className="table-cell-with-gap"
-                      >
-                        {parts.map((part, partIndex) => {
-                          if (part.match(/\d+……+/)) {
-                            return (
-                              <input
-                                key={partIndex}
-                                type="text"
-                                className="table-gap-input"
-                                value={answers[question.id] || ""}
-                                onChange={(e) =>
-                                  onAnswerChange(question.id, e.target.value)
-                                }
-                                style={{
-                                  width: `${Math.max(part.length * 8, 50)}px`,
-                                }}
-                                maxLength={
-                                  question.word_limit.includes("ONE WORD")
-                                    ? 15
-                                    : 30
-                                }
-                              />
-                            );
-                          }
-                          return <span key={partIndex}>{part}</span>;
-                        })}
-                      </td>
-                    );
-                  }
-                }
-                return <td key={`${rowIndex}-${colIndex}`}>{cellContent}</td>;
+                      if (gapMatch) {
+                        const questionNum = parseInt(gapMatch[1], 10);
+                        const question = questions.find(
+                          (q) => q.id === questionNum
+                        );
+
+                        if (!question) {
+                          console.error(
+                            "Missing question for gap:",
+                            questionNum
+                          );
+                          return null;
+                        }
+
+                        return (
+                          <input
+                            key={i}
+                            type="text"
+                            className="table-gap-input"
+                            value={answers[question.id] || ""}
+                            onChange={(e) =>
+                              onAnswerChange(question.id, e.target.value)
+                            }
+                            placeholder={question.id}
+                            maxLength={
+                              question.word_limit?.includes("ONE WORD")
+                                ? 15
+                                : 30
+                            }
+                            style={{ minWidth: 90 }}
+                            autoComplete="off"
+                          />
+                        );
+                      }
+
+                      return <span key={i}>{part}</span>;
+                    })}
+                  </td>
+                );
               })}
             </tr>
           ))}
         </tbody>
       </table>
+
       {tableData.note && (
         <div className="table-note">
           <strong>Note:</strong> {tableData.note}
@@ -100,46 +101,47 @@ const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
   return (
     <div className="visual-notes">
       {notesData.title && <h3 className="notes-title">{notesData.title}</h3>}
+
       <ul className="ielts-notes">
         {notesData.items.map((item, index) => {
-          const gapMatch = item.match(/\d+……+/);
-          if (gapMatch) {
-            const questionNum = parseInt(item.match(/\d+/)[0]);
-            const question = questions.find((q) => q.id === questionNum);
+          const questionId = notesData.question_ids?.[index];
+          const question = questions.find((q) => q.id === questionId);
 
-            if (question) {
-              const parts = item.split(/(\d+……+)/);
-              return (
-                <li key={index} className="note-item-with-gap">
-                  {parts.map((part, partIndex) => {
-                    if (part.match(/\d+……+/)) {
-                      return (
-                        <input
-                          key={partIndex}
-                          type="text"
-                          className="notes-gap-input"
-                          value={answers[question.id] || ""}
-                          onChange={(e) =>
-                            onAnswerChange(question.id, e.target.value)
-                          }
-                          style={{
-                            width: `${Math.max(part.length * 8, 50)}px`,
-                          }}
-                          maxLength={
-                            question.word_limit.includes("ONE WORD") ? 15 : 30
-                          }
-                        />
-                      );
-                    }
-                    return <span key={partIndex}>{part}</span>;
-                  })}
-                </li>
-              );
-            }
+          if (!question) {
+            return (
+              <li key={index} className="note-item">
+                {item}
+              </li>
+            );
           }
+
+          const parts = item.split(/(\d+\s*(?:\.{2,}|…+))/);
+
           return (
-            <li key={index} className="note-item">
-              {item}
+            <li key={index} className="note-item-with-gap">
+              {parts.map((part, partIndex) => {
+                if (part.match(/\d+\s*(?:\.{2,}|…+)/)) {
+                  return (
+                    <input
+                      key={partIndex}
+                      type="text"
+                      className="notes-gap-input"
+                      value={answers[question.id] || ""}
+                      onChange={(e) =>
+                        onAnswerChange(question.id, e.target.value)
+                      }
+                      placeholder={question.id}
+                      maxLength={
+                        question.word_limit?.includes("ONE WORD") ? 15 : 30
+                      }
+                      style={{ minWidth: 90 }}
+                      autoComplete="off"
+                    />
+                  );
+                }
+
+                return <span key={partIndex}>{part}</span>;
+              })}
             </li>
           );
         })}
@@ -171,23 +173,22 @@ const StructuredNotesRenderer = ({
                   (q) => q.id === item.question_id
                 );
                 if (question) {
-                  const parts = item.content.split(/(\d+ …………)/g);
+                  const parts = item.content.split(/(\d+\s*(?:\.{2,}|…+))/g);
                   return (
                     <li key={itemIndex} className="structured-item-with-gap">
                       {parts.map((part, partIndex) => {
-                        if (part.match(/\d+ …………/)) {
+                        if (part.match(/\d+\s*…+/)) {
                           return (
                             <input
-                              key={partIndex}
                               type="text"
                               className="structured-gap-input"
                               value={answers[question.id] || ""}
                               onChange={(e) =>
                                 onAnswerChange(question.id, e.target.value)
                               }
-                              style={{ width: "100px" }}
+                              placeholder={question.id}
                               maxLength={
-                                question.word_limit.includes("ONE WORD")
+                                question.word_limit?.includes("ONE WORD")
                                   ? 20
                                   : 30
                               }
@@ -254,28 +255,32 @@ const MatchingTableRenderer = ({
               <tr key={idx}>
                 <td className="person-cell">{pair.person}</td>
                 <td className="answer-cell">
-                  <select
-                    className="matching-select"
-                    value={answers[question?.id] || ""}
-                    onChange={(e) =>
-                      onAnswerChange(question.id, e.target.value)
-                    }
-                  >
-                    <option value="">Select answer</option>
-                    {matchingData.options_box?.options.map((option, optIdx) => {
-                      const letter = option.charAt(0);
-                      return (
-                        <option key={optIdx} value={letter}>
-                          {option}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  {answers[question?.id] && (
-                    <span className="selected-answer-preview">
-                      Selected: {answers[question?.id]}
-                    </span>
-                  )}
+                  <div className="select-container">
+                    <select
+                      className="matching-select"
+                      value={answers[question?.id] || ""}
+                      onChange={(e) =>
+                        onAnswerChange(question.id, e.target.value)
+                      }
+                    >
+                      <option value="">Select answer</option>
+                      {matchingData.options_box?.options.map(
+                        (option, optIdx) => {
+                          const letter = option.charAt(0);
+                          return (
+                            <option key={optIdx} value={letter}>
+                              {option}
+                            </option>
+                          );
+                        }
+                      )}
+                    </select>
+                    {answers[question?.id] && (
+                      <span className="selected-answer-preview">
+                        Selected: {answers[question?.id]}
+                      </span>
+                    )}
+                  </div>
                 </td>
               </tr>
             );
@@ -323,7 +328,10 @@ const MatchingListRenderer = ({
               <select
                 className="matching-list-select"
                 value={answers[question?.id] || ""}
-                onChange={(e) => onAnswerChange(question.id, e.target.value)}
+                onChange={(e) => {
+                  if (!question) return;
+                  onAnswerChange(question.id, e.target.value);
+                }}
               >
                 <option value="">Choose answer</option>
                 {matchingData.options_box?.options.map((option, optIdx) => {
@@ -355,9 +363,6 @@ const MultipleChoiceBlockRenderer = ({
         .filter((q) => q.type === "multiple_choice")
         .map((question, idx) => (
           <div key={question.id} className="mc-block-item">
-            <div className="question-header-row">
-              <span className="question-num">Question {question.id}</span>
-            </div>
             <p className="mc-question-text">{question.question}</p>
             <div className="options-list">
               {question.options.map((option, optIdx) => {
@@ -503,26 +508,25 @@ const VisualStructureRenderer = ({
 };
 
 const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
+  if (!question) return null;
+
   if (question.type === "gap_fill") {
     return (
       <div className="question-card gap-fill-card standalone">
-        <div className="question-header-row">
-          <span className="question-num">Question {question.id}</span>
-          {question.word_limit && (
-            <span className="word-limit-tag">{question.word_limit}</span>
-          )}
-        </div>
         <div className="question-body">
           <p className="question-prompt">{question.prompt}</p>
-          <input
-            type="text"
-            className="answer-input gap-fill-input"
-            value={answer || ""}
-            onChange={(e) => onAnswerChange(question.id, e.target.value)}
-            placeholder="Type your answer here..."
-            maxLength={question.word_limit.includes("ONE WORD") ? 15 : 30}
-            autoComplete="off"
-          />
+          <div className="gap-input-container">
+            <span className="question-num">{question.id}</span>
+            <input
+              type="text"
+              className="answer-input gap-fill-input"
+              value={answer || ""}
+              onChange={(e) => onAnswerChange(question.id, e.target.value)}
+              placeholder="Type your answer..."
+              maxLength={question.word_limit?.includes("ONE WORD") ? 15 : 30}
+              autoComplete="off"
+            />
+          </div>
         </div>
       </div>
     );
@@ -531,10 +535,6 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
   if (question.type === "multiple_choice") {
     return (
       <div className="question-card mc-card standalone">
-        <div className="question-header-row">
-          <span className="question-num">Question {question.id}</span>
-          <span className="question-type-tag">Multiple Choice</span>
-        </div>
         <div className="question-body">
           <p className="mc-question-text">{question.question}</p>
           <div className="options-list">
@@ -569,10 +569,6 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
   if (question.type === "matching") {
     return (
       <div className="question-card matching-card standalone">
-        <div className="question-header-row">
-          <span className="question-num">Question {question.id}</span>
-          <span className="question-type-tag">Matching</span>
-        </div>
         <div className="question-body">
           <p className="matching-question-text">{question.question}</p>
           {question.matching_instruction && (
@@ -580,21 +576,23 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
               {question.matching_instruction}
             </p>
           )}
-          <select
-            className="matching-select"
-            value={answer || ""}
-            onChange={(e) => onAnswerChange(question.id, e.target.value)}
-          >
-            <option value="">-- Select an answer --</option>
-            {question.matching_options?.map((option, idx) => {
-              const letter = option.split(" ")[0];
-              return (
-                <option key={idx} value={letter}>
-                  {option}
-                </option>
-              );
-            })}
-          </select>
+          <div className="select-container">
+            <select
+              className="matching-select"
+              value={answer || ""}
+              onChange={(e) => onAnswerChange(question.id, e.target.value)}
+            >
+              <option value="">-- Select an answer --</option>
+              {question.matching_options?.map((option, idx) => {
+                const letter = option.split(" ")[0];
+                return (
+                  <option key={idx} value={letter}>
+                    {option}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
           {answer && (
             <div className="answer-preview-box">
               Your answer: <strong>{answer}</strong>
@@ -616,7 +614,6 @@ const ListeningTestDashboard = () => {
   });
   const [currentPartIndex, setCurrentPartIndex] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [volume, setVolume] = useState(75);
   const [timeRemaining, setTimeRemaining] = useState(30 * 60);
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -626,6 +623,7 @@ const ListeningTestDashboard = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(75);
 
   // ==================== FULLSCREEN AND EXIT PREVENTION ====================
   useEffect(() => {
@@ -779,28 +777,10 @@ const ListeningTestDashboard = () => {
   const handleVolumeChange = (e) => {
     const newVolume = parseInt(e.target.value);
     setVolume(newVolume);
+    // Update CSS variable for slider background gradient
+    e.target.style.setProperty("--volume-value", `${newVolume}%`);
     if (audioRef.current) {
       audioRef.current.volume = newVolume / 100;
-    }
-  };
-
-  // ==================== AUDIO CONTROLS ====================
-  const handlePlayPause = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleSeek = (e) => {
-    const seekTime = parseFloat(e.target.value);
-    if (audioRef.current) {
-      audioRef.current.currentTime = seekTime;
-      setCurrentTime(seekTime);
     }
   };
 
@@ -856,50 +836,35 @@ const ListeningTestDashboard = () => {
           </p>
         </div>
         <div className="test-controls">
-          {/* Audio Controls */}
-          <div className="audio-controls">
-            <button className="audio-control-btn" onClick={handlePlayPause}>
-              {isPlaying ? "⏸️" : "▶️"}
-            </button>
-            <input
-              type="range"
-              className="audio-progress"
-              min="0"
-              max={duration || 100}
-              value={currentTime}
-              onChange={handleSeek}
-            />
-            <span className="audio-time">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
-          </div>
-
-          {/* Timer */}
-          <div className="timer">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span>{formatTime(timeRemaining)}</span>
+          {/* Timer - Centered */}
+          <div className="timer-container">
+            <div className="timer">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span className="time-text">{formatTime(timeRemaining)}</span>
+            </div>
           </div>
 
           {/* Volume Control */}
-          <div className="volume-control-nav">
+          <div className="volume-control">
             <span className="volume-icon">🔊</span>
             <input
               type="range"
-              className="volume-slider-nav"
+              className="volume-slider"
               min="0"
               max="100"
               value={volume}
               onChange={handleVolumeChange}
+              style={{ "--volume-value": `${volume}%` }}
             />
             <span className="volume-percent">{volume}%</span>
           </div>
@@ -911,6 +876,15 @@ const ListeningTestDashboard = () => {
 
       {/* ==================== MAIN CONTENT ==================== */}
       <div className="test-container">
+        {/* Part Header */}
+        <div className="part-header">
+          <h1 className="part-title">Listening</h1>
+          <p className="part-subtitle">
+            Questions {currentPart.questions[0]?.id || 1} -{" "}
+            {currentPart.questions[currentPart.questions.length - 1]?.id || 10}
+          </p>
+        </div>
+
         {/* Instructions Section */}
         <div className="test-instructions">
           <h2>Instructions</h2>
