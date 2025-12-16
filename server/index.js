@@ -19,7 +19,11 @@ async function start() {
     // Enable CORS for frontend communication
     app.use(
       cors({
-        origin: ["http://localhost:3000", "http://localhost:3001"],
+        origin: [
+          "http://localhost:3000", // Local development
+          "https://cd-ielts.netlify.app", // ← ADD YOUR NETLIFY URL HERE
+          "https://*.netlify.app", // Allow all Netlify subdomains
+        ],
         credentials: true,
       })
     );
