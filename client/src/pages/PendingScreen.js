@@ -187,9 +187,9 @@ function PendingScreen() {
         const canStart = await checkIfTestCanStart();
         if (canStart) {
           setAdminStarted(true);
-          // Redirect to dashboard after short delay
+          // Redirect to listening starter screen after short delay
           setTimeout(() => {
-            navigate("/dashboard", { state: { idCode } });
+            navigate("/test/listening", { state: { idCode } });
           }, 1500);
         }
       } catch (err) {

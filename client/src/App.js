@@ -7,6 +7,9 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import TestPage from "./pages/TestPage";
+import ListeningStarter from "./pages/ListeningStarter";
+import ReadingStarter from "./pages/ReadingStarter";
+import WritingStarter from "./pages/WritingStarter";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -55,6 +58,9 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/test/listening" element={<ListeningStarter />} />
+          <Route path="/test/reading" element={<ReadingStarter />} />
+          <Route path="/test/writing" element={<WritingStarter />} />
         </Routes>
       </div>
     </Router>

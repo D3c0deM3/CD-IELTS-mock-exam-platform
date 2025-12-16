@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import ThemeToggle from "../components/ThemeToggle";
+import MaterialUpload from "../components/MaterialUpload";
 import adminService from "../services/adminService";
 import "./AdminDashboard.css";
 
@@ -631,6 +632,14 @@ const AdminDashboard = () => {
             >
               Tests
             </button>
+            <button
+              className={`tab-button ${
+                activeTab === "materials" ? "active" : ""
+              }`}
+              onClick={() => setActiveTab("materials")}
+            >
+              📦 Upload Materials
+            </button>
           </div>
 
           {/* Sessions Tab */}
@@ -1120,6 +1129,13 @@ const AdminDashboard = () => {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Materials Upload Tab */}
+          {activeTab === "materials" && (
+            <div>
+              <MaterialUpload />
             </div>
           )}
         </div>

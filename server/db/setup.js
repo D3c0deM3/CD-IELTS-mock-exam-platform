@@ -244,6 +244,91 @@ const setupDatabase = async () => {
       )
     `);
 
+    // Table for test materials (passages, answer keys, audio)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_materials (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        test_id INT NOT NULL,
+        material_type ENUM('passages', 'answers', 'audio') NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_url VARCHAR(500),
+        file_size BIGINT,
+        uploaded_by INT NOT NULL,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE RESTRICT,
+        KEY idx_test_type (test_id, material_type)
+      )
+    `);
+
+    // Table for test passages (Reading/Listening content)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_passages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        test_id INT NOT NULL,
+        section_type ENUM('reading', 'listening', 'writing') NOT NULL,
+        section_number INT NOT NULL,
+        passage_number INT,
+        title VARCHAR(255),
+        content LONGTEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        KEY idx_test_section (test_id, section_type),
+        UNIQUE KEY unique_passage (test_id, section_type, section_number, passage_number)
+      )
+    `);
+
+    // Table for test questions
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_questions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        test_id INT NOT NULL,
+        passage_id INT,
+        section_type ENUM('reading', 'listening', 'writing') NOT NULL,
+        section_number INT NOT NULL,
+        question_number INT NOT NULL,
+        question_text LONGTEXT NOT NULL,
+        question_type VARCHAR(100) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        FOREIGN KEY (passage_id) REFERENCES test_passages(id) ON DELETE SET NULL,
+        KEY idx_test_passage (test_id, passage_id),
+        KEY idx_test_section (test_id, section_type)
+      )
+    `);
+
+    // Table for question options (for multiple choice questions)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS question_options (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        question_id INT NOT NULL,
+        option_label VARCHAR(10) NOT NULL,
+        option_text LONGTEXT NOT NULL,
+        is_correct BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (question_id) REFERENCES test_questions(id) ON DELETE CASCADE,
+        KEY idx_question (question_id),
+        UNIQUE KEY unique_option (question_id, option_label)
+      )
+    `);
+
+    // Table for answer keys
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS question_answers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        question_id INT NOT NULL,
+        answer_text LONGTEXT NOT NULL,
+        answer_type ENUM('text', 'multiple_choice', 'true_false') NOT NULL,
+        explanation TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (question_id) REFERENCES test_questions(id) ON DELETE CASCADE,
+        KEY idx_question (question_id)
+      )
+    `);
+
     console.log("Database tables created successfully.");
   } catch (err) {
     console.error("Error creating database tables:", err);

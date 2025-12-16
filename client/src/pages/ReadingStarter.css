@@ -1,0 +1,504 @@
+/* ============ READING STARTER - MINIMALISTIC DESIGN ============ */
+
+.reading-starter {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 40px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
+  transition: background 0.3s ease;
+}
+
+.reading-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ============ HEADER ============ */
+.reading-header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.reading-header h1 {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.candidate-id {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ============ CONTENT SECTION ============ */
+.content-section {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 40px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .content-section {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.content-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+/* ============ INSTRUCTIONS ============ */
+.reading-instructions {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.reading-instructions p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.test-format {
+  background: var(--bg);
+  padding: 20px;
+  border-radius: 6px;
+  margin: 20px 0;
+  border-left: 3px solid var(--primary);
+}
+
+.test-format strong {
+  color: var(--text);
+}
+
+/* ============ FEATURES SECTION ============ */
+.features-section {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.feature-card {
+  background: var(--bg);
+  padding: 20px;
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.feature-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.feature-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ============ READY SECTION ============ */
+.ready-section {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+[data-theme="dark"] .ready-section {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ready-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 24px 0;
+}
+
+/* ============ CHECKLIST ============ */
+.checklist {
+  margin-bottom: 30px;
+  text-align: left;
+}
+
+.checklist label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.checklist label:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.checklist input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.checklist input[type="checkbox"]:disabled {
+  cursor: default;
+}
+
+/* ============ START BUTTON ============ */
+.start-button {
+  width: 100%;
+  max-width: 400px;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 0 auto 20px;
+  display: block;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.start-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.start-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.start-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============ DISCLAIMER ============ */
+.disclaimer {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ============ RESPONSIVE DESIGN ============ */
+@media (max-width: 768px) {
+  .reading-starter {
+    padding: 30px 15px;
+  }
+
+  .reading-header {
+    margin-bottom: 40px;
+  }
+
+  .reading-header h1 {
+    font-size: 24px;
+  }
+
+  .content-section,
+  .ready-section {
+    padding: 30px 20px;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ready-section h2 {
+    font-size: 18px;
+  }
+
+  .start-button {
+    max-width: 100%;
+    font-size: 14px;
+    padding: 12px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .reading-starter {
+    padding: 20px 12px;
+  }
+
+  .reading-header {
+    margin-bottom: 30px;
+  }
+
+  .reading-header h1 {
+    font-size: 20px;
+  }
+
+  .content-section,
+  .ready-section {
+    padding: 20px;
+  }
+
+  .content-section h2,
+  .ready-section h2 {
+    font-size: 16px;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .feature-card {
+    padding: 16px;
+  }
+
+  .feature-icon {
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+
+  .checklist label {
+    font-size: 13px;
+    padding: 10px;
+  }
+
+  .checklist input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .disclaimer {
+    font-size: 12px;
+  }
+}
+
+.feature-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.feature-item h4 {
+  margin: 0 0 8px 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feature-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ============ Ready to Start Section ============ */
+.ready-to-start-section {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: var(--shadow);
+}
+
+.confirmation-box {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.confirmation-box h3 {
+  font-size: 22px;
+  margin: 0 0 25px 0;
+  color: var(--text);
+  font-weight: 600;
+  text-align: center;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 30px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  padding: 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.checkbox-item:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+
+.checkbox-item input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.checkbox-item span {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ============ Start Button ============ */
+.start-button {
+  width: 100%;
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.start-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+.start-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.start-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-icon {
+  font-size: 18px;
+}
+
+.disclaimer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ============ Responsive Design ============ */
+@media (max-width: 768px) {
+  .reading-header {
+    flex-direction: column;
+    padding: 25px;
+  }
+
+  .reading-header h1 {
+    font-size: 22px;
+  }
+
+  .reading-content {
+    grid-template-columns: 1fr;
+  }
+
+  .instructions-panel,
+  .features-panel {
+    padding: 20px;
+  }
+
+  .instructions-panel h2,
+  .features-panel h2 {
+    font-size: 18px;
+  }
+
+  .ready-to-start-section {
+    padding: 25px;
+  }
+
+  .confirmation-box h3 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .reading-starter {
+    padding: 10px;
+  }
+
+  .reading-header {
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .reading-header h1 {
+    font-size: 18px;
+  }
+
+  .instructions-panel,
+  .features-panel,
+  .ready-to-start-section {
+    padding: 16px;
+  }
+
+  .instruction-item ul {
+    padding-left: 16px;
+  }
+
+  .instruction-item li {
+    font-size: 12px;
+  }
+
+  .features-list {
+    grid-template-columns: 1fr;
+  }
+}

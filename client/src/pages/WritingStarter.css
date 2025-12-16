@@ -1,0 +1,350 @@
+/* ============ WRITING STARTER - MINIMALISTIC DESIGN ============ */
+
+.writing-starter {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 40px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
+  transition: background 0.3s ease;
+}
+
+.writing-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ============ HEADER ============ */
+.writing-header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.writing-header h1 {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.candidate-id {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ============ CONTENT SECTION ============ */
+.content-section {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 40px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .content-section {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ============ TASK PANELS ============ */
+.task-panels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.task-panel {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid var(--primary);
+}
+
+[data-theme="dark"] .task-panel {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.task-panel h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 16px 0;
+}
+
+.task-info {
+  background: var(--bg);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.task-requirements {
+  margin-bottom: 16px;
+}
+
+.task-requirements h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  margin: 0 0 8px 0;
+  color: var(--primary);
+}
+
+.task-requirements ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.task-requirements li {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.task-requirements strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ============ TIPS SECTION ============ */
+.tips-section {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .tips-section {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.tips-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.tip-card {
+  background: var(--bg);
+  padding: 16px;
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.tip-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.tip-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.tip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ============ READY SECTION ============ */
+.ready-section {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+[data-theme="dark"] .ready-section {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ready-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 24px 0;
+}
+
+/* ============ CHECKLIST ============ */
+.checklist {
+  margin-bottom: 30px;
+  text-align: left;
+}
+
+.checklist label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.checklist label:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.checklist input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.checklist input[type="checkbox"]:disabled {
+  cursor: default;
+}
+
+/* ============ START BUTTON ============ */
+.start-button {
+  width: 100%;
+  max-width: 400px;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 0 auto 20px;
+  display: block;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.start-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.start-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.start-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============ DISCLAIMER ============ */
+.disclaimer {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ============ RESPONSIVE DESIGN ============ */
+@media (max-width: 768px) {
+  .writing-starter {
+    padding: 30px 15px;
+  }
+
+  .writing-header {
+    margin-bottom: 40px;
+  }
+
+  .writing-header h1 {
+    font-size: 24px;
+  }
+
+  .task-panels,
+  .tips-section,
+  .ready-section {
+    padding: 30px 20px;
+  }
+
+  .tips-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ready-section h2 {
+    font-size: 18px;
+  }
+
+  .start-button {
+    max-width: 100%;
+    font-size: 14px;
+    padding: 12px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .writing-starter {
+    padding: 20px 12px;
+  }
+
+  .writing-header {
+    margin-bottom: 30px;
+  }
+
+  .writing-header h1 {
+    font-size: 20px;
+  }
+
+  .task-panels,
+  .tips-section,
+  .ready-section {
+    padding: 20px;
+  }
+
+  .tips-section h2,
+  .ready-section h2 {
+    font-size: 16px;
+  }
+
+  .tips-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .task-panel h3 {
+    font-size: 16px;
+  }
+
+  .checklist label {
+    font-size: 13px;
+    padding: 10px;
+  }
+
+  .checklist input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .disclaimer {
+    font-size: 12px;
+  }
+}
