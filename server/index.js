@@ -20,6 +20,7 @@ if (process.env.NODE_ENV !== "production") {
 
 const app = express();
 const setupDatabase = require("./db/setup");
+const ensureAdminExists = require("./db/ensureAdmin");
 
 // -------------------- HEALTHCHECK (FIRST) --------------------
 app.get("/api/health", (req, res) => {
@@ -55,7 +56,12 @@ app.listen(PORT, () => {
 
   // DB init happens AFTER server is alive
   setupDatabase()
-    .then(() => console.log("Database initialized"))
+    .then(() => {
+      console.log("Database initialized");
+      // Ensure admin user exists
+      return ensureAdminExists();
+    })
+    .then(() => console.log("Admin check complete"))
     .catch((err) =>
       console.error("Database init failed (non-fatal):", err.message)
     );
