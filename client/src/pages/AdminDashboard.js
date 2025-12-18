@@ -526,7 +526,9 @@ const AdminDashboard = () => {
         p.listening_score === null ||
         p.reading_score === null ||
         p.writing_score === null ||
-        p.speaking_score === null
+        p.writing_score === 0 ||
+        p.speaking_score === null ||
+        p.speaking_score === 0
     );
 
     if (incompleteScores.length > 0) {
@@ -534,8 +536,8 @@ const AdminDashboard = () => {
         const missing = [];
         if (p.listening_score === null) missing.push("Listening");
         if (p.reading_score === null) missing.push("Reading");
-        if (p.writing_score === null) missing.push("Writing");
-        if (p.speaking_score === null) missing.push("Speaking");
+        if (p.writing_score === null || p.writing_score === 0) missing.push("Writing");
+        if (p.speaking_score === null || p.speaking_score === 0) missing.push("Speaking");
         return { name: p.full_name, missing: missing.join(", ") };
       });
 
@@ -574,8 +576,8 @@ const AdminDashboard = () => {
   const openScoresModal = (participant) => {
     setSelectedParticipant(participant);
     setScoresForm({
-      writing_score: participant.writing_score || "",
-      speaking_score: participant.speaking_score || "",
+      writing_score: (participant.writing_score && participant.writing_score !== 0) ? participant.writing_score : "",
+      speaking_score: (participant.speaking_score && participant.speaking_score !== 0) ? participant.speaking_score : "",
     });
     setShowScoresModal(true);
   };
@@ -995,9 +997,9 @@ const AdminDashboard = () => {
                             </td>
                             <td>{participant.full_name}</td>
                             <td>{participant.phone_number || "—"}</td>
-                            <td>{participant.listening_score || "—"}</td>
-                            <td>{participant.reading_score || "—"}</td>
-                            <td>{participant.writing_score || "—"}</td>
+                            <td>{participant.listening_score !== null && participant.listening_score !== undefined ? `${Math.round(participant.listening_score)}/40` : "—"}</td>
+                            <td>{participant.reading_score !== null && participant.reading_score !== undefined ? `${Math.round(participant.reading_score)}/40` : "—"}</td>
+                            <td>{participant.writing_score === 0 ? "Pending" : (participant.writing_score || "—")}</td>
                             <td>{participant.speaking_score || "—"}</td>
                             <td>
                               <span

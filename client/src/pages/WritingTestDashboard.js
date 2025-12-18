@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import API_CONFIG from "../config/api";
 import "./WritingTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
@@ -52,7 +53,11 @@ const ChartRenderer = ({ graphData }) => {
     ctx.textAlign = "center";
 
     // X-axis label
-    ctx.fillText(graphData.x_axis || "X Axis", canvas.width / 2, canvas.height - 10);
+    ctx.fillText(
+      graphData.x_axis || "X Axis",
+      canvas.width / 2,
+      canvas.height - 10
+    );
 
     // Y-axis label
     ctx.save();
@@ -81,14 +86,14 @@ const ChartRenderer = ({ graphData }) => {
           : "#666";
       ctx.font = "11px Arial";
       ctx.textAlign = "right";
-      
+
       for (let i = 0; i <= 5; i++) {
         const y = padding + (height / 5) * i;
         ctx.beginPath();
         ctx.moveTo(padding, y);
         ctx.lineTo(canvas.width - padding, y);
         ctx.stroke();
-        
+
         // Draw Y-axis numbers
         const value = Math.round(maxValue - (maxValue / 5) * i);
         ctx.fillText(value, padding - 12, y + 4);
@@ -111,9 +116,7 @@ const ChartRenderer = ({ graphData }) => {
         const x =
           padding + ((point.year - minYear) / (maxYear - minYear)) * width;
         const y =
-          canvas.height -
-          padding -
-          (point.dog_owners / maxValue) * height;
+          canvas.height - padding - (point.dog_owners / maxValue) * height;
         if (first) {
           ctx.moveTo(x, y);
           first = false;
@@ -132,9 +135,7 @@ const ChartRenderer = ({ graphData }) => {
         const x =
           padding + ((point.year - minYear) / (maxYear - minYear)) * width;
         const y =
-          canvas.height -
-          padding -
-          (point.cat_owners / maxValue) * height;
+          canvas.height - padding - (point.cat_owners / maxValue) * height;
         if (first) {
           ctx.moveTo(x, y);
           first = false;
@@ -149,13 +150,9 @@ const ChartRenderer = ({ graphData }) => {
         const x =
           padding + ((point.year - minYear) / (maxYear - minYear)) * width;
         const yDog =
-          canvas.height -
-          padding -
-          (point.dog_owners / maxValue) * height;
+          canvas.height - padding - (point.dog_owners / maxValue) * height;
         const yCat =
-          canvas.height -
-          padding -
-          (point.cat_owners / maxValue) * height;
+          canvas.height - padding - (point.cat_owners / maxValue) * height;
 
         // Dog points
         ctx.fillStyle = "#2563eb";
@@ -250,6 +247,7 @@ const WritingTestDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==================== THEME MANAGEMENT ====================
   useEffect(() => {
@@ -326,24 +324,62 @@ const WritingTestDashboard = () => {
     setShowSubmitConfirm(true);
   }, []);
 
-  const confirmSubmitTest = useCallback(() => {
-    console.log("Writing test submitted with answers:", answers);
+  const confirmSubmitTest = useCallback(async () => {
+    setIsSubmitting(true);
+    
+    try {
+      // Get participant info from localStorage
+      const participantString = localStorage.getItem("currentParticipant");
+      console.log("localStorage currentParticipant:", participantString);
+      
+      const participantData = JSON.parse(participantString || "{}");
+      console.log("Parsed participant data:", participantData);
+      
+      if (!participantData.id || !participantData.full_name) {
+        console.error("Participant data not found - id:", participantData.id, "full_name:", participantData.full_name);
+        alert("Error: Participant data not found. Please restart the test.");
+        setIsSubmitting(false);
+        return;
+      }
 
-    const task1Words = (answers[1] || "")
-      .split(/\s+/)
-      .filter((w) => w.length > 0).length;
-    const task2Words = (answers[2] || "")
-      .split(/\s+/)
-      .filter((w) => w.length > 0).length;
+      // Format answers with uppercase normalization for text answers
+      const formattedAnswers = {
+        1: (answers[1] || "").trim(),
+        2: (answers[2] || "").trim(),
+      };
 
-    console.log(
-      `Writing test submitted!\nTask 1: ${task1Words} words\nTask 2: ${task2Words} words`
-    );
+      // Send to backend API
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/test-sessions/submit-writing`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participant_id: participantData.id,
+          full_name: participantData.full_name,
+          writing_answers: formattedAnswers,
+        }),
+      });
 
-    setShowSubmitConfirm(false);
-    navigate("/test/speaking", {
-      state: { startTime: new Date().toISOString() },
-    });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to submit writing test");
+      }
+
+      const result = await response.json();
+      console.log("Writing submission response:", result);
+
+      setShowSubmitConfirm(false);
+      
+      // Navigate to speaking test
+      navigate("/test/speaking", {
+        state: { startTime: new Date().toISOString() },
+      });
+    } catch (error) {
+      console.error("Error submitting writing test:", error);
+      alert(`Error submitting test: ${error.message}`);
+      setIsSubmitting(false);
+    }
   }, [answers, navigate]);
 
   const cancelSubmitTest = useCallback(() => {
@@ -412,27 +448,32 @@ const WritingTestDashboard = () => {
       <div className="writing-content">
         {/* LEFT COLUMN - GRAPH/TOPIC */}
         <div className="graph-column">
-          {currentTask.type === "graph_description" && currentTask.graph_data && (
-            <div className="graph-wrapper">
-              <h2 className="graph-title">{currentTask.graph_data.title}</h2>
-              <p className="instruction-text">{currentTask.instructions}</p>
-              {currentTask.requirements && (
-                <p className="requirement-text">
-                  <strong>Requirements:</strong> {currentTask.requirements}
-                </p>
-              )}
-              <ChartRenderer key={theme} graphData={currentTask.graph_data} />
-              <div className="task-meta">
-                <span className="word-limit">
-                  Minimum {currentTask.word_limit} words
-                </span>
-                <span className="time-limit">{currentTask.time_limit} minutes</span>
+          {currentTask.type === "graph_description" &&
+            currentTask.graph_data && (
+              <div className="graph-wrapper">
+                <h2 className="graph-title">{currentTask.graph_data.title}</h2>
+                <p className="instruction-text">{currentTask.instructions}</p>
+                {currentTask.requirements && (
+                  <p className="requirement-text">
+                    <strong>Requirements:</strong> {currentTask.requirements}
+                  </p>
+                )}
+                <ChartRenderer key={theme} graphData={currentTask.graph_data} />
+                <div className="task-meta">
+                  <span className="word-limit">
+                    Minimum {currentTask.word_limit} words
+                  </span>
+                  <span className="time-limit">
+                    {currentTask.time_limit} minutes
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
           {currentTask.type === "essay" && (
             <div className="essay-topic-wrapper">
-              <h2 className="topic-title">Topic: Task {currentTask.task_number}</h2>
+              <h2 className="topic-title">
+                Topic: Task {currentTask.task_number}
+              </h2>
               <p className="topic-text">{currentTask.instructions}</p>
               {currentTask.questions && currentTask.questions.length > 0 && (
                 <div className="topic-questions">
@@ -452,7 +493,9 @@ const WritingTestDashboard = () => {
                 <span className="word-limit">
                   Minimum {currentTask.word_limit} words
                 </span>
-                <span className="time-limit">{currentTask.time_limit} minutes</span>
+                <span className="time-limit">
+                  {currentTask.time_limit} minutes
+                </span>
               </div>
             </div>
           )}
@@ -485,8 +528,11 @@ const WritingTestDashboard = () => {
         </div>
 
         <div className="word-count-info">
-          Task 1: {(answers[1] || "").split(/\s+/).filter((w) => w.length > 0).length} words | Task 2:{" "}
-          {(answers[2] || "").split(/\s+/).filter((w) => w.length > 0).length} words
+          Task 1:{" "}
+          {(answers[1] || "").split(/\s+/).filter((w) => w.length > 0).length}{" "}
+          words | Task 2:{" "}
+          {(answers[2] || "").split(/\s+/).filter((w) => w.length > 0).length}{" "}
+          words
         </div>
 
         <button
@@ -507,21 +553,43 @@ const WritingTestDashboard = () => {
             </div>
             <div className="modal-body">
               <p className="word-summary">
-                Task 1: <strong>{(answers[1] || "").split(/\s+/).filter((w) => w.length > 0).length}</strong> words
+                Task 1:{" "}
+                <strong>
+                  {
+                    (answers[1] || "").split(/\s+/).filter((w) => w.length > 0)
+                      .length
+                  }
+                </strong>{" "}
+                words
               </p>
               <p className="word-summary">
-                Task 2: <strong>{(answers[2] || "").split(/\s+/).filter((w) => w.length > 0).length}</strong> words
+                Task 2:{" "}
+                <strong>
+                  {
+                    (answers[2] || "").split(/\s+/).filter((w) => w.length > 0)
+                      .length
+                  }
+                </strong>{" "}
+                words
               </p>
               <p className="warning-message">
                 Once you submit, you cannot return to modify your answers.
               </p>
             </div>
             <div className="modal-footer">
-              <button className="cancel-button" onClick={cancelSubmitTest}>
+              <button 
+                className="cancel-button" 
+                onClick={cancelSubmitTest}
+                disabled={isSubmitting}
+              >
                 Cancel
               </button>
-              <button className="confirm-button" onClick={confirmSubmitTest}>
-                Submit
+              <button 
+                className="confirm-button" 
+                onClick={confirmSubmitTest}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Submitting..." : "Submit"}
               </button>
             </div>
           </div>

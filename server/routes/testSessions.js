@@ -2,6 +2,11 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const authMiddleware = require("../middleware/auth");
+const { 
+  processWritingScore,
+  calculateListeningScore,
+  calculateReadingScore
+} = require("../utils/scoreCalculator");
 
 /**
  * POST /api/test-sessions/register-students
@@ -422,6 +427,241 @@ router.get("/:id/can-take-test", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("Error checking test availability:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /api/test-sessions/submit-listening
+ * Submit listening answers and save calculated score to database
+ * Body: { participant_id, full_name, listening_answers: { 1: "answer1", 2: "answer2", ... } }
+ */
+router.post("/submit-listening", async (req, res) => {
+  const { participant_id, full_name, listening_answers } = req.body;
+
+  if (!participant_id || !full_name || !listening_answers) {
+    return res.status(400).json({
+      error: "Missing required fields: participant_id, full_name, listening_answers",
+    });
+  }
+
+  try {
+    // Verify participant exists
+    const [participantRows] = await db.execute(
+      "SELECT id, full_name FROM test_participants WHERE id = ?",
+      [participant_id]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = participantRows[0];
+
+    // Verify name matches
+    const registeredName = (participant.full_name || "").trim().toLowerCase();
+    const providedName = (full_name || "").trim().toLowerCase();
+
+    if (registeredName !== providedName) {
+      return res.status(403).json({
+        error: "Name does not match registered participant",
+      });
+    }
+
+    // Calculate listening score
+    const listeningScore = calculateListeningScore(listening_answers);
+
+    // Save listening score to database
+    await db.execute(
+      `UPDATE test_participants 
+       SET listening_score = ?, 
+           updated_at = NOW()
+       WHERE id = ?`,
+      [listeningScore, participant.id]
+    );
+
+    res.json({
+      message: "Listening test submitted successfully",
+      participant_id: participant.id,
+      listening_score: listeningScore,
+      total_questions: 40,
+    });
+  } catch (err) {
+    console.error("Error submitting listening answers:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /api/test-sessions/submit-reading
+ * Submit reading answers and save calculated score to database
+ * Body: { participant_id, full_name, reading_answers: { 1: "answer1", 2: "answer2", ... } }
+ */
+router.post("/submit-reading", async (req, res) => {
+  const { participant_id, full_name, reading_answers } = req.body;
+
+  if (!participant_id || !full_name || !reading_answers) {
+    return res.status(400).json({
+      error: "Missing required fields: participant_id, full_name, reading_answers",
+    });
+  }
+
+  try {
+    // Verify participant exists
+    const [participantRows] = await db.execute(
+      "SELECT id, full_name FROM test_participants WHERE id = ?",
+      [participant_id]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = participantRows[0];
+
+    // Verify name matches
+    const registeredName = (participant.full_name || "").trim().toLowerCase();
+    const providedName = (full_name || "").trim().toLowerCase();
+
+    if (registeredName !== providedName) {
+      return res.status(403).json({
+        error: "Name does not match registered participant",
+      });
+    }
+
+    // Calculate reading score
+    const readingScore = calculateReadingScore(reading_answers);
+
+    // Save reading score to database
+    await db.execute(
+      `UPDATE test_participants 
+       SET reading_score = ?, 
+           updated_at = NOW()
+       WHERE id = ?`,
+      [readingScore, participant.id]
+    );
+
+    res.json({
+      message: "Reading test submitted successfully",
+      participant_id: participant.id,
+      reading_score: readingScore,
+      total_questions: 40,
+    });
+  } catch (err) {
+    console.error("Error submitting reading answers:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /api/test-sessions/submit-writing
+ * Submit writing answers and save calculated score to database
+ * Body: { participant_id, full_name, writing_answers: { 1: "essay1 text", 2: "essay2 text" } }
+ */
+router.post("/submit-writing", async (req, res) => {
+  const { participant_id, full_name, writing_answers } = req.body;
+
+  if (!participant_id || !full_name || !writing_answers) {
+    return res
+      .status(400)
+      .json({
+        error: "Missing required fields: participant_id, full_name, writing_answers",
+      });
+  }
+
+  try {
+    // Find participant to verify identity
+    const [participantRows] = await db.execute(
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name
+       FROM test_participants tp
+       WHERE tp.id = ?`,
+      [participant_id]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = participantRows[0];
+
+    // Verify name matches
+    const registeredName = (participant.full_name || "").trim().toLowerCase();
+    const providedName = (full_name || "").trim().toLowerCase();
+
+    if (registeredName !== providedName) {
+      return res.status(403).json({
+        error: "Name does not match registered participant",
+      });
+    }
+
+    // Calculate writing score
+    const scoreData = processWritingScore(writing_answers);
+
+    // Save writing answers and scores to database
+    // Update test_participants with preliminary writing score
+    await db.execute(
+      `UPDATE test_participants 
+       SET writing_score = ?, 
+           updated_at = NOW()
+       WHERE id = ?`,
+      [0, participant.id] // 0 = pending admin review (will be set by admin)
+    );
+
+    res.json({
+      message: "Writing test submitted successfully",
+      participant_id: participant.id,
+      writing_submission: {
+        task_1_words: scoreData.writing_raw_score.task_1.word_count,
+        task_1_meets_minimum: scoreData.writing_raw_score.task_1.meets_minimum,
+        task_2_words: scoreData.writing_raw_score.task_2.word_count,
+        task_2_meets_minimum: scoreData.writing_raw_score.task_2.meets_minimum,
+        status: "pending_admin_review",
+      },
+    });
+  } catch (err) {
+    console.error("Error submitting writing answers:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/test-sessions/participant/:id/scores
+ * Get calculated/final scores for a participant
+ * Returns listening, reading, writing, speaking scores
+ */
+router.get("/participant/:id/scores", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [participantRows] = await db.execute(
+      `SELECT 
+        id,
+        listening_score,
+        reading_score,
+        writing_score,
+        speaking_score
+       FROM test_participants
+       WHERE id = ?`,
+      [id]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant not found" });
+    }
+
+    const participant = participantRows[0];
+
+    res.json({
+      participant_id: participant.id,
+      scores: {
+        listening_score: participant.listening_score,
+        reading_score: participant.reading_score,
+        writing_score: participant.writing_score,
+        speaking_score: participant.speaking_score,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching participant scores:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

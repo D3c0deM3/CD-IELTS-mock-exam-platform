@@ -575,6 +575,61 @@ router.put("/participants/:id/scores", async (req, res) => {
   }
 });
 
+// GET /api/admin/pending-scores/:session_id - Get participants pending score review (writing/speaking)
+router.get("/pending-scores/:session_id", async (req, res) => {
+  const { session_id } = req.params;
+
+  try {
+    // Get all participants for this session that need writing/speaking scores
+    const [participants] = await db.execute(
+      `SELECT 
+        tp.id,
+        tp.participant_id_code,
+        tp.full_name,
+        tp.listening_score,
+        tp.reading_score,
+        tp.writing_score,
+        tp.speaking_score,
+        tp.is_writing_scored,
+        tp.is_speaking_scored,
+        tp.test_status,
+        tp.test_completed_at
+       FROM test_participants tp
+       WHERE tp.session_id = ? AND tp.test_status = 'completed'
+       ORDER BY tp.full_name ASC`,
+      [session_id]
+    );
+
+    // Separate into categories
+    const pendingWriting = participants.filter(
+      (p) => p.listening_score && p.reading_score && !p.is_writing_scored
+    );
+    const pendingSpeaking = participants.filter(
+      (p) => p.listening_score && p.reading_score && !p.is_speaking_scored
+    );
+    const allScored = participants.filter(
+      (p) => p.is_writing_scored && p.is_speaking_scored
+    );
+
+    res.json({
+      session_id,
+      summary: {
+        total_participants: participants.length,
+        completed_tests: participants.length,
+        pending_writing_review: pendingWriting.length,
+        pending_speaking_review: pendingSpeaking.length,
+        all_scored: allScored.length,
+      },
+      pending_writing: pendingWriting,
+      pending_speaking: pendingSpeaking,
+      completed: allScored,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // PATCH /api/admin/sessions/:id/start-all - Start test for all entered participants with timer
 router.patch("/sessions/:id/start-all", async (req, res) => {
   const { id: session_id } = req.params;

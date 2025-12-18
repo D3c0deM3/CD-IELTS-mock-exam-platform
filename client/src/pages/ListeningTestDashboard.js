@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import API_CONFIG from "../config/api";
 import audioService from "../services/audioService";
 import "./ListeningTestDashboard.css";
 import testDataJson from "./mock_2.json";
@@ -994,7 +995,7 @@ const ListeningTestDashboard = () => {
     setShowSubmitConfirm(true);
   }, []);
 
-  const confirmSubmitTest = useCallback(() => {
+  const confirmSubmitTest = useCallback(async () => {
     console.log("Test submitted with answers:", answers);
 
     // Calculate score
@@ -1007,24 +1008,59 @@ const ListeningTestDashboard = () => {
       `Test submitted!\nYou answered ${answeredQuestions} out of ${totalQuestions} questions.`
     );
 
-    // Close confirmation modal
     setShowSubmitConfirm(false);
 
-    // Stop audio before leaving the test
-    audioService.stopAudio();
-    console.log("✓ Audio stopped");
+    try {
+      // Get participant data from localStorage
+      const participantString = localStorage.getItem("currentParticipant");
+      const participantData = JSON.parse(participantString || "{}");
 
-    // Exit fullscreen
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else if (document.webkitFullscreenElement) {
-      document.webkitExitFullscreen();
+      if (!participantData.id || !participantData.full_name) {
+        console.error("Participant data not found");
+        alert("Error: Participant data not found. Please restart the test.");
+        return;
+      }
+
+      // Submit listening answers to backend
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/test-sessions/submit-listening`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participant_id: participantData.id,
+          full_name: participantData.full_name,
+          listening_answers: answers,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to submit listening test");
+      }
+
+      const result = await response.json();
+      console.log("Listening submission response:", result);
+
+      // Stop audio before leaving the test
+      audioService.stopAudio();
+      console.log("✓ Audio stopped");
+
+      // Exit fullscreen
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (document.webkitFullscreenElement) {
+        document.webkitExitFullscreen();
+      }
+
+      // Navigate to reading starter
+      navigate("/test/reading", {
+        state: { startTime: new Date().toISOString() },
+      });
+    } catch (error) {
+      console.error("Error submitting listening test:", error);
+      alert(`Error submitting test: ${error.message}`);
     }
-
-    // Navigate to reading starter
-    navigate("/test/reading", {
-      state: { startTime: new Date().toISOString() },
-    });
   }, [answers, navigate, testData]);
 
   const cancelSubmitTest = useCallback(() => {

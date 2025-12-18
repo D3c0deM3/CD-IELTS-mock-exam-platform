@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import API_CONFIG from "../config/api";
 import "./ReadingTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
@@ -440,7 +441,7 @@ const ReadingTestDashboard = () => {
     setShowSubmitConfirm(true);
   }, []);
 
-  const confirmSubmitTest = useCallback(() => {
+  const confirmSubmitTest = useCallback(async () => {
     console.log("Reading test submitted with answers:", answers);
 
     const totalQuestions =
@@ -455,9 +456,46 @@ const ReadingTestDashboard = () => {
     );
 
     setShowSubmitConfirm(false);
-    navigate("/test/writing/dashboard", {
-      state: { startTime: new Date().toISOString() },
-    });
+
+    try {
+      // Get participant data from localStorage
+      const participantString = localStorage.getItem("currentParticipant");
+      const participantData = JSON.parse(participantString || "{}");
+
+      if (!participantData.id || !participantData.full_name) {
+        console.error("Participant data not found");
+        alert("Error: Participant data not found. Please restart the test.");
+        return;
+      }
+
+      // Submit reading answers to backend
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/test-sessions/submit-reading`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participant_id: participantData.id,
+          full_name: participantData.full_name,
+          reading_answers: answers,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to submit reading test");
+      }
+
+      const result = await response.json();
+      console.log("Reading submission response:", result);
+
+      navigate("/test/writing/dashboard", {
+        state: { startTime: new Date().toISOString() },
+      });
+    } catch (error) {
+      console.error("Error submitting reading test:", error);
+      alert(`Error submitting test: ${error.message}`);
+    }
   }, [answers, navigate, testData]);
 
   const cancelSubmitTest = useCallback(() => {
