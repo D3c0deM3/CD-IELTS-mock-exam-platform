@@ -1,215 +1,241 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
-import "./ReadingStarter.css";
+import readingVideo from "../starter_videos/reading_starter.mp4";
+import "./ListeningStarter.css";
 
 function ReadingStarter() {
+  const [volume, setVolume] = useState(100);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [videoEnded, setVideoEnded] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(300);
+  const videoRef = useRef(null);
+  const videoContainerRef = useRef(null);
   const navigate = useNavigate();
-  const [agreedToStart, setAgreedToStart] = useState(false);
-  const idCode = localStorage.getItem("ielts_mock_user_id") || "Test Candidate";
 
-  // Handle start test
-  const handleStartTest = () => {
-    if (!agreedToStart) {
-      alert("Please confirm you are ready to start");
-      return;
-    }
-    // Navigate to reading section
-    navigate("/test/reading", {
-      state: { startTime: new Date().toISOString() },
-    });
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          navigate("/test/reading/dashboard");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [navigate]);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Security: Prevent navigation away
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = "";
-      return "";
-    };
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []);
+  const handleVolumeChange = (e) => {
+    const newVolume = parseInt(e.target.value);
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume / 100;
+    }
+  };
+
+  const handlePlayPause = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+    }
+  };
+
+  const handleVideoClick = () => {
+    handlePlayPause();
+  };
+
+  const handleSeek = (e) => {
+    const newTime = (e.target.value / 100) * duration;
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+      videoRef.current.volume = volume / 100;
+    }
+  };
+
+  const handleVideoEnded = () => {
+    setVideoEnded(true);
+    setIsPlaying(false);
+  };
+
+  const handleFullscreen = async () => {
+    try {
+      if (!isFullscreen) {
+        if (videoContainerRef.current.requestFullscreen) {
+          await videoContainerRef.current.requestFullscreen();
+          setIsFullscreen(true);
+        }
+      } else {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          setIsFullscreen(false);
+        }
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
+    }
+  };
+
+  const handleStartTest = () => {
+    navigate("/test/reading/dashboard");
+  };
 
   return (
-    <div className="reading-starter">
-      <ThemeToggle />
-
-      <div className="reading-container">
-        {/* Header */}
-        <div className="reading-header">
-          <div className="header-content">
-            <h1>Reading Test - Instructions & Guidelines</h1>
-            <p className="candidate-info">Candidate: {idCode}</p>
-          </div>
-          <div className="header-badge">
-            <span className="section-label">Section 2</span>
-            <span className="time-label">60 minutes</span>
+    <div className="listening-starter">
+      <div className="top-navigation">
+        <div className="nav-left">
+          <span className="timer-label">Time Remaining:</span>
+          <div className="timer-display">
+            <span className="timer-time">{formatTimer(timeRemaining)}</span>
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="reading-content">
-          {/* Instructions */}
-          <div className="instructions-panel">
-            <h2>
-              <span className="icon">📖</span>
-              Test Instructions
-            </h2>
-
-            <div className="instructions-content">
-              <div className="instruction-item">
-                <h4>Test Format</h4>
-                <ul>
-                  <li>3 reading passages with increasing difficulty</li>
-                  <li>40 questions total across all passages</li>
-                  <li>60 minutes total duration</li>
-                  <li>
-                    Question types: True/False/Not Given, Multiple Choice,
-                    Matching, Gap Fill
-                  </li>
-                </ul>
-              </div>
-
-              <div className="instruction-item">
-                <h4>How to Answer</h4>
-                <ul>
-                  <li>Read the passage carefully before answering questions</li>
-                  <li>
-                    Use the search and highlight tools to find relevant
-                    information
-                  </li>
-                  <li>Transfer your answers to the answer sheet</li>
-                  <li>You can move between passages as needed</li>
-                </ul>
-              </div>
-
-              <div className="instruction-item">
-                <h4>Time Management Tips</h4>
-                <ul>
-                  <li>Passage 1: ~18 minutes</li>
-                  <li>Passage 2: ~20 minutes</li>
-                  <li>Passage 3: ~22 minutes</li>
-                  <li>Spend first 5-10 minutes skimming each passage</li>
-                </ul>
-              </div>
-
-              <div className="instruction-item info-box">
-                <h4>💡 Pro Tip</h4>
-                <p>
-                  Don't spend too much time on difficult questions. Mark them
-                  and come back later if you have time.
-                </p>
-              </div>
-            </div>
+        <div className="nav-right">
+          <div className="volume-control-nav">
+            <span className="volume-icon">🔊</span>
+            <input
+              type="range"
+              className="volume-slider-nav"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={handleVolumeChange}
+            />
+            <span className="volume-percent">{volume}%</span>
           </div>
+          <ThemeToggle />
+        </div>
+      </div>
 
-          {/* Features */}
-          <div className="features-panel">
-            <h2>
-              <span className="icon">⚙️</span>
-              Available Tools
-            </h2>
-
-            <div className="features-list">
-              <div className="feature-item">
-                <div className="feature-icon">🔍</div>
-                <h4>Search Function</h4>
-                <p>
-                  Search for keywords within passages to quickly locate relevant
-                  information
-                </p>
-              </div>
-
-              <div className="feature-item">
-                <div className="feature-icon">✏️</div>
-                <h4>Highlight Tool</h4>
-                <p>
-                  Highlight important text in passages to make notes while
-                  reading
-                </p>
-              </div>
-
-              <div className="feature-item">
-                <div className="feature-icon">📋</div>
-                <h4>Answer Sheet</h4>
-                <p>
-                  Automatic tracking of your answers with clear progress
-                  indicators
-                </p>
-              </div>
-
-              <div className="feature-item">
-                <div className="feature-icon">⏱️</div>
-                <h4>Timer</h4>
-                <p>
-                  Real-time countdown timer showing remaining time for this
-                  section
-                </p>
-              </div>
-
-              <div className="feature-item">
-                <div className="feature-icon">🎯</div>
-                <h4>Question Navigator</h4>
-                <p>
-                  Jump between passages and questions with the question
-                  navigation panel
-                </p>
-              </div>
-
-              <div className="feature-item">
-                <div className="feature-icon">📊</div>
-                <h4>Progress Tracker</h4>
-                <p>
-                  See overview of answered, unanswered, and reviewed questions
-                </p>
-              </div>
-            </div>
-          </div>
+      <div className="listening-container">
+        <div className="listening-header">
+          <h1>Reading Test Instructions</h1>
+          <p>
+            You will have 60 minutes to complete the reading section. Please
+            watch the instructions carefully.
+          </p>
         </div>
 
-        {/* Ready to Start Section */}
-        <div className="ready-to-start-section">
-          <div className="confirmation-box">
-            <h3>Ready to Begin?</h3>
-
-            <div className="checklist">
-              <label className="checkbox-item">
-                <input type="checkbox" disabled checked />
-                <span>I have read and understood the test instructions</span>
-              </label>
-              <label className="checkbox-item">
-                <input type="checkbox" disabled checked />
-                <span>I understand the question types and formats</span>
-              </label>
-              <label className="checkbox-item">
-                <input type="checkbox" disabled checked />
-                <span>I am familiar with the available tools</span>
-              </label>
-              <label className="checkbox-item">
+        <div className="content-section">
+          <div className="video-instructions">
+            <div className="video-container" ref={videoContainerRef}>
+              <video
+                ref={videoRef}
+                width="100%"
+                height="auto"
+                controlsList="nodownload"
+                style={{
+                  borderRadius: "8px",
+                  display: "block",
+                  cursor: "pointer",
+                }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onClick={handleVideoClick}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onEnded={handleVideoEnded}
+              >
+                <source src={readingVideo} type="video/mp4" />
+                Your browser does not support the video element.
+              </video>
+              {!isPlaying && (
+                <div className="video-overlay">
+                  <button
+                    className="play-pause-btn"
+                    onClick={handlePlayPause}
+                    aria-label="Play"
+                  >
+                    <svg viewBox="0 0 24 24" fill="white">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              <button
+                className="fullscreen-btn"
+                onClick={handleFullscreen}
+                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? (
+                  <svg viewBox="0 0 24 24" fill="white">
+                    <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="white">
+                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+                  </svg>
+                )}
+              </button>
+              <div className="video-timeline">
                 <input
-                  type="checkbox"
-                  checked={agreedToStart}
-                  onChange={(e) => setAgreedToStart(e.target.checked)}
+                  type="range"
+                  className="progress-bar"
+                  min="0"
+                  max="100"
+                  value={duration ? (currentTime / duration) * 100 : 0}
+                  onChange={handleSeek}
                 />
-                <span>I am ready to start the reading test</span>
-              </label>
+                <div className="time-display">
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
+              </div>
             </div>
 
-            <button
-              className="start-button"
-              onClick={handleStartTest}
-              disabled={!agreedToStart}
-            >
-              <span className="button-icon">▶</span>
-              Start Reading Test
-            </button>
-
-            <p className="disclaimer">
-              Once you start, you have 60 minutes to complete the reading
-              section. Use your time wisely.
+            <p className="video-desc">
+              Watch the complete video. The start button will enable after you
+              finish.
             </p>
+
+            <div className="action-buttons-center">
+              <button
+                className="primary-button-center"
+                onClick={handleStartTest}
+                disabled={!videoEnded}
+                title={
+                  videoEnded
+                    ? "Start Test"
+                    : "Please watch the video completely first"
+                }
+              >
+                <span>Start Test Now</span>
+                <span>▶</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

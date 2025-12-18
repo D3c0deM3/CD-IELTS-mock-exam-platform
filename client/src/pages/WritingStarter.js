@@ -1,26 +1,163 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import writingVideo from "../starter_videos/writing_starter.mp4";
 import "./WritingStarter.css";
 
 function WritingStarter() {
   const navigate = useNavigate();
-  const [agreedToStart, setAgreedToStart] = useState(false);
-  const idCode = localStorage.getItem("ielts_mock_user_id") || "Test Candidate";
+  const videoRef = useRef(null);
+  const videoContainerRef = useRef(null);
+  const [volume, setVolume] = useState(75);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [videoEnded, setVideoEnded] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(300);
 
-  // Handle start test
-  const handleStartTest = () => {
-    if (!agreedToStart) {
-      alert("Please confirm you are ready to start");
-      return;
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = 0.75;
     }
-    // Navigate to writing section
-    navigate("/test/writing", {
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" || e.key === "F11") {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          navigate("/test/writing/dashboard", {
+            state: { startTime: new Date().toISOString() },
+          });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [navigate]);
+
+  const handleVideoEnded = () => {
+    setVideoEnded(true);
+  };
+
+  const handleStartTest = () => {
+    navigate("/test/writing/dashboard", {
       state: { startTime: new Date().toISOString() },
     });
   };
 
-  // Security: Prevent navigation away
+  const handleVideoClick = (e) => {
+    e.stopPropagation();
+    handlePlayPause();
+  };
+
+  const handleFullscreen = () => {
+    if (videoContainerRef.current) {
+      if (!isFullscreen) {
+        if (videoContainerRef.current.requestFullscreen) {
+          videoContainerRef.current.requestFullscreen();
+        } else if (videoContainerRef.current.webkitRequestFullscreen) {
+          videoContainerRef.current.webkitRequestFullscreen();
+        } else if (videoContainerRef.current.msRequestFullscreen) {
+          videoContainerRef.current.msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else if (document.webkitFullscreenElement) {
+          document.webkitExitFullscreen();
+        } else if (document.msFullscreenElement) {
+          document.msExitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(
+        !!document.fullscreenElement || !!document.webkitFullscreenElement
+      );
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+    };
+  }, []);
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+    }
+  };
+
+  const handleSeek = (e) => {
+    const newTime = (parseFloat(e.target.value) / 100) * duration;
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+    }
+  };
+
+  const handleVolumeChange = (e) => {
+    const newVolume = parseInt(e.target.value);
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume / 100;
+    }
+  };
+
+  const handlePlayPause = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        videoRef.current.play();
+        setIsPlaying(true);
+      }
+    }
+  };
+
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       e.preventDefault();
@@ -34,250 +171,132 @@ function WritingStarter() {
 
   return (
     <div className="writing-starter">
-      <ThemeToggle />
+      <div className="top-navigation">
+        <div className="nav-left">
+          <div className="timer-section">
+            <span className="timer-icon">⏱</span>
+            <span className="timer-time">{formatTimer(timeRemaining)}</span>
+          </div>
+        </div>
+
+        <div className="nav-right">
+          <div className="volume-control-nav">
+            <span className="volume-icon">🔊</span>
+            <input
+              type="range"
+              className="volume-slider-nav"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={handleVolumeChange}
+            />
+            <span className="volume-percent">{volume}%</span>
+          </div>
+          <ThemeToggle />
+        </div>
+      </div>
 
       <div className="writing-container">
-        {/* Header */}
         <div className="writing-header">
-          <div className="header-content">
-            <h1>Writing Test - Task Instructions</h1>
-            <p className="candidate-info">Candidate: {idCode}</p>
-          </div>
-          <div className="header-badge">
-            <span className="section-label">Section 3</span>
-            <span className="time-label">60 minutes</span>
-          </div>
+          <h1>Writing Test Instructions</h1>
+          <p>
+            Please follow the instructions carefully. You will have 60 minutes
+            to complete two writing tasks. Make sure you understand the
+            requirements before starting.
+          </p>
+          <p style={{ fontSize: "13px", color: "#64748b", marginTop: "8px" }}>
+            <strong>Tip:</strong> You can adjust the video volume using the
+            volume slider located in the top-right corner of your screen.
+          </p>
         </div>
 
-        {/* Main Content */}
-        <div className="writing-content">
-          {/* Task 1 */}
-          <div className="task-panel">
-            <h2>
-              <span className="icon">📊</span>
-              Task 1: Academic Writing (20 minutes)
-            </h2>
-
-            <div className="task-content">
-              <div className="task-description">
-                <h4>Objective</h4>
-                <p>
-                  You will be shown a graph, table, chart, or diagram. You must
-                  write at least 150 words describing the key information
-                  presented.
-                </p>
-              </div>
-
-              <div className="task-requirements">
-                <h4>Key Requirements</h4>
-                <ul>
-                  <li>
-                    <strong>Minimum 150 words</strong> - Write below this will
-                    lose marks
-                  </li>
-                  <li>
-                    <strong>Describe main features</strong> - Focus on the most
-                    important information
-                  </li>
-                  <li>
-                    <strong>Make comparisons</strong> - Where relevant, compare
-                    different data points
-                  </li>
-                  <li>
-                    <strong>Use academic vocabulary</strong> - Formal and
-                    professional tone
-                  </li>
-                  <li>
-                    <strong>Good grammar and spelling</strong> - Accuracy is
-                    important
-                  </li>
-                  <li>
-                    <strong>Organized paragraphs</strong> - Introduction, body,
-                    conclusion
-                  </li>
-                </ul>
-              </div>
-
-              <div className="tips-box">
-                <h4>💡 Writing Tips</h4>
-                <ul>
-                  <li>Don't copy text from the task - use your own words</li>
-                  <li>Introduce the visual before describing it</li>
-                  <li>Use varied sentence structures</li>
-                  <li>Spend 2-3 minutes planning before writing</li>
-                  <li>Leave time to proofread your work</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Task 2 */}
-          <div className="task-panel">
-            <h2>
-              <span className="icon">✍️</span>
-              Task 2: Essay Writing (40 minutes)
-            </h2>
-
-            <div className="task-content">
-              <div className="task-description">
-                <h4>Objective</h4>
-                <p>
-                  You will be given a topic with 1-3 questions. You must write
-                  an essay of at least 250 words presenting your ideas clearly
-                  and persuasively.
-                </p>
-              </div>
-
-              <div className="task-requirements">
-                <h4>Key Requirements</h4>
-                <ul>
-                  <li>
-                    <strong>Minimum 250 words</strong> - Significantly below
-                    this loses marks
-                  </li>
-                  <li>
-                    <strong>Address all parts</strong> - Answer all questions
-                    posed
-                  </li>
-                  <li>
-                    <strong>Present ideas clearly</strong> - Your position
-                    should be obvious
-                  </li>
-                  <li>
-                    <strong>Support with examples</strong> - Use specific,
-                    relevant examples
-                  </li>
-                  <li>
-                    <strong>Logical organization</strong> - Introduction, body
-                    paragraphs, conclusion
-                  </li>
-                  <li>
-                    <strong>Academic tone</strong> - Formal and professional
-                    language
-                  </li>
-                </ul>
-              </div>
-
-              <div className="tips-box">
-                <h4>💡 Essay Tips</h4>
-                <ul>
-                  <li>Spend 5 minutes planning your essay structure</li>
-                  <li>Write clear topic sentences for each paragraph</li>
-                  <li>
-                    Use linking words and phrases (Furthermore, In addition,
-                    etc.)
-                  </li>
-                  <li>
-                    Write a strong conclusion that summarizes your main points
-                  </li>
-                  <li>
-                    Allocate time: Planning (5 min), Writing (30 min), Checking
-                    (5 min)
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* General Tips */}
-        <div className="general-tips">
-          <h2>
-            <span className="icon">⭐</span>
-            Important Information
-          </h2>
-
-          <div className="tips-grid">
-            <div className="tip-card">
-              <h4>Legibility</h4>
-              <p>Write clearly and neatly. Illegible text cannot be marked.</p>
-            </div>
-
-            <div className="tip-card">
-              <h4>Spelling</h4>
-              <p>
-                British English spelling is preferred (e.g., "colour" not
-                "color")
-              </p>
-            </div>
-
-            <div className="tip-card">
-              <h4>Word Count</h4>
-              <p>
-                Count your words carefully. Aim for 160+ words (Task 1) and 270+
-                (Task 2)
-              </p>
-            </div>
-
-            <div className="tip-card">
-              <h4>Handwriting</h4>
-              <p>
-                If writing by hand, use a black or blue pen and write in CAPITAL
-                letters for better clarity
-              </p>
-            </div>
-
-            <div className="tip-card">
-              <h4>No Bullet Points</h4>
-              <p>
-                Write in full sentences and paragraphs. Bullet points are not
-                allowed.
-              </p>
-            </div>
-
-            <div className="tip-card">
-              <h4>Time Management</h4>
-              <p>
-                Task 1 (20 min): Plan (2), Write (15), Check (3) | Task 2 (40
-                min): Plan (5), Write (30), Check (5)
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Ready to Start Section */}
-        <div className="ready-to-start-section">
-          <div className="confirmation-box">
-            <h3>Ready to Begin?</h3>
-
-            <div className="checklist">
-              <label className="checkbox-item">
-                <input type="checkbox" disabled checked />
-                <span>I understand the requirements for both tasks</span>
-              </label>
-              <label className="checkbox-item">
-                <input type="checkbox" disabled checked />
-                <span>
-                  I know the minimum word count requirements (150 and 250 words)
-                </span>
-              </label>
-              <label className="checkbox-item">
-                <input type="checkbox" disabled checked />
-                <span>I am familiar with the assessment criteria</span>
-              </label>
-              <label className="checkbox-item">
+        <div className="content-section">
+          <div className="video-instructions">
+            <div className="video-container" ref={videoContainerRef}>
+              <video
+                ref={videoRef}
+                width="100%"
+                height="auto"
+                controlsList="nodownload"
+                style={{
+                  borderRadius: "8px",
+                  display: "block",
+                  cursor: "pointer",
+                }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onClick={handleVideoClick}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onEnded={handleVideoEnded}
+              >
+                <source src={writingVideo} type="video/mp4" />
+                Your browser does not support the video element.
+              </video>
+              {!isPlaying && (
+                <div className="video-overlay">
+                  <button
+                    className="play-pause-btn"
+                    onClick={handlePlayPause}
+                    aria-label="Play"
+                  >
+                    <svg viewBox="0 0 24 24" fill="white">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              <button
+                className="fullscreen-btn"
+                onClick={handleFullscreen}
+                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? (
+                  <svg viewBox="0 0 24 24" fill="white">
+                    <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="white">
+                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+                  </svg>
+                )}
+              </button>
+              <div className="video-timeline">
                 <input
-                  type="checkbox"
-                  checked={agreedToStart}
-                  onChange={(e) => setAgreedToStart(e.target.checked)}
+                  type="range"
+                  className="progress-bar"
+                  min="0"
+                  max="100"
+                  value={duration ? (currentTime / duration) * 100 : 0}
+                  onChange={handleSeek}
                 />
-                <span>I am ready to start the writing test</span>
-              </label>
+                <div className="time-display">
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
+              </div>
             </div>
 
-            <button
-              className="start-button"
-              onClick={handleStartTest}
-              disabled={!agreedToStart}
-            >
-              <span className="button-icon">▶</span>
-              Start Writing Test
-            </button>
-
-            <p className="disclaimer">
-              You have 60 minutes total for both tasks. Once you start, the
-              timer cannot be paused. Plan your time carefully.
+            <p className="video-desc">
+              <strong>Important:</strong> Watch the complete video. The start
+              button will enable after you finish.
             </p>
+
+            <div className="action-buttons-center">
+              <button
+                className="primary-button-center"
+                onClick={handleStartTest}
+                disabled={!videoEnded}
+                title={
+                  videoEnded
+                    ? "Start Test"
+                    : "Please watch the video completely first"
+                }
+              >
+                <span>Start Test Now</span>
+                <span>▶</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

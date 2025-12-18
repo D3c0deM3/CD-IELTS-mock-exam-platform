@@ -73,19 +73,20 @@ const testSessionService = {
   /**
    * Participant: Check in with ID code at start screen
    */
-  checkInParticipant: async (participant_id_code) => {
+  checkInParticipant: async (participant_id_code, full_name) => {
     return await apiClient.post(
       `${API_CONFIG.BASE_URL}/api/test-sessions/check-in-participant`,
-      { participant_id_code }
+      { participant_id_code, full_name }
     );
   },
 
   /**
    * Participant: Check if they can start the test
    */
-  canStartTest: async (participant_id_code) => {
+  canStartTest: async (participant_id_code, full_name) => {
     return await apiClient.get(
-      `${API_CONFIG.BASE_URL}/api/test-sessions/participant/${participant_id_code}/can-start`
+      `${API_CONFIG.BASE_URL}/api/test-sessions/participant/${participant_id_code}/can-start`,
+      { params: { full_name } }
     );
   },
 };

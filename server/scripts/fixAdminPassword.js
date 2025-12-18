@@ -11,8 +11,12 @@ const fixAdminPassword = async () => {
     const newPassword = process.argv[3]; // Pass password as argument
 
     if (!phoneNumber || !newPassword) {
-      console.log("Usage: node fixAdminPassword.js <phone_number> <new_password>");
-      console.log("Example: node fixAdminPassword.js 1234567890 MyPassword123!");
+      console.log(
+        "Usage: node fixAdminPassword.js <phone_number> <new_password>"
+      );
+      console.log(
+        "Example: node fixAdminPassword.js 1234567890 MyPassword123!"
+      );
       process.exit(1);
     }
 

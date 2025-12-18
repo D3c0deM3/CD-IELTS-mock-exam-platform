@@ -10,7 +10,9 @@ import TestPage from "./pages/TestPage";
 import ListeningStarter from "./pages/ListeningStarter";
 import ListeningTestDashboard from "./pages/ListeningTestDashboard";
 import ReadingStarter from "./pages/ReadingStarter";
+import ReadingTestDashboard from "./pages/ReadingTestDashboard";
 import WritingStarter from "./pages/WritingStarter";
+import WritingTestDashboard from "./pages/WritingTestDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -65,7 +67,15 @@ function App() {
             element={<ListeningTestDashboard />}
           />
           <Route path="/test/reading" element={<ReadingStarter />} />
+          <Route
+            path="/test/reading/dashboard"
+            element={<ReadingTestDashboard />}
+          />
           <Route path="/test/writing" element={<WritingStarter />} />
+          <Route
+            path="/test/writing/dashboard"
+            element={<WritingTestDashboard />}
+          />
         </Routes>
       </div>
     </Router>

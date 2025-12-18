@@ -25,7 +25,10 @@ const testPasswordHash = async () => {
     console.log("Full Name:", user.full_name);
     console.log("Role:", user.role);
     console.log("Status:", user.status);
-    console.log("Password Hash (first 50 chars):", user.password.substring(0, 50) + "...");
+    console.log(
+      "Password Hash (first 50 chars):",
+      user.password.substring(0, 50) + "..."
+    );
 
     // Test with the default password
     const testPassword = "DecodeM3";
@@ -38,7 +41,9 @@ const testPasswordHash = async () => {
       console.log("\n⚠️  Password doesn't match!");
       console.log("This means the stored hash was created differently.");
       console.log("\nYou should reset the password with:");
-      console.log(`node scripts/fixAdminPassword.js "${phoneNumber}" "DecodeM3"`);
+      console.log(
+        `node scripts/fixAdminPassword.js "${phoneNumber}" "DecodeM3"`
+      );
     }
 
     process.exit(0);

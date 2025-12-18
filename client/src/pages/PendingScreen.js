@@ -176,7 +176,15 @@ function PendingScreen() {
       try {
         const testSessionService =
           require("../services/testSessionService").default;
-        const response = await testSessionService.canStartTest(idCode);
+        // Get user's full name from localStorage
+        const userData = localStorage.getItem("user");
+        const user = userData ? JSON.parse(userData) : null;
+        const fullName = user?.full_name;
+
+        const response = await testSessionService.canStartTest(
+          idCode,
+          fullName
+        );
         return response?.can_start === true;
       } catch (err) {
         return false;

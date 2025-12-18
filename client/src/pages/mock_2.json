@@ -1310,6 +1310,7 @@
                 "type": "table_completion",
                 "title": "Questions 36-40",
                 "instructions": "Complete the table below. Choose NO MORE THAN TWO WORDS from the passage for each answer.",
+                "question_ids": [36, 37, 38, 39, 40],
                 "table": {
                   "headers": [
                     "Type of innovations",

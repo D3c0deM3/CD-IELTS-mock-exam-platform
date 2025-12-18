@@ -249,16 +249,17 @@ router.get("/:id", authMiddleware, async (req, res) => {
 /**
  * POST /api/test-sessions/check-in-participant
  * Participant enters their ID code on the start screen
+ * Verifies the ID belongs to the user logged in on this device
  */
 router.post("/check-in-participant", async (req, res) => {
-  const { participant_id_code } = req.body;
+  const { participant_id_code, full_name } = req.body;
 
   if (!participant_id_code) {
-    return res.status(400).json({ error: "participant_id_code is required" });
+    return res.status(400).json({ error: "Participant ID code is required" });
   }
 
   try {
-    // Find participant and update their check-in status
+    // Find participant by ID code
     const [participantRows] = await db.execute(
       `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, ts.test_id, t.name as test_name
        FROM test_participants tp
@@ -269,10 +270,27 @@ router.post("/check-in-participant", async (req, res) => {
     );
 
     if (participantRows.length === 0) {
-      return res.status(404).json({ error: "Participant ID code not found" });
+      return res
+        .status(404)
+        .json({
+          error:
+            "This participant ID code does not exist. Please check and try again.",
+        });
     }
 
     const participant = participantRows[0];
+
+    // Verify that the participant's name matches the logged-in user's name
+    // Both must match exactly (after trimming whitespace and converting to lowercase)
+    const registeredName = (participant.full_name || "").trim().toLowerCase();
+    const providedName = (full_name || "").trim().toLowerCase();
+
+    if (registeredName !== providedName) {
+      return res.status(403).json({
+        error:
+          "This ID code is not registered to your account. You are not authorized to use this ID.",
+      });
+    }
 
     // Update check-in status
     await db.execute(
@@ -304,13 +322,15 @@ router.post("/check-in-participant", async (req, res) => {
 /**
  * GET /api/test-sessions/participant/:id_code/can-start
  * Check if participant can start the test
+ * Verifies the ID belongs to the user logged in on this device
  */
 router.get("/participant/:id_code/can-start", async (req, res) => {
   const { id_code } = req.params;
+  const { full_name } = req.query;
 
   try {
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.test_started, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.session_id
+      `SELECT tp.id, tp.test_started, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.session_id
        FROM test_participants tp
        WHERE tp.participant_id_code = ?`,
       [id_code]
@@ -321,6 +341,17 @@ router.get("/participant/:id_code/can-start", async (req, res) => {
     }
 
     const participant = participantRows[0];
+
+    // Verify that the participant's name matches the user's name from localStorage
+    // Both must match exactly (after trimming whitespace and converting to lowercase)
+    const registeredName = (participant.full_name || "").trim().toLowerCase();
+    const providedName = (full_name || "").trim().toLowerCase();
+
+    if (registeredName !== providedName) {
+      return res.status(403).json({
+        error: "You are not authorized to access this test.",
+      });
+    }
 
     res.json({
       can_start:

@@ -32,8 +32,19 @@ function StartScreen() {
     setError("");
 
     try {
-      // Call backend to validate and check-in participant
-      await testSessionService.checkInParticipant(idCode.trim());
+      // Get user's full name from localStorage (automatically)
+      const userData = localStorage.getItem("user");
+      if (!userData) {
+        setError("Please log in first before entering a test session");
+        setIsLoading(false);
+        return;
+      }
+
+      const user = JSON.parse(userData);
+      const fullName = user.full_name;
+
+      // Call backend to validate participant ID matches this user's name
+      await testSessionService.checkInParticipant(idCode.trim(), fullName);
 
       // Store ID in localStorage
       localStorage.setItem("ielts_mock_user_id", idCode.trim());

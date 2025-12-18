@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import audioService from "../services/audioService";
 import "./ListeningTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
@@ -220,7 +221,96 @@ const MatchingTableRenderer = ({
   answers,
   onAnswerChange,
 }) => {
+  const [draggedOption, setDraggedOption] = useState(null);
+  const [dragSource, setDragSource] = useState(null);
+  const scrollIntervalRef = useRef(null);
+  const isDraggingRef = useRef(false);
+
   if (!matchingData) return null;
+
+  // Handle global dragover for auto-scroll
+  useEffect(() => {
+    const handleGlobalDragOver = (e) => {
+      if (!isDraggingRef.current) return;
+
+      const threshold = 100;
+      const clientY = e.clientY;
+      const viewportHeight = window.innerHeight;
+      const isNearBottom = clientY > viewportHeight - threshold;
+
+      if (isNearBottom) {
+        // Start auto-scrolling if not already
+        if (!scrollIntervalRef.current) {
+          scrollIntervalRef.current = setInterval(() => {
+            window.scrollBy(0, 12);
+          }, 16);
+        }
+      } else {
+        // Stop scrolling if away from bottom
+        if (scrollIntervalRef.current) {
+          clearInterval(scrollIntervalRef.current);
+          scrollIntervalRef.current = null;
+        }
+      }
+    };
+
+    document.addEventListener("dragover", handleGlobalDragOver);
+
+    return () => {
+      document.removeEventListener("dragover", handleGlobalDragOver);
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleDragStart = (e, option, source = "options") => {
+    const letter = option.charAt(0);
+    setDraggedOption(letter);
+    setDragSource(source);
+    isDraggingRef.current = true;
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = (e, questionId) => {
+    e.preventDefault();
+    isDraggingRef.current = false;
+
+    // Stop auto-scroll on drop
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+
+    if (draggedOption) {
+      onAnswerChange(questionId, draggedOption);
+    }
+    setDraggedOption(null);
+    setDragSource(null);
+  };
+
+  const handleDragEnd = () => {
+    isDraggingRef.current = false;
+
+    // Stop auto-scroll when drag ends
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+
+    setDraggedOption(null);
+    setDragSource(null);
+  };
+
+  const handleClearAnswer = (questionId) => {
+    onAnswerChange(questionId, "");
+  };
 
   return (
     <div className="visual-matching-table">
@@ -228,65 +318,80 @@ const MatchingTableRenderer = ({
       <div className="matching-instructions">{matchingData.instructions}</div>
 
       {matchingData.options_box && (
-        <div className="matching-options-box">
+        <div className="matching-options-box drag-enabled">
           <h4>{matchingData.options_box.title}</h4>
-          <div className="options-grid">
-            {matchingData.options_box.options.map((option, idx) => (
-              <div key={idx} className="option-tag">
-                {option}
-              </div>
-            ))}
+          <div className="options-grid draggable-options">
+            {matchingData.options_box.options.map((option, idx) => {
+              const letter = option.charAt(0);
+              const isUsed = Object.values(answers).includes(letter);
+              return (
+                <div
+                  key={idx}
+                  className={`option-tag draggable ${isUsed ? "used" : ""}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, option)}
+                  onDragEnd={handleDragEnd}
+                  title="Drag to match with a question"
+                >
+                  {option}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      <table className="matching-pairs-table">
-        <thead>
-          <tr>
-            {matchingData.columns.map((col, idx) => (
-              <th key={idx}>{col}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {matchingData.matching_pairs.map((pair, idx) => {
-            const question = questions.find((q) => q.id === pair.question_id);
-            return (
-              <tr key={idx}>
-                <td className="person-cell">{pair.person}</td>
-                <td className="answer-cell">
-                  <div className="select-container">
-                    <select
-                      className="matching-select"
-                      value={answers[question?.id] || ""}
-                      onChange={(e) =>
-                        onAnswerChange(question.id, e.target.value)
-                      }
-                    >
-                      <option value="">Select answer</option>
-                      {matchingData.options_box?.options.map(
-                        (option, optIdx) => {
-                          const letter = option.charAt(0);
-                          return (
-                            <option key={optIdx} value={letter}>
-                              {option}
-                            </option>
-                          );
-                        }
+      <div className="matching-table-wrapper">
+        <table className="matching-pairs-table">
+          <thead>
+            <tr>
+              {matchingData.columns.map((col, idx) => (
+                <th key={idx}>{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matchingData.matching_pairs.map((pair, idx) => {
+              const question = questions.find((q) => q.id === pair.question_id);
+              const selectedAnswer = answers[question?.id];
+              const selectedOption = matchingData.options_box?.options.find(
+                (opt) => opt.charAt(0) === selectedAnswer
+              );
+
+              return (
+                <tr key={idx}>
+                  <td className="person-cell">{pair.person}</td>
+                  <td
+                    className="answer-cell drop-zone"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, question.id)}
+                  >
+                    <div className="drop-target">
+                      {selectedAnswer ? (
+                        <div className="matched-answer">
+                          <span className="answer-letter">
+                            {selectedAnswer}
+                          </span>
+                          <span className="answer-text">{selectedOption}</span>
+                          <button
+                            className="clear-btn"
+                            onClick={() => handleClearAnswer(question.id)}
+                            title="Clear this match"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="drop-hint">Drop here</span>
                       )}
-                    </select>
-                    {answers[question?.id] && (
-                      <span className="selected-answer-preview">
-                        Selected: {answers[question?.id]}
-                      </span>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
@@ -368,6 +473,8 @@ const MultipleChoiceBlockRenderer = ({
               {question.options.map((option, optIdx) => {
                 const letter = String.fromCharCode(65 + optIdx);
                 const isSelected = answers[question.id] === letter;
+                // Strip letter prefix if it exists (e.g., "A Some text" -> "Some text")
+                const cleanedOption = option.replace(/^[A-Z]\s+/, "");
                 return (
                   <label
                     key={optIdx}
@@ -383,7 +490,7 @@ const MultipleChoiceBlockRenderer = ({
                       }
                     />
                     <span className="option-letter">{letter}</span>
-                    <span className="option-content">{option}</span>
+                    <span className="option-content">{cleanedOption}</span>
                   </label>
                 );
               })}
@@ -394,22 +501,67 @@ const MultipleChoiceBlockRenderer = ({
   );
 };
 
+// Helper function to extract instructions for specific question range
+const extractInstructionsForRange = (fullInstructions, questionIds) => {
+  if (!fullInstructions || !questionIds || questionIds.length === 0) {
+    return null;
+  }
+
+  const startQ = questionIds[0];
+  const endQ = questionIds[questionIds.length - 1];
+
+  // Use regex to find the section that mentions this question range
+  // Pattern: "Questions X-Y:" or "Questions X:" followed by text until the next "Questions" marker
+  const pattern = new RegExp(
+    `Questions?\\s+${startQ}[^\\d]*(?:${endQ})?[^:]*:\\s*(.+?)(?=Questions?\\s+\\d|$)`,
+    "is"
+  );
+
+  const match = fullInstructions.match(pattern);
+
+  if (match && match[1]) {
+    // Clean up the extracted text
+    const extractedText = `Questions ${startQ}-${endQ}:\n${match[1].trim()}`;
+    return extractedText;
+  }
+
+  return null;
+};
+
 const VisualStructureRenderer = ({
   visualStructure,
   questions,
   answers,
   onAnswerChange,
   partNumber,
+  partInstructions,
+  partContext,
 }) => {
   if (!visualStructure) {
-    return questions.map((question) => (
-      <StandaloneQuestionRenderer
-        key={question.id}
-        question={question}
-        answer={answers[question.id]}
-        onAnswerChange={onAnswerChange}
-      />
-    ));
+    // No visual structure - show instructions then questions
+    return (
+      <>
+        {partInstructions && (
+          <div className="test-instructions">
+            <h2>Instructions</h2>
+            <p>{partInstructions}</p>
+            {partContext && (
+              <p className="context-text">
+                <strong>Context:</strong> {partContext}
+              </p>
+            )}
+          </div>
+        )}
+        {questions.map((question) => (
+          <StandaloneQuestionRenderer
+            key={question.id}
+            question={question}
+            answer={answers[question.id]}
+            onAnswerChange={onAnswerChange}
+          />
+        ))}
+      </>
+    );
   }
 
   switch (visualStructure.type) {
@@ -417,93 +569,148 @@ const VisualStructureRenderer = ({
       return (
         <div className="mixed-visual-structure">
           {visualStructure.components.map((component, idx) => {
-            switch (component.type) {
-              case "table":
-                return (
+            // Extract question IDs based on component type
+            let componentQuestionIds = component.question_ids || [];
+
+            if (
+              component.type === "matching_table" &&
+              component.matching_pairs
+            ) {
+              componentQuestionIds = component.matching_pairs.map(
+                (p) => p.question_id
+              );
+            } else if (component.type === "matching_list" && component.items) {
+              componentQuestionIds = component.items.map(
+                (item) => item.question_id
+              );
+            } else if (component.type === "multiple_choice_block") {
+              // For multiple_choice_block, extract IDs from multiple_choice questions
+              componentQuestionIds = questions
+                .filter((q) => q.type === "multiple_choice")
+                .map((q) => q.id);
+            }
+
+            // Filter questions for this component
+            const componentQuestions = questions.filter((q) =>
+              componentQuestionIds.includes(q.id)
+            );
+
+            // Skip if no questions found
+            if (componentQuestions.length === 0) {
+              return null;
+            }
+
+            // Extract instruction text for this specific question range
+            const componentInstructions =
+              componentQuestionIds.length > 0
+                ? extractInstructionsForRange(
+                    partInstructions,
+                    componentQuestionIds
+                  )
+                : null;
+
+            return (
+              <div key={idx} className="component-section">
+                {/* Show section-specific instructions above each component */}
+                {componentInstructions && (
+                  <div className="component-instructions">
+                    <p>{componentInstructions}</p>
+                  </div>
+                )}
+
+                {component.type === "table" && (
                   <TableRenderer
-                    key={idx}
                     tableData={component}
-                    questions={questions.filter((q) =>
-                      component.question_ids?.includes(q.id)
-                    )}
+                    questions={componentQuestions}
                     answers={answers}
                     onAnswerChange={onAnswerChange}
                     partNumber={partNumber}
                   />
-                );
-              case "notes":
-                return (
+                )}
+                {component.type === "notes" && (
                   <NotesRenderer
-                    key={idx}
                     notesData={component}
-                    questions={questions.filter((q) =>
-                      component.question_ids?.includes(q.id)
-                    )}
+                    questions={componentQuestions}
                     answers={answers}
                     onAnswerChange={onAnswerChange}
                   />
-                );
-              case "multiple_choice_block":
-                return (
+                )}
+                {component.type === "multiple_choice_block" && (
                   <MultipleChoiceBlockRenderer
-                    key={idx}
-                    questions={questions}
+                    questions={componentQuestions}
                     answers={answers}
                     onAnswerChange={onAnswerChange}
                   />
-                );
-              case "matching_table":
-                return (
+                )}
+                {component.type === "matching_table" && (
                   <MatchingTableRenderer
-                    key={idx}
                     matchingData={component}
-                    questions={questions.filter((q) =>
-                      component.matching_pairs?.some(
-                        (p) => p.question_id === q.id
-                      )
-                    )}
+                    questions={componentQuestions}
                     answers={answers}
                     onAnswerChange={onAnswerChange}
                   />
-                );
-              case "matching_list":
-                return (
+                )}
+                {component.type === "matching_list" && (
                   <MatchingListRenderer
-                    key={idx}
                     matchingData={component}
-                    questions={questions.filter((q) =>
-                      component.items?.some((item) => item.question_id === q.id)
-                    )}
+                    questions={componentQuestions}
                     answers={answers}
                     onAnswerChange={onAnswerChange}
                   />
-                );
-              default:
-                return null;
-            }
+                )}
+              </div>
+            );
           })}
         </div>
       );
 
     case "structured_notes":
       return (
-        <StructuredNotesRenderer
-          structuredData={visualStructure}
-          questions={questions}
-          answers={answers}
-          onAnswerChange={onAnswerChange}
-        />
+        <>
+          {partInstructions && (
+            <div className="test-instructions">
+              <h2>Instructions</h2>
+              <p>{partInstructions}</p>
+              {partContext && (
+                <p className="context-text">
+                  <strong>Context:</strong> {partContext}
+                </p>
+              )}
+            </div>
+          )}
+          <StructuredNotesRenderer
+            structuredData={visualStructure}
+            questions={questions}
+            answers={answers}
+            onAnswerChange={onAnswerChange}
+          />
+        </>
       );
 
     default:
-      return questions.map((question) => (
-        <StandaloneQuestionRenderer
-          key={question.id}
-          question={question}
-          answer={answers[question.id]}
-          onAnswerChange={onAnswerChange}
-        />
-      ));
+      return (
+        <>
+          {partInstructions && (
+            <div className="test-instructions">
+              <h2>Instructions</h2>
+              <p>{partInstructions}</p>
+              {partContext && (
+                <p className="context-text">
+                  <strong>Context:</strong> {partContext}
+                </p>
+              )}
+            </div>
+          )}
+          {questions.map((question) => (
+            <StandaloneQuestionRenderer
+              key={question.id}
+              question={question}
+              answer={answers[question.id]}
+              onAnswerChange={onAnswerChange}
+            />
+          ))}
+        </>
+      );
   }
 };
 
@@ -617,6 +824,8 @@ const ListeningTestDashboard = () => {
   const [timeRemaining, setTimeRemaining] = useState(30 * 60);
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [audioLoaded, setAudioLoaded] = useState(false);
+  const [audioDuration, setAudioDuration] = useState(0);
   const audioRef = useRef(null);
 
   // ==================== AUDIO PLAYBACK ====================
@@ -625,24 +834,18 @@ const ListeningTestDashboard = () => {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(75);
 
+  // ==================== TEXT HIGHLIGHTING ====================
+  const [highlights, setHighlights] = useState([]);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [selectedText, setSelectedText] = useState("");
+
+  // ==================== SUBMIT CONFIRMATION ====================
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
   // ==================== FULLSCREEN AND EXIT PREVENTION ====================
   useEffect(() => {
-    const enterFullscreen = async () => {
-      try {
-        const elem = document.documentElement;
-        if (elem.requestFullscreen) {
-          await elem.requestFullscreen();
-        } else if (elem.webkitRequestFullscreen) {
-          await elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) {
-          await elem.msRequestFullscreen();
-        }
-      } catch (error) {
-        console.log("Fullscreen request failed:", error);
-      }
-    };
-
-    enterFullscreen();
+    // Note: Fullscreen can only be triggered by user gesture, not automatically
+    // The browser will prevent automatic fullscreen requests for security reasons
 
     const handleKeyDown = (e) => {
       if (e.key === "Escape" || e.key === "F11") {
@@ -705,8 +908,93 @@ const ListeningTestDashboard = () => {
     };
   }, []);
 
+  // ==================== AUDIO PLAYBACK - AUTO PLAY WITH DYNAMIC TIMER ====================
+  useEffect(() => {
+    const playAudioAndSetTimer = async () => {
+      try {
+        console.log("⏳ Attempting to start audio playback...");
+
+        // First, ensure audio is preloaded (in case it wasn't preloaded in starter)
+        let duration = audioService.getAudioDuration();
+        let audio = audioService.getAudioElement();
+
+        if (!audio || !duration) {
+          console.log("🔄 Audio not cached, preloading now...");
+          try {
+            const result = await audioService.preloadAudio();
+            duration = result.duration;
+            audio = result.audio;
+            console.log(
+              `✓ Audio preloaded in dashboard. Duration: ${duration.toFixed(
+                2
+              )}s`
+            );
+          } catch (preloadErr) {
+            console.error("✗ Failed to preload audio:", preloadErr);
+            setAudioLoaded(true);
+            return;
+          }
+        }
+
+        // Validate audio and duration
+        if (!audio) {
+          console.warn("✗ Audio element is null");
+          setAudioLoaded(true);
+          return;
+        }
+
+        if (!duration || duration <= 0) {
+          console.warn("✗ Audio duration invalid:", duration);
+          setAudioLoaded(true);
+          return;
+        }
+
+        // Set timer to audio duration + 5 minutes (300 seconds) for answers
+        const totalTime = Math.ceil(duration) + 300;
+        setTimeRemaining(totalTime);
+        setAudioDuration(duration);
+
+        console.log(
+          `📊 Timer set - Duration: ${duration.toFixed(
+            2
+          )}s, Total test time: ${totalTime}s (${Math.floor(
+            totalTime / 60
+          )}:${String(totalTime % 60).padStart(2, "0")})`
+        );
+
+        // Store audio reference
+        audioRef.current = audio;
+
+        // Play audio automatically
+        console.log("▶ Starting audio playback...");
+        try {
+          await audioService.playAudio();
+          setAudioLoaded(true);
+          console.log("✓ Audio now playing");
+        } catch (playErr) {
+          console.error("✗ Playback error:", playErr);
+          setAudioLoaded(true);
+        }
+      } catch (err) {
+        console.error("✗ Audio effect error:", err);
+        setAudioLoaded(true); // Continue even if audio fails
+      }
+    };
+
+    // Play audio after brief delay to ensure page is fully rendered
+    const timer = setTimeout(playAudioAndSetTimer, 1000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+
   // ==================== SUBMIT TEST HANDLER ====================
   const handleSubmitTest = useCallback(() => {
+    setShowSubmitConfirm(true);
+  }, []);
+
+  const confirmSubmitTest = useCallback(() => {
     console.log("Test submitted with answers:", answers);
 
     // Calculate score
@@ -715,9 +1003,16 @@ const ListeningTestDashboard = () => {
       0;
     const answeredQuestions = Object.keys(answers).length;
 
-    alert(
+    console.log(
       `Test submitted!\nYou answered ${answeredQuestions} out of ${totalQuestions} questions.`
     );
+
+    // Close confirmation modal
+    setShowSubmitConfirm(false);
+
+    // Stop audio before leaving the test
+    audioService.stopAudio();
+    console.log("✓ Audio stopped");
 
     // Exit fullscreen
     if (document.fullscreenElement) {
@@ -726,13 +1021,36 @@ const ListeningTestDashboard = () => {
       document.webkitExitFullscreen();
     }
 
-    navigate("/dashboard");
+    // Navigate to reading starter
+    navigate("/test/reading", {
+      state: { startTime: new Date().toISOString() },
+    });
   }, [answers, navigate, testData]);
 
+  const cancelSubmitTest = useCallback(() => {
+    setShowSubmitConfirm(false);
+  }, []);
+
+  // ==================== TIMER COUNTDOWN ====================
   // ==================== TIMER COUNTDOWN ====================
   useEffect(() => {
     if (timeRemaining <= 0) {
-      handleSubmitTest();
+      // Auto-submit when timer reaches 0
+      // Stop audio before leaving the test
+      audioService.stopAudio();
+      console.log("✓ Audio stopped");
+
+      // Exit fullscreen
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (document.webkitFullscreenElement) {
+        document.webkitExitFullscreen();
+      }
+
+      // Navigate to reading starter
+      navigate("/test/reading", {
+        state: { startTime: new Date().toISOString() },
+      });
       return;
     }
 
@@ -741,7 +1059,7 @@ const ListeningTestDashboard = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeRemaining, handleSubmitTest]);
+  }, [timeRemaining, navigate]);
 
   // ==================== LOAD TEST DATA ====================
   useEffect(() => {
@@ -779,10 +1097,82 @@ const ListeningTestDashboard = () => {
     setVolume(newVolume);
     // Update CSS variable for slider background gradient
     e.target.style.setProperty("--volume-value", `${newVolume}%`);
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume / 100;
-    }
+    // Set audio volume using audioService
+    audioService.setVolume(newVolume / 100);
   };
+
+  // ==================== TEXT HIGHLIGHTING HANDLERS ====================
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    const selected = window.getSelection().toString().trim();
+
+    if (selected.length === 0) {
+      setContextMenu(null);
+      return;
+    }
+
+    setSelectedText(selected);
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const highlightSelectedText = () => {
+    const selection = window.getSelection();
+
+    if (selection.toString().length === 0) {
+      setContextMenu(null);
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const span = document.createElement("span");
+    span.className = "text-highlight";
+    span.style.backgroundColor = "#FFFF00";
+    span.style.cursor = "pointer";
+
+    try {
+      range.surroundContents(span);
+
+      // Store highlight info
+      const highlight = {
+        id: Date.now(),
+        text: selection.toString(),
+        timestamp: new Date().toLocaleTimeString(),
+      };
+
+      setHighlights([...highlights, highlight]);
+
+      // Add click handler to remove highlight
+      span.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (e.ctrlKey || e.metaKey) {
+          const parent = span.parentNode;
+          while (span.firstChild) {
+            parent.insertBefore(span.firstChild, span);
+          }
+          parent.removeChild(span);
+          setHighlights(highlights.filter((h) => h.id !== highlight.id));
+        }
+      });
+    } catch (err) {
+      console.warn("Could not highlight text (complex selection):", err);
+    }
+
+    setContextMenu(null);
+    selection.removeAllRanges();
+  };
+
+  // Close context menu on click anywhere
+  useEffect(() => {
+    const handleClick = () => {
+      setContextMenu(null);
+    };
+
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
   // ==================== FORMAT TIME ====================
   const formatTime = (seconds) => {
@@ -815,17 +1205,29 @@ const ListeningTestDashboard = () => {
 
   // ==================== MAIN RENDER ====================
   return (
-    <div className="listening-test-dashboard" data-theme={theme}>
-      {/* Audio Player (hidden) */}
-      <audio
-        ref={audioRef}
-        onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
-        onLoadedMetadata={(e) => setDuration(e.target.duration)}
-        onEnded={() => setIsPlaying(false)}
-      >
-        <source src="/audio/listening-part-1.mp3" type="audio/mpeg" />
-        Your browser does not support the audio element.
-      </audio>
+    <div
+      className="listening-test-dashboard"
+      data-theme={theme}
+      onContextMenu={handleContextMenu}
+    >
+      {/* Audio element is managed by audioService - volume changes apply to it */}
+
+      {/* ==================== CONTEXT MENU ==================== */}
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{
+            position: "fixed",
+            top: contextMenu.y,
+            left: contextMenu.x,
+          }}
+        >
+          <button className="context-menu-item" onClick={highlightSelectedText}>
+            <span className="menu-icon">🔆</span>
+            Highlight
+          </button>
+        </div>
+      )}
 
       {/* ==================== HEADER ==================== */}
       <div className="test-header">
@@ -885,18 +1287,7 @@ const ListeningTestDashboard = () => {
           </p>
         </div>
 
-        {/* Instructions Section */}
-        <div className="test-instructions">
-          <h2>Instructions</h2>
-          <p>{currentPart.instructions}</p>
-          {currentPart.context && (
-            <p className="context-text">
-              <strong>Context:</strong> {currentPart.context}
-            </p>
-          )}
-        </div>
-
-        {/* Visual Structure Renderer */}
+        {/* Visual Structure Renderer - Instructions moved inside components */}
         <div className="visual-structure-container">
           <VisualStructureRenderer
             visualStructure={currentPart.visual_structure}
@@ -904,6 +1295,8 @@ const ListeningTestDashboard = () => {
             answers={answers}
             onAnswerChange={handleAnswerChange}
             partNumber={currentPart.part_number}
+            partInstructions={currentPart.instructions}
+            partContext={currentPart.context}
           />
         </div>
 
@@ -959,6 +1352,44 @@ const ListeningTestDashboard = () => {
           Submit Test
         </button>
       </div>
+
+      {/* ==================== SUBMIT CONFIRMATION MODAL ==================== */}
+      {showSubmitConfirm && (
+        <div className="modal-overlay">
+          <div className="confirmation-modal">
+            <div className="modal-header">
+              <h2>Submit Listening Test?</h2>
+            </div>
+            <div className="modal-body">
+              <p>
+                Are you sure you want to submit your answers and move to the
+                reading section?
+              </p>
+              <div className="modal-stats">
+                <p>
+                  <strong>Answered Questions:</strong>{" "}
+                  {Object.keys(answers).length} /{" "}
+                  {testData.parts.reduce(
+                    (sum, part) => sum + part.questions.length,
+                    0
+                  )}
+                </p>
+              </div>
+              <p className="modal-warning">
+                Once you submit, you cannot return to modify your answers.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="cancel-button" onClick={cancelSubmitTest}>
+                Cancel
+              </button>
+              <button className="confirm-button" onClick={confirmSubmitTest}>
+                Yes, Submit Test
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

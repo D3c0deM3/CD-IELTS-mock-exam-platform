@@ -78,7 +78,7 @@ router.post("/register", async (req, res) => {
       message: "User created successfully",
       userId,
       token,
-      user: { role: "student" },
+      user: { role: "student", full_name, phone_number },
     });
   } catch (err) {
     console.error("DB error:", err);
@@ -130,7 +130,14 @@ router.post("/login", async (req, res) => {
     );
 
     console.log(`Login successful: User ${user.id} (${user.full_name})`);
-    res.json({ token, user: { role: user.role } });
+    res.json({
+      token,
+      user: {
+        role: user.role,
+        full_name: user.full_name,
+        phone_number: user.phone_number,
+      },
+    });
   } catch (err) {
     console.error("DB error:", err);
     res.status(500).json({ error: "Internal server error" });

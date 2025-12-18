@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import audioService from "../services/audioService";
 import listeningVideo from "../starter_videos/listening_starter.mp4";
 import "./ListeningStarter.css";
 
@@ -36,6 +37,25 @@ function ListeningStarter() {
     if (videoRef.current) {
       videoRef.current.volume = 0.75;
     }
+  }, []);
+
+  // Preload listening test audio while user watches intro video
+  useEffect(() => {
+    const preloadTestAudio = async () => {
+      try {
+        await audioService.preloadAudio();
+        console.log("Audio preloaded successfully during starter screen");
+      } catch (err) {
+        console.error("Failed to preload audio:", err);
+      }
+    };
+
+    preloadTestAudio();
+
+    // Cleanup on unmount
+    return () => {
+      audioService.clearAudioCache();
+    };
   }, []);
 
   // Fullscreen lock and exit prevention
