@@ -1,6 +1,19 @@
+// Detect environment and set API URL
+const getApiUrl = () => {
+  // In production (deployed), use the Railway backend or the provided URL
+  if (process.env.NODE_ENV === "production" || process.env.REACT_APP_API_URL) {
+    return (
+      process.env.REACT_APP_API_URL ||
+      "https://cd-ielts-mock-exam-platform-production.up.railway.app"
+    );
+  }
+  // In development (localhost), use localhost
+  return "http://localhost:4000";
+};
+
 // Centralized API configuration
 const API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_URL || "http://localhost:4000",
+  BASE_URL: getApiUrl(),
   ENDPOINTS: {
     AUTH: {
       LOGIN: "/api/users/login",

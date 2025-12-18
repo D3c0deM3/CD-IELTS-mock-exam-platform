@@ -227,6 +227,20 @@ html[data-theme="dark"] {
   color: var(--text);
   font-size: 14px;
   font-family: inherit;
+  box-sizing: border-box;
+}
+
+.form-input::placeholder,
+.form-select::placeholder,
+.form-textarea::placeholder {
+  color: var(--muted);
+}
+
+/* Ensure inputs are never white text on white background */
+.form-input,
+.form-select,
+.form-textarea {
+  caret-color: var(--text);
 }
 
 .form-input:focus,
@@ -235,6 +249,56 @@ html[data-theme="dark"] {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: var(--paper);
+  color: var(--text);
+}
+
+/* Dark theme specific input styling */
+html[data-theme="dark"] .form-input,
+html[data-theme="dark"] .form-select,
+html[data-theme="dark"] .form-textarea {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+  caret-color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] .form-input:focus,
+html[data-theme="dark"] .form-select:focus,
+html[data-theme="dark"] .form-textarea:focus {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Fix autofill background color - Light theme */
+.form-input:-webkit-autofill,
+.form-input:-webkit-autofill:hover,
+.form-input:-webkit-autofill:focus,
+.form-select:-webkit-autofill,
+.form-select:-webkit-autofill:hover,
+.form-select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0b1220 !important;
+  border-color: #e6eef8 !important;
+  caret-color: #0b1220 !important;
+}
+
+/* Fix autofill background color - Dark theme */
+html[data-theme="dark"] .form-input:-webkit-autofill,
+html[data-theme="dark"] .form-input:-webkit-autofill:hover,
+html[data-theme="dark"] .form-input:-webkit-autofill:focus,
+html[data-theme="dark"] .form-select:-webkit-autofill,
+html[data-theme="dark"] .form-select:-webkit-autofill:hover,
+html[data-theme="dark"] .form-select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  border-color: #334155 !important;
+  caret-color: #f1f5f9 !important;
+}
+
+.form-input:-webkit-autofill::first-line {
+  font-size: 14px;
 }
 
 .form-row {

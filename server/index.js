@@ -1,5 +1,10 @@
 const express = require("express");
 
+// Load .env early
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
+
 const usersRoute = require("./routes/users");
 const adminRoute = require("./routes/admin");
 const testsRoute = require("./routes/tests");
@@ -7,16 +12,8 @@ const dashboardRoute = require("./routes/dashboard");
 const testSessionsRoute = require("./routes/testSessions");
 const pdfUploadRoute = require("./routes/pdf-upload");
 const materialsRoute = require("./routes/materials");
-if (process.env.NODE_ENV !== "production") {
-  require("dotenv").config();
-}
 
 const cors = require("cors");
-
-// dotenv ONLY for local development
-if (process.env.NODE_ENV !== "production") {
-  require("dotenv").config();
-}
 
 const app = express();
 const setupDatabase = require("./db/setup");
@@ -28,9 +25,18 @@ app.get("/api/health", (req, res) => {
 });
 
 // -------------------- MIDDLEWARE --------------------
+const corsOrigins =
+  process.env.NODE_ENV === "production"
+    ? [
+        "https://cd-ielts.netlify.app",
+        "https://cd-ielts-mock-exam-platform-production.up.railway.app",
+        process.env.RAILWAY_PUBLIC_DOMAIN,
+      ].filter(Boolean)
+    : ["http://localhost:3000", "http://localhost:3001"];
+
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://cd-ielts.netlify.app"],
+    origin: corsOrigins,
     credentials: true,
   })
 );
@@ -50,9 +56,10 @@ app.use("/api/materials", require("./routes/materials"));
 
 // -------------------- START SERVER FIRST --------------------
 const PORT = process.env.PORT || 4000;
+const ENV = process.env.NODE_ENV || "development";
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT} (${ENV})`);
 
   // DB init happens AFTER server is alive
   setupDatabase()

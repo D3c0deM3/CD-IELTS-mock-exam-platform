@@ -100,11 +100,19 @@ router.post("/login", async (req, res) => {
     );
 
     if (rows.length === 0) {
+      console.log(`Login attempt: User not found for phone ${phone_number}`);
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const user = rows[0];
+    console.log(
+      `Login attempt: User found - ${user.full_name}, role: ${user.role}, status: ${user.status}`
+    );
+
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log(
+      `Login attempt: Password ${isMatch ? "matches" : "does not match"}`
+    );
 
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
@@ -121,6 +129,7 @@ router.post("/login", async (req, res) => {
       [user.id, token, expiresAt]
     );
 
+    console.log(`Login successful: User ${user.id} (${user.full_name})`);
     res.json({ token, user: { role: user.role } });
   } catch (err) {
     console.error("DB error:", err);
