@@ -298,8 +298,8 @@ const WritingTestDashboard = () => {
     if (timeRemaining <= 0) {
       // Auto-submit when timer reaches 0
       setShowSubmitConfirm(false);
-      navigate("/test/speaking", {
-        state: { startTime: new Date().toISOString() },
+      navigate("/test/end", {
+        state: { submittedAt: new Date().toISOString() },
       });
       return;
     }
@@ -326,17 +326,22 @@ const WritingTestDashboard = () => {
 
   const confirmSubmitTest = useCallback(async () => {
     setIsSubmitting(true);
-    
+
     try {
       // Get participant info from localStorage
       const participantString = localStorage.getItem("currentParticipant");
       console.log("localStorage currentParticipant:", participantString);
-      
+
       const participantData = JSON.parse(participantString || "{}");
       console.log("Parsed participant data:", participantData);
-      
+
       if (!participantData.id || !participantData.full_name) {
-        console.error("Participant data not found - id:", participantData.id, "full_name:", participantData.full_name);
+        console.error(
+          "Participant data not found - id:",
+          participantData.id,
+          "full_name:",
+          participantData.full_name
+        );
         alert("Error: Participant data not found. Please restart the test.");
         setIsSubmitting(false);
         return;
@@ -349,17 +354,20 @@ const WritingTestDashboard = () => {
       };
 
       // Send to backend API
-      const response = await fetch(`${API_CONFIG.BASE_URL}/api/test-sessions/submit-writing`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          participant_id: participantData.id,
-          full_name: participantData.full_name,
-          writing_answers: formattedAnswers,
-        }),
-      });
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/test-sessions/submit-writing`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            participant_id: participantData.id,
+            full_name: participantData.full_name,
+            writing_answers: formattedAnswers,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -370,10 +378,10 @@ const WritingTestDashboard = () => {
       console.log("Writing submission response:", result);
 
       setShowSubmitConfirm(false);
-      
-      // Navigate to speaking test
-      navigate("/test/speaking", {
-        state: { startTime: new Date().toISOString() },
+
+      // Navigate to end test screen
+      navigate("/test/end", {
+        state: { submittedAt: new Date().toISOString() },
       });
     } catch (error) {
       console.error("Error submitting writing test:", error);
@@ -577,15 +585,15 @@ const WritingTestDashboard = () => {
               </p>
             </div>
             <div className="modal-footer">
-              <button 
-                className="cancel-button" 
+              <button
+                className="cancel-button"
                 onClick={cancelSubmitTest}
                 disabled={isSubmitting}
               >
                 Cancel
               </button>
-              <button 
-                className="confirm-button" 
+              <button
+                className="confirm-button"
                 onClick={confirmSubmitTest}
                 disabled={isSubmitting}
               >

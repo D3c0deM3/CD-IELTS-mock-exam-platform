@@ -13,6 +13,7 @@ import ReadingStarter from "./pages/ReadingStarter";
 import ReadingTestDashboard from "./pages/ReadingTestDashboard";
 import WritingStarter from "./pages/WritingStarter";
 import WritingTestDashboard from "./pages/WritingTestDashboard";
+import EndTestScreen from "./pages/EndTestScreen";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -76,6 +77,7 @@ function App() {
             path="/test/writing/dashboard"
             element={<WritingTestDashboard />}
           />
+          <Route path="/test/end" element={<EndTestScreen />} />
         </Routes>
       </div>
     </Router>
