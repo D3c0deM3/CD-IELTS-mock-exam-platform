@@ -28,6 +28,13 @@ const AdminDashboard = () => {
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [timerActive, setTimerActive] = useState(false);
+  const [writingSubmissions, setWritingSubmissions] = useState([]);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [showWritingReviewModal, setShowWritingReviewModal] = useState(false);
+  const [writingReviewForm, setWritingReviewForm] = useState({
+    writing_score: "",
+    admin_notes: "",
+  });
 
   // Form states
   const [testForm, setTestForm] = useState({ name: "", description: "" });
@@ -149,6 +156,19 @@ const AdminDashboard = () => {
       setTests(response);
     } catch (err) {
       console.error("Failed to fetch tests:", err);
+    }
+  };
+
+  const fetchWritingSubmissions = async (sessionId) => {
+    try {
+      setLoading(true);
+      const response = await adminService.getWritingSubmissions(sessionId);
+      setWritingSubmissions(response.submissions);
+    } catch (err) {
+      console.error("Failed to fetch writing submissions:", err);
+      setError("Failed to fetch writing submissions");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -536,8 +556,10 @@ const AdminDashboard = () => {
         const missing = [];
         if (p.listening_score === null) missing.push("Listening");
         if (p.reading_score === null) missing.push("Reading");
-        if (p.writing_score === null || p.writing_score === 0) missing.push("Writing");
-        if (p.speaking_score === null || p.speaking_score === 0) missing.push("Speaking");
+        if (p.writing_score === null || p.writing_score === 0)
+          missing.push("Writing");
+        if (p.speaking_score === null || p.speaking_score === 0)
+          missing.push("Speaking");
         return { name: p.full_name, missing: missing.join(", ") };
       });
 
@@ -576,10 +598,54 @@ const AdminDashboard = () => {
   const openScoresModal = (participant) => {
     setSelectedParticipant(participant);
     setScoresForm({
-      writing_score: (participant.writing_score && participant.writing_score !== 0) ? participant.writing_score : "",
-      speaking_score: (participant.speaking_score && participant.speaking_score !== 0) ? participant.speaking_score : "",
+      writing_score:
+        participant.writing_score && participant.writing_score !== 0
+          ? participant.writing_score
+          : "",
+      speaking_score:
+        participant.speaking_score && participant.speaking_score !== 0
+          ? participant.speaking_score
+          : "",
     });
     setShowScoresModal(true);
+  };
+
+  const handleReviewWriting = async (e) => {
+    e.preventDefault();
+    if (writingReviewForm.writing_score === "") {
+      setError("Writing score is required");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adminService.reviewWritingSubmission(
+        selectedSession.id,
+        selectedSubmission.id,
+        parseFloat(writingReviewForm.writing_score),
+        writingReviewForm.admin_notes
+      );
+      setShowWritingReviewModal(false);
+      setSelectedSubmission(null);
+      setWritingReviewForm({ writing_score: "", admin_notes: "" });
+      fetchWritingSubmissions(selectedSession.id);
+      setError("");
+      alert("Writing submission reviewed and scored successfully!");
+    } catch (err) {
+      setError("Failed to review writing submission");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openWritingReviewModal = (submission) => {
+    setSelectedSubmission(submission);
+    setWritingReviewForm({
+      writing_score: submission.writing_score || "",
+      admin_notes: submission.admin_notes || "",
+    });
+    setShowWritingReviewModal(true);
   };
 
   return (
@@ -627,6 +693,20 @@ const AdminDashboard = () => {
               disabled={!selectedSession}
             >
               Monitor Session
+            </button>
+            <button
+              className={`tab-button ${
+                activeTab === "writing-submissions" ? "active" : ""
+              }`}
+              onClick={() => {
+                setActiveTab("writing-submissions");
+                if (selectedSession) {
+                  fetchWritingSubmissions(selectedSession.id);
+                }
+              }}
+              disabled={!selectedSession}
+            >
+              ✍️ Writing Submissions
             </button>
             <button
               className={`tab-button ${activeTab === "tests" ? "active" : ""}`}
@@ -997,10 +1077,34 @@ const AdminDashboard = () => {
                             </td>
                             <td>{participant.full_name}</td>
                             <td>{participant.phone_number || "—"}</td>
-                            <td>{participant.listening_score !== null && participant.listening_score !== undefined ? `${Math.round(participant.listening_score)}/40` : "—"}</td>
-                            <td>{participant.reading_score !== null && participant.reading_score !== undefined ? `${Math.round(participant.reading_score)}/40` : "—"}</td>
-                            <td>{participant.writing_score === 0 ? "Pending" : (participant.writing_score || "—")}</td>
-                            <td>{participant.speaking_score || "—"}</td>
+                            <td>
+                              {participant.listening_score !== null &&
+                              participant.listening_score !== undefined
+                                ? `${Math.round(
+                                    participant.listening_score
+                                  )}/40`
+                                : "—"}
+                            </td>
+                            <td>
+                              {participant.reading_score !== null &&
+                              participant.reading_score !== undefined
+                                ? `${Math.round(participant.reading_score)}/40`
+                                : "—"}
+                            </td>
+                            <td>
+                              {participant.writing_score === 0
+                                ? "Pending"
+                                : participant.writing_score !== null &&
+                                  participant.writing_score !== undefined
+                                ? Math.round(participant.writing_score)
+                                : "—"}
+                            </td>
+                            <td>
+                              {participant.speaking_score !== null &&
+                              participant.speaking_score !== undefined
+                                ? Math.round(participant.speaking_score)
+                                : "—"}
+                            </td>
                             <td>
                               <span
                                 style={{
@@ -1091,6 +1195,148 @@ const AdminDashboard = () => {
                 </div>
               </div>
             )}
+
+          {/* Writing Submissions Tab */}
+          {activeTab === "writing-submissions" && selectedSession && (
+            <div>
+              <div className="card">
+                <div className="card-header">
+                  <h2>✍️ Writing Essay Submissions</h2>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--muted)",
+                      margin: 0,
+                    }}
+                  >
+                    Session: {selectedSession.test_name} •{" "}
+                    {writingSubmissions.length} submissions
+                  </p>
+                </div>
+
+                {writingSubmissions.length === 0 ? (
+                  <p style={{ padding: "16px", color: "var(--muted)" }}>
+                    No writing submissions for this session yet.
+                  </p>
+                ) : (
+                  <div className="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>ID Code</th>
+                          <th>Name</th>
+                          <th>Phone</th>
+                          <th>Task 1 (Words)</th>
+                          <th>Task 2 (Words)</th>
+                          <th>Score</th>
+                          <th>Status</th>
+                          <th>Submitted</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {writingSubmissions.map((submission) => (
+                          <tr key={submission.id}>
+                            <td>
+                              <strong>{submission.participant_id_code}</strong>
+                            </td>
+                            <td>{submission.full_name}</td>
+                            <td>{submission.phone_number || "—"}</td>
+                            <td>
+                              {submission.task_1_word_count}
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  color:
+                                    submission.task_1_word_count >= 150
+                                      ? "var(--success)"
+                                      : "var(--error)",
+                                  marginLeft: "4px",
+                                }}
+                              >
+                                {submission.task_1_word_count >= 150
+                                  ? "✓"
+                                  : "⚠️"}
+                              </span>
+                            </td>
+                            <td>
+                              {submission.task_2_word_count}
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  color:
+                                    submission.task_2_word_count >= 250
+                                      ? "var(--success)"
+                                      : "var(--error)",
+                                  marginLeft: "4px",
+                                }}
+                              >
+                                {submission.task_2_word_count >= 250
+                                  ? "✓"
+                                  : "⚠️"}
+                              </span>
+                            </td>
+                            <td>
+                              {submission.writing_score ? (
+                                <strong>{submission.writing_score}</strong>
+                              ) : (
+                                <span style={{ color: "var(--muted)" }}>—</span>
+                              )}
+                            </td>
+                            <td>
+                              <span
+                                style={{
+                                  fontSize: "12px",
+                                  padding: "4px 8px",
+                                  borderRadius: "4px",
+                                  backgroundColor: submission.is_reviewed
+                                    ? "rgba(34, 197, 94, 0.1)"
+                                    : "rgba(59, 130, 246, 0.1)",
+                                  color: submission.is_reviewed
+                                    ? "var(--success)"
+                                    : "var(--info)",
+                                }}
+                              >
+                                {submission.is_reviewed
+                                  ? "Reviewed"
+                                  : "Pending"}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: "13px" }}>
+                              {new Date(
+                                submission.submitted_at
+                              ).toLocaleDateString()}{" "}
+                              {new Date(
+                                submission.submitted_at
+                              ).toLocaleTimeString()}
+                            </td>
+                            <td style={{ minWidth: "120px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "4px",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <button
+                                  className="btn btn-small btn-info"
+                                  onClick={() =>
+                                    openWritingReviewModal(submission)
+                                  }
+                                >
+                                  {submission.is_reviewed ? "Edit" : "Review"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tests Tab */}
           {activeTab === "tests" && (
@@ -1659,6 +1905,187 @@ const AdminDashboard = () => {
               >
                 🗑️ Delete Session Permanently
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Writing Review Modal */}
+      {showWritingReviewModal && selectedSubmission && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowWritingReviewModal(false)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: "90vh", overflowY: "auto", maxWidth: "900px" }}
+          >
+            <div className="modal-header">
+              Review Writing Submission - {selectedSubmission.full_name}
+            </div>
+
+            <div style={{ padding: "16px" }}>
+              <div
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  padding: "12px",
+                  borderRadius: "6px",
+                  marginBottom: "16px",
+                  fontSize: "13px",
+                }}
+              >
+                <p style={{ margin: "0 0 8px 0" }}>
+                  <strong>Participant ID:</strong>{" "}
+                  {selectedSubmission.participant_id_code}
+                </p>
+                <p style={{ margin: "0 0 8px 0" }}>
+                  <strong>Phone:</strong>{" "}
+                  {selectedSubmission.phone_number || "N/A"}
+                </p>
+                <p style={{ margin: "0 0 8px 0" }}>
+                  <strong>Submitted:</strong>{" "}
+                  {new Date(selectedSubmission.submitted_at).toLocaleString()}
+                </p>
+                <p style={{ margin: "0" }}>
+                  <strong>Status:</strong>{" "}
+                  <span
+                    style={{
+                      backgroundColor: selectedSubmission.is_reviewed
+                        ? "rgba(34, 197, 94, 0.2)"
+                        : "rgba(59, 130, 246, 0.2)",
+                      padding: "2px 6px",
+                      borderRadius: "3px",
+                    }}
+                  >
+                    {selectedSubmission.is_reviewed ? "Reviewed" : "Pending"}
+                  </span>
+                </p>
+              </div>
+
+              {/* Task 1 */}
+              <div style={{ marginBottom: "24px" }}>
+                <h4 style={{ marginBottom: "8px" }}>
+                  Task 1 - Letter Writing (
+                  {selectedSubmission.task_1_word_count} words)
+                </h4>
+                <div
+                  style={{
+                    backgroundColor: "var(--bg-secondary)",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                    whiteSpace: "pre-wrap",
+                    wordWrap: "break-word",
+                    maxHeight: "300px",
+                    overflowY: "auto",
+                    borderLeft:
+                      selectedSubmission.task_1_word_count >= 150
+                        ? "4px solid var(--success)"
+                        : "4px solid var(--error)",
+                  }}
+                >
+                  {selectedSubmission.task_1_content || "(No content)"}
+                </div>
+              </div>
+
+              {/* Task 2 */}
+              <div style={{ marginBottom: "24px" }}>
+                <h4 style={{ marginBottom: "8px" }}>
+                  Task 2 - Essay Writing ({selectedSubmission.task_2_word_count}{" "}
+                  words)
+                </h4>
+                <div
+                  style={{
+                    backgroundColor: "var(--bg-secondary)",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                    whiteSpace: "pre-wrap",
+                    wordWrap: "break-word",
+                    maxHeight: "400px",
+                    overflowY: "auto",
+                    borderLeft:
+                      selectedSubmission.task_2_word_count >= 250
+                        ? "4px solid var(--success)"
+                        : "4px solid var(--error)",
+                  }}
+                >
+                  {selectedSubmission.task_2_content || "(No content)"}
+                </div>
+              </div>
+
+              {/* Review Form */}
+              <form onSubmit={handleReviewWriting}>
+                <div className="form-group">
+                  <label className="form-label">Writing Score (0-9) *</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    min="0"
+                    max="9"
+                    step="0.5"
+                    value={writingReviewForm.writing_score}
+                    onChange={(e) =>
+                      setWritingReviewForm({
+                        ...writingReviewForm,
+                        writing_score: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., 6.5"
+                    required
+                  />
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--muted)",
+                      marginTop: "4px",
+                    }}
+                  >
+                    Assign a band score from 0-9
+                  </p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Admin Notes</label>
+                  <textarea
+                    className="form-textarea"
+                    value={writingReviewForm.admin_notes}
+                    onChange={(e) =>
+                      setWritingReviewForm({
+                        ...writingReviewForm,
+                        admin_notes: e.target.value,
+                      })
+                    }
+                    placeholder="Add feedback or notes about this submission..."
+                    rows="4"
+                  ></textarea>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowWritingReviewModal(false);
+                      setSelectedSubmission(null);
+                      setWritingReviewForm({
+                        writing_score: "",
+                        admin_notes: "",
+                      });
+                    }}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-success"
+                    disabled={loading}
+                  >
+                    ✓ Save Score & Review
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

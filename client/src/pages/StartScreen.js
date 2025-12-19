@@ -44,15 +44,21 @@ function StartScreen() {
       const fullName = user.full_name;
 
       // Call backend to validate participant ID matches this user's name
-      const response = await testSessionService.checkInParticipant(idCode.trim(), fullName);
+      const response = await testSessionService.checkInParticipant(
+        idCode.trim(),
+        fullName
+      );
 
       // Store participant data in localStorage for use throughout the test
       // Note: apiClient already returns response.data, so response is the data object
       console.log("Check-in response:", response);
-      
+
       if (response?.participant) {
         console.log("Storing participant data:", response.participant);
-        localStorage.setItem("currentParticipant", JSON.stringify(response.participant));
+        localStorage.setItem(
+          "currentParticipant",
+          JSON.stringify(response.participant)
+        );
       } else {
         console.warn("No participant data found in response");
       }

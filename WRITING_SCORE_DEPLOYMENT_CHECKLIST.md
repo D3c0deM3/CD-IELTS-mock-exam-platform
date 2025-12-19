@@ -5,13 +5,16 @@
 ### Code Changes ✅
 
 **Backend Files Modified:**
+
 - [x] `server/utils/scoreCalculator.js` - Created
+
   - [x] `normalizeText()` function
-  - [x] `calculateWritingScore()` function  
+  - [x] `calculateWritingScore()` function
   - [x] `processWritingScore()` function
   - [x] Module exports
 
 - [x] `server/routes/testSessions.js` - Modified
+
   - [x] Import scoreCalculator
   - [x] POST `/submit-writing` endpoint
   - [x] GET `/participant/:id/scores` endpoint
@@ -23,6 +26,7 @@
   - [x] Error handling & validation
 
 **Frontend Files Modified:**
+
 - [x] `client/src/pages/WritingTestDashboard.js` - Modified
   - [x] Add `isSubmitting` state
   - [x] Enhanced `confirmSubmitTest()` with API call
@@ -33,6 +37,7 @@
   - [x] "Submitting..." text display
 
 **Documentation Created:**
+
 - [x] `WRITING_SCORE_IMPLEMENTATION.md` - Detailed technical documentation
 - [x] `WRITING_SCORE_QUICK_REFERENCE.md` - Quick reference guide
 - [x] `WRITING_SCORE_FINAL_SUMMARY.md` - Implementation summary
@@ -44,18 +49,21 @@
 ## Database Verification
 
 ### Required Columns (Already Exist)
+
 - [x] `test_participants.writing_score` (DECIMAL 5,2)
 - [x] `test_participants.speaking_score` (DECIMAL 5,2)
 - [x] `test_participants.is_writing_scored` (BOOLEAN)
 - [x] `test_participants.is_speaking_scored` (BOOLEAN)
 
 **Verify with SQL:**
+
 ```sql
 DESCRIBE test_participants;
 -- Should show all required columns present
 ```
 
 ### Data Integrity
+
 - [x] No NULL constraints on score columns (nullable)
 - [x] Default values appropriate (NULL for scores)
 - [x] Indexes present on participant_id
@@ -68,6 +76,7 @@ DESCRIBE test_participants;
 ### Test POST /api/test-sessions/submit-writing
 
 **Test Case 1: Valid Submission**
+
 ```
 Request:
 POST /api/test-sessions/submit-writing
@@ -102,6 +111,7 @@ Verify:
 ```
 
 **Test Case 2: Missing Participant Data**
+
 ```
 Request:
 POST /api/test-sessions/submit-writing
@@ -122,6 +132,7 @@ Verify:
 ```
 
 **Test Case 3: Name Mismatch**
+
 ```
 Request:
 POST /api/test-sessions/submit-writing
@@ -147,6 +158,7 @@ Verify:
 ### Test GET /api/test-sessions/participant/:id/scores
 
 **Test Case 1: Valid Request**
+
 ```
 GET /api/test-sessions/participant/1/scores
 
@@ -171,6 +183,7 @@ Verify:
 ```
 
 **Test Case 2: Participant Not Found**
+
 ```
 GET /api/test-sessions/participant/99999/scores
 
@@ -189,6 +202,7 @@ Verify:
 ### Test GET /api/admin/pending-scores/:session_id
 
 **Test Case 1: Valid Request**
+
 ```
 GET /api/admin/pending-scores/1
 
@@ -226,6 +240,7 @@ Verify:
 ### Test PUT /api/admin/participants/:id/scores
 
 **Test Case 1: Valid Score Update**
+
 ```
 PUT /api/admin/participants/1/scores
 {
@@ -249,6 +264,7 @@ Verify:
 ```
 
 **Test Case 2: Invalid Score Range**
+
 ```
 PUT /api/admin/participants/1/scores
 {
@@ -268,6 +284,7 @@ Verify:
 ```
 
 **Test Case 3: Missing Scores**
+
 ```
 PUT /api/admin/participants/1/scores
 {
@@ -293,6 +310,7 @@ Verify:
 ### WritingTestDashboard Submission
 
 **Test Case 1: Successful Submission**
+
 ```
 Steps:
 1. Complete writing essays (Task 1 & 2)
@@ -314,6 +332,7 @@ Verify:
 ```
 
 **Test Case 2: Network Error Handling**
+
 ```
 Steps:
 1. Start submission
@@ -333,6 +352,7 @@ Verify:
 ```
 
 **Test Case 3: Missing Participant Data**
+
 ```
 Steps:
 1. Clear localStorage
@@ -356,6 +376,7 @@ Verify:
 ### Score Setting Interface
 
 **Test Case 1: Open Scores Modal**
+
 ```
 Steps:
 1. Admin logs in
@@ -376,6 +397,7 @@ Verify:
 ```
 
 **Test Case 2: Set Scores Successfully**
+
 ```
 Steps:
 1. Open scores modal
@@ -397,6 +419,7 @@ Verify:
 ```
 
 **Test Case 3: Invalid Score Entry**
+
 ```
 Steps:
 1. Open scores modal
@@ -421,6 +444,7 @@ Verify:
 ### Score Display
 
 **Test Case 1: All Scores Present**
+
 ```
 Steps:
 1. User logs in
@@ -442,6 +466,7 @@ Verify:
 ```
 
 **Test Case 2: Partial Scores (During Review)**
+
 ```
 Steps:
 1. User logged in
@@ -461,6 +486,7 @@ Verify:
 ```
 
 **Test Case 3: Results History**
+
 ```
 Steps:
 1. Dashboard loaded
@@ -487,6 +513,7 @@ Verify:
 ### End-to-End Flow
 
 **Scenario: Complete User Journey**
+
 ```
 1. User starts test session
    [ ] Participant registered
@@ -525,6 +552,7 @@ Overall: [ ] PASS / [ ] FAIL
 ### Load Testing
 
 **Test 1: Multiple Submissions**
+
 ```
 Scenario: 100 users submit writing simultaneously
 Expected:
@@ -535,6 +563,7 @@ Expected:
 ```
 
 **Test 2: Admin Scoring**
+
 ```
 Scenario: Admin sets scores for 50 participants
 Expected:
@@ -545,6 +574,7 @@ Expected:
 ```
 
 **Test 3: Dashboard Load**
+
 ```
 Scenario: User loads dashboard with 100 past results
 Expected:
@@ -561,6 +591,7 @@ Expected:
 ### Authentication & Authorization
 
 **Test 1: Unauthorized Score Submission**
+
 ```
 Scenario: Non-admin tries to set scores
 Expected:
@@ -570,6 +601,7 @@ Expected:
 ```
 
 **Test 2: Data Verification**
+
 ```
 Scenario: Wrong participant submits with wrong name
 Expected:
@@ -579,6 +611,7 @@ Expected:
 ```
 
 **Test 3: Score Range Validation**
+
 ```
 Scenario: Admin submits score > 9
 Expected:
@@ -592,6 +625,7 @@ Expected:
 ## Deployment Steps
 
 ### Pre-Deployment
+
 1. [ ] All code changes committed
 2. [ ] No uncommitted modifications
 3. [ ] Database schema verified
@@ -599,6 +633,7 @@ Expected:
 5. [ ] All tests passing locally
 
 ### Database Preparation
+
 1. [ ] Connect to production database
 2. [ ] Verify columns exist
 3. [ ] Verify indexes present
@@ -606,6 +641,7 @@ Expected:
 5. [ ] Backup successful
 
 ### Code Deployment
+
 1. [ ] Pull latest changes
 2. [ ] Install dependencies (if any)
 3. [ ] Run database migrations (if any)
@@ -613,6 +649,7 @@ Expected:
 5. [ ] Verify API endpoints respond
 
 ### Frontend Deployment
+
 1. [ ] Build client assets
 2. [ ] Deploy to web server
 3. [ ] Clear browser cache (if needed)
@@ -620,6 +657,7 @@ Expected:
 5. [ ] Test in multiple browsers
 
 ### Post-Deployment Verification
+
 1. [ ] All endpoints responding
 2. [ ] User can submit writing
 3. [ ] Admin can set scores
@@ -651,6 +689,7 @@ If deployment fails:
 ## Monitoring Post-Deployment
 
 ### First 24 Hours
+
 - [ ] Monitor error logs
 - [ ] Check database performance
 - [ ] Test all user journeys
@@ -658,6 +697,7 @@ If deployment fails:
 - [ ] Verify no data corruption
 
 ### First Week
+
 - [ ] Analyze usage patterns
 - [ ] Verify score accuracy
 - [ ] Check for edge cases
@@ -665,6 +705,7 @@ If deployment fails:
 - [ ] Performance trending
 
 ### Ongoing
+
 - [ ] Daily error log review
 - [ ] Weekly performance metrics
 - [ ] Monthly audit of scores
@@ -675,17 +716,20 @@ If deployment fails:
 ## Documentation Checklist
 
 User Documentation:
+
 - [ ] `WRITING_SCORE_QUICK_REFERENCE.md` - Provided to users
 - [ ] Dashboard displayed scores - Self-explanatory
 - [ ] Error messages - Clear and actionable
 
 Admin Documentation:
+
 - [ ] `WRITING_SCORE_INTEGRATION_GUIDE.md` - Provided to admins
 - [ ] API endpoints documented - In server code
 - [ ] Score setting process - Explained in guide
 - [ ] Pending scores view - Instructions provided
 
 Developer Documentation:
+
 - [ ] `WRITING_SCORE_IMPLEMENTATION.md` - Complete technical docs
 - [ ] `WRITING_SCORE_FINAL_SUMMARY.md` - Architecture overview
 - [ ] Code comments - Inline documentation
@@ -695,13 +739,13 @@ Developer Documentation:
 
 ## Sign-Off
 
-**Developer:** _______________  Date: _______________
+**Developer:** ******\_\_\_****** Date: ******\_\_\_******
 
-**QA Testing:** _______________  Date: _______________
+**QA Testing:** ******\_\_\_****** Date: ******\_\_\_******
 
-**Admin Approval:** _______________  Date: _______________
+**Admin Approval:** ******\_\_\_****** Date: ******\_\_\_******
 
-**Go Live Approval:** _______________  Date: _______________
+**Go Live Approval:** ******\_\_\_****** Date: ******\_\_\_******
 
 ---
 

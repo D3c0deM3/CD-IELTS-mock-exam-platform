@@ -28,10 +28,7 @@ const loadAnswersKey = () => {
  */
 const normalizeText = (text) => {
   if (!text) return "";
-  return text
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, " "); // Normalize multiple spaces
+  return text.trim().toUpperCase().replace(/\s+/g, " "); // Normalize multiple spaces
 };
 
 /**
@@ -120,7 +117,9 @@ const compareAnswers = (userAnswers, correctAnswers, section) => {
     const questionNum = userAnswer.question;
     const userAns = normalizeText(userAnswer.answer);
 
-    const correctAnswer = correctAnswers.find((a) => a.question === questionNum);
+    const correctAnswer = correctAnswers.find(
+      (a) => a.question === questionNum
+    );
 
     if (correctAnswer) {
       const correctAns = normalizeText(correctAnswer.answer);
@@ -207,7 +206,7 @@ const processWritingScore = (writingAnswers) => {
 const normalizeAnswer = (answer) => {
   if (!answer) return "";
   const normalized = normalizeText(answer);
-  
+
   // Convert abbreviated answers
   switch (normalized) {
     case "T":
@@ -231,9 +230,9 @@ const normalizeAnswer = (answer) => {
 };
 
 /**
- * Calculate listening score
+ * Calculate listening score and return both raw and band score
  * @param {Object} userAnswers - User's listening answers { question_number: answer }
- * @returns {number} Score out of 40
+ * @returns {Object} { rawScore, bandScore }
  */
 const calculateListeningScore = (userAnswers) => {
   try {
@@ -244,25 +243,31 @@ const calculateListeningScore = (userAnswers) => {
 
     correctAnswers.forEach((item) => {
       // Check both string and numeric keys for the answer
-      const userAnswer = userAnswers[item.question] || userAnswers[String(item.question)];
-      
-      if (userAnswer && normalizeAnswer(userAnswer) === normalizeAnswer(item.answer)) {
+      const userAnswer =
+        userAnswers[item.question] || userAnswers[String(item.question)];
+
+      if (
+        userAnswer &&
+        normalizeAnswer(userAnswer) === normalizeAnswer(item.answer)
+      ) {
         correctCount++;
       }
     });
 
     console.log(`Listening score calculation: ${correctCount}/40 correct`);
-    return correctCount; // Score out of 40
+    const bandScore = calculateBandScore(correctCount, "listening");
+    console.log(`Listening band score: ${bandScore}`);
+    return { rawScore: correctCount, bandScore: bandScore };
   } catch (error) {
     console.error("Error calculating listening score:", error);
-    return 0;
+    return { rawScore: 0, bandScore: 0 };
   }
 };
 
 /**
- * Calculate reading score
+ * Calculate reading score and return both raw and band score
  * @param {Object} userAnswers - User's reading answers { question_number: answer }
- * @returns {number} Score out of 40
+ * @returns {Object} { rawScore, bandScore }
  */
 const calculateReadingScore = (userAnswers) => {
   try {
@@ -273,18 +278,24 @@ const calculateReadingScore = (userAnswers) => {
 
     correctAnswers.forEach((item) => {
       // Check both string and numeric keys for the answer
-      const userAnswer = userAnswers[item.question] || userAnswers[String(item.question)];
-      
-      if (userAnswer && normalizeAnswer(userAnswer) === normalizeAnswer(item.answer)) {
+      const userAnswer =
+        userAnswers[item.question] || userAnswers[String(item.question)];
+
+      if (
+        userAnswer &&
+        normalizeAnswer(userAnswer) === normalizeAnswer(item.answer)
+      ) {
         correctCount++;
       }
     });
 
     console.log(`Reading score calculation: ${correctCount}/40 correct`);
-    return correctCount; // Score out of 40
+    const bandScore = calculateBandScore(correctCount, "reading");
+    console.log(`Reading band score: ${bandScore}`);
+    return { rawScore: correctCount, bandScore: bandScore };
   } catch (error) {
     console.error("Error calculating reading score:", error);
-    return 0;
+    return { rawScore: 0, bandScore: 0 };
   }
 };
 

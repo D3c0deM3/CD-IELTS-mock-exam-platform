@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const authMiddleware = require("../middleware/auth");
+const { calculateBandScore } = require("../utils/scoreCalculator");
 
 // Middleware to check for admin role
 const adminMiddleware = async (req, res, next) => {
@@ -1099,6 +1100,16 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
 
         const user_id = userRows[0].id;
 
+        // Convert raw scores to band scores for listening and reading
+        const listeningBandScore = calculateBandScore(
+          participant.listening_score,
+          "listening"
+        );
+        const readingBandScore = calculateBandScore(
+          participant.reading_score,
+          "reading"
+        );
+
         // Check if result already exists for this user and test
         const [existingResult] = await db.execute(
           "SELECT id FROM results WHERE student_id = ? AND test_id = ?",
@@ -1106,7 +1117,7 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
         );
 
         if (existingResult.length > 0) {
-          // Update existing result with all four scores
+          // Update existing result with all four scores (listening and reading as band scores)
           await db.execute(
             `UPDATE results 
              SET listening_score = ?, reading_score = ?, writing_score = ?, speaking_score = ?, 
@@ -1114,8 +1125,8 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
                  updated_at = NOW()
              WHERE student_id = ? AND test_id = ?`,
             [
-              participant.listening_score,
-              participant.reading_score,
+              listeningBandScore,
+              readingBandScore,
               participant.writing_score,
               participant.speaking_score,
               user_id,
@@ -1123,7 +1134,7 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
             ]
           );
         } else {
-          // Create new result with all four scores
+          // Create new result with all four scores (listening and reading as band scores)
           await db.execute(
             `INSERT INTO results 
              (student_id, test_id, listening_score, reading_score, writing_score, speaking_score, 
@@ -1132,8 +1143,8 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
             [
               user_id,
               session.test_id,
-              participant.listening_score,
-              participant.reading_score,
+              listeningBandScore,
+              readingBandScore,
               participant.writing_score,
               participant.speaking_score,
             ]

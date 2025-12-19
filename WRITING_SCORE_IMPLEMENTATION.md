@@ -1,6 +1,7 @@
 # Writing Test Score Calculation & Admin Review Implementation
 
 ## Overview
+
 This document describes the complete implementation of the writing test scoring system where users submit their answers, the system calculates preliminary scores, and admins review and set final writing & speaking scores before displaying them to users.
 
 ## Architecture Flow
@@ -30,6 +31,7 @@ User Dashboard - Display Final Scores
 ### 1. Score Calculation Utility (`server/utils/scoreCalculator.js`)
 
 **Key Functions:**
+
 - `normalizeText(text)` - Converts to uppercase, trims whitespace, normalizes spaces
 - `calculateWritingScore(userAnswers)` - Analyzes word counts against minimum requirements
   - Task 1: Minimum 150 words required
@@ -37,6 +39,7 @@ User Dashboard - Display Final Scores
 - `processWritingScore(writingAnswers)` - Packages score data for database storage
 
 **Features:**
+
 - Case-insensitive comparison (all uppercase)
 - Automatic word count calculation
 - Minimum requirement validation
@@ -45,9 +48,11 @@ User Dashboard - Display Final Scores
 ### 2. Backend API Endpoints
 
 #### **POST /api/test-sessions/submit-writing**
+
 Saves user's writing answers and preliminary score calculations.
 
 **Request Body:**
+
 ```json
 {
   "participant_id": 1,
@@ -60,6 +65,7 @@ Saves user's writing answers and preliminary score calculations.
 ```
 
 **Response:**
+
 ```json
 {
   "message": "Writing test submitted successfully",
@@ -75,6 +81,7 @@ Saves user's writing answers and preliminary score calculations.
 ```
 
 **Database Changes:**
+
 - Sets `is_writing_scored = 1` (marks that writing has been submitted)
 - Sets `writing_score = 0` (initial placeholder, will be set by admin)
 - Updates `updated_at` timestamp
@@ -82,9 +89,11 @@ Saves user's writing answers and preliminary score calculations.
 ---
 
 #### **GET /api/test-sessions/participant/:id/scores**
+
 Retrieves calculated scores for a participant.
 
 **Response:**
+
 ```json
 {
   "participant_id": 1,
@@ -102,9 +111,11 @@ Retrieves calculated scores for a participant.
 ---
 
 #### **GET /api/admin/pending-scores/:session_id**
+
 Retrieves all participants with pending score reviews for a session.
 
 **Response:**
+
 ```json
 {
   "session_id": 1,
@@ -136,9 +147,11 @@ Retrieves all participants with pending score reviews for a session.
 ---
 
 #### **PUT /api/admin/participants/:id/scores** (Existing)
+
 Admin endpoint to set writing and speaking scores.
 
 **Request Body:**
+
 ```json
 {
   "writing_score": 7.5,
@@ -147,6 +160,7 @@ Admin endpoint to set writing and speaking scores.
 ```
 
 **Database Changes:**
+
 - Updates `writing_score` and `speaking_score` columns
 - Updates `is_writing_scored` and `is_speaking_scored` flags
 - Updates `updated_at` timestamp
@@ -154,18 +168,19 @@ Admin endpoint to set writing and speaking scores.
 ### 3. Client-Side Changes
 
 #### **WritingTestDashboard.js**
+
 Enhanced with submission handler:
 
 ```javascript
 const confirmSubmitTest = useCallback(async () => {
   setIsSubmitting(true);
-  
+
   try {
     // Get participant info from localStorage
     const participantData = JSON.parse(
       localStorage.getItem("currentParticipant") || "{}"
     );
-    
+
     // Format answers (auto-lowercase and trim)
     const formattedAnswers = {
       1: (answers[1] || "").trim(),
@@ -184,7 +199,7 @@ const confirmSubmitTest = useCallback(async () => {
     });
 
     if (!response.ok) throw new Error(await response.json().error);
-    
+
     // Navigate to speaking test
     navigate("/test/speaking", {
       state: { startTime: new Date().toISOString() },
@@ -196,6 +211,7 @@ const confirmSubmitTest = useCallback(async () => {
 ```
 
 **Key Features:**
+
 - Normalizes all text to remove whitespace variations
 - Sends participant verification (ID + name)
 - Shows "Submitting..." state during submission
@@ -205,6 +221,7 @@ const confirmSubmitTest = useCallback(async () => {
 ### 4. Admin Dashboard Integration
 
 **Session Dashboard Tab:**
+
 1. Displays all participants with their scores
 2. Shows status indicators:
    - Scores pending review (empty cells)
@@ -212,6 +229,7 @@ const confirmSubmitTest = useCallback(async () => {
    - Complete (all scores set)
 
 **Score Setting Modal:**
+
 - Already exists in AdminDashboard.js
 - Opens when clicking "Scores" button on participant row
 - Accepts writing score (0-9, 0.5 increments)
@@ -220,19 +238,21 @@ const confirmSubmitTest = useCallback(async () => {
 
 **New Pending Scores View:**
 To display pending reviews, fetch from:
+
 ```javascript
 const response = await fetch(`/api/admin/pending-scores/${sessionId}`);
 const data = await response.json();
 
 // Shows:
 // - pending_writing: participants needing writing scores
-// - pending_speaking: participants needing speaking scores  
+// - pending_speaking: participants needing speaking scores
 // - completed: participants with all scores set
 ```
 
 ### 5. Database Schema Changes
 
 **test_participants table:**
+
 ```sql
 -- Already exists, columns used:
 - id: Primary key
@@ -252,6 +272,7 @@ const data = await response.json();
 
 **Dashboard.js** (Already Implemented):
 The normalized scores are already displayed:
+
 ```javascript
 const normalized = (results || []).map((r) => {
   // Maps database scores to band scores
@@ -259,14 +280,25 @@ const normalized = (results || []).map((r) => {
 });
 
 // Display in UI:
-{latest?._norm?.listening}    // 7.5
-{latest?._norm?.reading}      // 8.0
-{latest?._norm?.writing}      // 7.5 (once admin sets)
-{latest?._norm?.speaking}     // 6.5 (once admin sets)
-{latest?._norm?.overall}      // Average of all four
+{
+  latest?._norm?.listening;
+} // 7.5
+{
+  latest?._norm?.reading;
+} // 8.0
+{
+  latest?._norm?.writing;
+} // 7.5 (once admin sets)
+{
+  latest?._norm?.speaking;
+} // 6.5 (once admin sets)
+{
+  latest?._norm?.overall;
+} // Average of all four
 ```
 
 **Results History:**
+
 - Shows all completed tests with scores
 - Displays overall band as donut chart
 - Shows component band breakdown in table
@@ -278,16 +310,18 @@ const normalized = (results || []).map((r) => {
 ### Text Normalization Process
 
 1. **User Input Handling:**
+
    - User types essay/answer in textarea
    - No restrictions on case, spaces, or punctuation
 
 2. **Submission Normalization:**
+
    ```javascript
    const normalizeText = (text) => {
      return text
-       .trim()                    // Remove leading/trailing whitespace
-       .toUpperCase()             // Convert to uppercase
-       .replace(/\s+/g, " ");     // Normalize multiple spaces to single
+       .trim() // Remove leading/trailing whitespace
+       .toUpperCase() // Convert to uppercase
+       .replace(/\s+/g, " "); // Normalize multiple spaces to single
    };
    ```
 
@@ -297,6 +331,7 @@ const normalized = (results || []).map((r) => {
    - Whitespace-insensitive comparison
 
 ### Example
+
 ```
 answers.json (correct answer):
 "FREEZER"
@@ -409,25 +444,30 @@ Rounded to nearest 0.5:
 ## Key Features
 
 ✅ **Automatic Submission Handling**
+
 - Writing answers sent to backend automatically
 - No display of scores to user
 - Placeholder score (0) stored pending admin review
 
 ✅ **Case-Insensitive Comparison**
+
 - All user text converted to uppercase for comparison
 - Avoids confusion from case variations
 
 ✅ **Admin Review Interface**
+
 - Existing AdminDashboard scores modal
 - Can set writing (0-9) and speaking (0-9) scores
 - 0.5 increment support for more granular scoring
 
 ✅ **Automatic Score Display**
+
 - Dashboard already displays normalized scores
 - Shows listening, reading, writing, speaking, and overall
 - History table shows all previous test results
 
 ✅ **Data Persistence**
+
 - All scores saved to database
 - Survives page refresh/logout
 - Available for admin review anytime
@@ -436,20 +476,21 @@ Rounded to nearest 0.5:
 
 ## API Reference Summary
 
-| Endpoint | Method | Purpose | Auth |
-|----------|--------|---------|------|
-| `/api/test-sessions/submit-writing` | POST | Save writing answers | Public |
-| `/api/test-sessions/participant/:id/scores` | GET | Get participant scores | Public |
-| `/api/admin/pending-scores/:session_id` | GET | Get pending reviews | Admin |
-| `/api/admin/participants/:id/scores` | PUT | Set W/S scores | Admin |
+| Endpoint                                    | Method | Purpose                | Auth   |
+| ------------------------------------------- | ------ | ---------------------- | ------ |
+| `/api/test-sessions/submit-writing`         | POST   | Save writing answers   | Public |
+| `/api/test-sessions/participant/:id/scores` | GET    | Get participant scores | Public |
+| `/api/admin/pending-scores/:session_id`     | GET    | Get pending reviews    | Admin  |
+| `/api/admin/participants/:id/scores`        | PUT    | Set W/S scores         | Admin  |
 
 ---
 
 ## Database Columns Used
 
 **test_participants table:**
+
 - `id` - Participant ID
-- `participant_id_code` - Unique code  
+- `participant_id_code` - Unique code
 - `full_name` - Name for verification
 - `listening_score` - DECIMAL(5,2)
 - `reading_score` - DECIMAL(5,2)
@@ -466,17 +507,17 @@ Rounded to nearest 0.5:
 ## Files Modified
 
 ### Server-Side
+
 1. **server/utils/scoreCalculator.js** ← NEW
    - Core scoring logic
-   
 2. **server/routes/testSessions.js**
    - Added `/submit-writing` endpoint
    - Added `/participant/:id/scores` endpoint
-   
 3. **server/routes/admin.js**
    - Added `/pending-scores/:session_id` endpoint
 
 ### Client-Side
+
 1. **client/src/pages/WritingTestDashboard.js**
    - Enhanced `confirmSubmitTest` handler
    - Added API submission logic
@@ -487,15 +528,18 @@ Rounded to nearest 0.5:
 ## Next Steps / Future Enhancements
 
 1. **Email Notifications**
+
    - Notify admin when writing submitted
    - Notify user when scores posted
 
 2. **Advanced Writing Scoring**
+
    - Implement keyword detection
    - Automatic grammar/vocabulary analysis
    - AI-powered preliminary scoring
 
 3. **Score Analytics**
+
    - Admin dashboard showing score distributions
    - Performance trends over time
    - Comparison statistics
@@ -510,16 +554,19 @@ Rounded to nearest 0.5:
 ## Support & Troubleshooting
 
 **Issue:** Scores not saving
+
 - Verify participant_id and full_name match database
 - Check backend API logs for errors
 - Confirm is_writing_scored flag is set
 
 **Issue:** Scores not displaying in Dashboard
+
 - Ensure admin has set the scores
 - Force page refresh to reload data
 - Check normalized data in browser console
 
 **Issue:** Case sensitivity issues
+
 - All comparisons done after uppercase normalization
 - Check normalizeText() function is being called
 - Verify database stores uppercase values
@@ -529,10 +576,12 @@ Rounded to nearest 0.5:
 ## Security Considerations
 
 1. **Participant Verification**
+
    - Full name + ID code match required
    - Prevents unauthorized score submission
 
 2. **Admin Authentication**
+
    - All admin endpoints require admin role
    - Scores can only be set by authenticated admins
 

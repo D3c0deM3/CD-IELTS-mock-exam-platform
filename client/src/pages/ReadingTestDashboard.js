@@ -175,10 +175,14 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                     <div className="question-content">
                       <p className="question-prompt">
                         {question.prompt
-                          .split(/(\d+\s*(?:\.{2,}|…+))/)
+                          .split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/)
                           .map((part, i) => {
+                            if (!part) return null;
+                            // Filter out dot-only parts (no actual content)
+                            if (part.match(/^[\.\u2026_\s]+$/)) return null;
+                            // Match gap pattern: number followed by dots/ellipsis (at start and end of part)
                             const gapMatch = part.match(
-                              /(\d+)\s*(?:\.{2,}|…+)/
+                              /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
                             );
 
                             if (gapMatch) {
@@ -469,17 +473,20 @@ const ReadingTestDashboard = () => {
       }
 
       // Submit reading answers to backend
-      const response = await fetch(`${API_CONFIG.BASE_URL}/api/test-sessions/submit-reading`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          participant_id: participantData.id,
-          full_name: participantData.full_name,
-          reading_answers: answers,
-        }),
-      });
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/test-sessions/submit-reading`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            participant_id: participantData.id,
+            full_name: participantData.full_name,
+            reading_answers: answers,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();

@@ -6,6 +6,16 @@ import audioService from "../services/audioService";
 import "./ListeningTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
+// ==================== HELPER FUNCTION ====================
+// Helper function to extract gap number and clean content
+const extractGapContent = (text) => {
+  const gapMatch = text.match(/^(\d+)\s*(?:\.{2,}|…+|_+)$/);
+  if (gapMatch) {
+    return { isGap: true, gapNum: parseInt(gapMatch[1], 10) };
+  }
+  return { isGap: false };
+};
+
 // ==================== COMPONENT IMPORTS ====================
 const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
   if (!tableData) return null;
@@ -36,12 +46,19 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
             <tr key={rowIndex}>
               {columns.map((col, colIndex) => {
                 const cellContent = row[col.key] ?? "";
-                const parts = cellContent.split(/(\d+\s*(?:\.{2,}|…+))/);
+                // More robust regex to handle various dot patterns (., ……, …, ___)
+                const parts = cellContent.split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/);
 
                 return (
                   <td key={`${rowIndex}-${colIndex}`}>
                     {parts.map((part, i) => {
-                      const gapMatch = part.match(/(\d+)\s*(?:\.{2,}|…+)/);
+                      if (!part) return null;
+                      // Filter out dot-only parts (no actual content)
+                      if (part.match(/^[\.\u2026_\s]+$/)) return null;
+                      // Match gap pattern: number followed by dots/ellipsis
+                      const gapMatch = part.match(
+                        /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
+                      );
 
                       if (gapMatch) {
                         const questionNum = parseInt(gapMatch[1], 10);
@@ -117,12 +134,17 @@ const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
             );
           }
 
-          const parts = item.split(/(\d+\s*(?:\.{2,}|…+))/);
+          // More robust regex to handle various dot patterns
+          const parts = item.split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/);
 
           return (
             <li key={index} className="note-item-with-gap">
               {parts.map((part, partIndex) => {
-                if (part.match(/\d+\s*(?:\.{2,}|…+)/)) {
+                if (!part) return null;
+                // Filter out dot-only parts (no actual content)
+                if (part.match(/^[\.\u2026_\s]+$/)) return null;
+                // Match gap pattern: number followed by dots/ellipsis
+                if (part.match(/^(\d+)\s*(?:\.{2,}|…+|_{2,})$/)) {
                   return (
                     <input
                       key={partIndex}
@@ -175,13 +197,21 @@ const StructuredNotesRenderer = ({
                   (q) => q.id === item.question_id
                 );
                 if (question) {
-                  const parts = item.content.split(/(\d+\s*(?:\.{2,}|…+))/g);
+                  // More robust regex to handle various dot patterns
+                  const parts = item.content.split(
+                    /(\d+\s*(?:\.{2,}|…+|_{2,}))/g
+                  );
                   return (
                     <li key={itemIndex} className="structured-item-with-gap">
                       {parts.map((part, partIndex) => {
-                        if (part.match(/\d+\s*…+/)) {
+                        if (!part) return null;
+                        // Filter out dot-only parts (no actual content)
+                        if (part.match(/^[\.\u2026_\s]+$/)) return null;
+                        // Match gap pattern: number followed by dots/ellipsis
+                        if (part.match(/^(\d+)\s*(?:\.{2,}|…+|_{2,})$/)) {
                           return (
                             <input
+                              key={partIndex}
                               type="text"
                               className="structured-gap-input"
                               value={answers[question.id] || ""}
@@ -226,6 +256,10 @@ const MatchingTableRenderer = ({
   const [dragSource, setDragSource] = useState(null);
   const scrollIntervalRef = useRef(null);
   const isDraggingRef = useRef(false);
+  const lastMouseYRef = useRef(0);
+  const scrollDirectionRef = useRef(null);
+  const SCROLL_THRESHOLD = 120;
+  const SCROLL_SPEED = 20;
 
   if (!matchingData) return null;
 
@@ -234,24 +268,38 @@ const MatchingTableRenderer = ({
     const handleGlobalDragOver = (e) => {
       if (!isDraggingRef.current) return;
 
-      const threshold = 100;
+      lastMouseYRef.current = e.clientY;
       const clientY = e.clientY;
       const viewportHeight = window.innerHeight;
-      const isNearBottom = clientY > viewportHeight - threshold;
 
-      if (isNearBottom) {
-        // Start auto-scrolling if not already
-        if (!scrollIntervalRef.current) {
-          scrollIntervalRef.current = setInterval(() => {
-            window.scrollBy(0, 12);
-          }, 16);
-        }
-      } else {
-        // Stop scrolling if away from bottom
-        if (scrollIntervalRef.current) {
-          clearInterval(scrollIntervalRef.current);
-          scrollIntervalRef.current = null;
-        }
+      // Determine scroll direction based on cursor position
+      let newDirection = null;
+      if (clientY < SCROLL_THRESHOLD) {
+        newDirection = "up";
+      } else if (clientY > viewportHeight - SCROLL_THRESHOLD) {
+        newDirection = "down";
+      }
+
+      // Update scroll direction
+      scrollDirectionRef.current = newDirection;
+
+      // Start interval if not already running
+      if (!scrollIntervalRef.current && newDirection) {
+        scrollIntervalRef.current = setInterval(() => {
+          const direction = scrollDirectionRef.current;
+          if (direction === "up") {
+            window.scrollBy(0, -SCROLL_SPEED);
+          } else if (direction === "down") {
+            window.scrollBy(0, SCROLL_SPEED);
+          }
+        }, 16);
+      }
+
+      // Stop interval if not near edges
+      if (!newDirection && scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+        scrollDirectionRef.current = null;
       }
     };
 
@@ -1022,17 +1070,20 @@ const ListeningTestDashboard = () => {
       }
 
       // Submit listening answers to backend
-      const response = await fetch(`${API_CONFIG.BASE_URL}/api/test-sessions/submit-listening`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          participant_id: participantData.id,
-          full_name: participantData.full_name,
-          listening_answers: answers,
-        }),
-      });
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/test-sessions/submit-listening`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            participant_id: participantData.id,
+            full_name: participantData.full_name,
+            listening_answers: answers,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();

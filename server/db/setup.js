@@ -329,6 +329,76 @@ const setupDatabase = async () => {
       )
     `);
 
+    // Table for writing essay submissions
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS writing_submissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        session_id INT NOT NULL,
+        participant_id INT NOT NULL,
+        participant_id_code VARCHAR(50) NOT NULL,
+        full_name VARCHAR(255) NOT NULL,
+        phone_number VARCHAR(255),
+        task_1_content LONGTEXT,
+        task_2_content LONGTEXT,
+        task_1_word_count INT DEFAULT 0,
+        task_2_word_count INT DEFAULT 0,
+        writing_score DECIMAL(5, 2),
+        admin_notes TEXT,
+        is_reviewed BOOLEAN DEFAULT 0,
+        reviewed_by INT,
+        reviewed_at DATETIME,
+        submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES test_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (participant_id) REFERENCES test_participants(id) ON DELETE CASCADE,
+        FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+        KEY idx_session_participant (session_id, participant_id),
+        KEY idx_reviewed (is_reviewed)
+      )
+    `);
+
+    // Add missing columns to writing_submissions if they don't exist
+    try {
+      await connection.execute(`
+        ALTER TABLE writing_submissions ADD COLUMN full_name VARCHAR(255)
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        console.log("Note: full_name column:", err.message);
+      }
+    }
+
+    try {
+      await connection.execute(`
+        ALTER TABLE writing_submissions ADD COLUMN phone_number VARCHAR(255)
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        console.log("Note: phone_number column:", err.message);
+      }
+    }
+
+    try {
+      await connection.execute(`
+        ALTER TABLE writing_submissions ADD COLUMN writing_score DECIMAL(5, 2)
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        console.log("Note: writing_score column:", err.message);
+      }
+    }
+
+    try {
+      await connection.execute(`
+        ALTER TABLE writing_submissions ADD COLUMN is_reviewed BOOLEAN DEFAULT 0
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        console.log("Note: is_reviewed column:", err.message);
+      }
+    }
+
     console.log("Database tables created successfully.");
   } catch (err) {
     console.error("Error creating database tables:", err);

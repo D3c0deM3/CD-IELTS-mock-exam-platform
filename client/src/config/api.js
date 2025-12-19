@@ -1,14 +1,21 @@
 // Detect environment and set API URL
+// Use window.location to detect runtime environment, not build-time NODE_ENV
 const getApiUrl = () => {
-  // In production (deployed), use the Railway backend or the provided URL
-  if (process.env.NODE_ENV === "production" || process.env.REACT_APP_API_URL) {
-    return (
-      process.env.REACT_APP_API_URL ||
-      "https://cd-ielts-mock-exam-platform-production.up.railway.app"
-    );
+  // Check if running on localhost
+  if (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  ) {
+    return "http://localhost:4000";
   }
-  // In development (localhost), use localhost
-  return "http://localhost:4000";
+
+  // Use environment variable if provided
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+
+  // Default to production backend
+  return "https://cd-ielts-mock-exam-platform-production.up.railway.app";
 };
 
 // Centralized API configuration

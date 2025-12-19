@@ -347,13 +347,18 @@ const WritingTestDashboard = () => {
         return;
       }
 
-      // Format answers with uppercase normalization for text answers
+      // Format answers with essay content
       const formattedAnswers = {
         1: (answers[1] || "").trim(),
         2: (answers[2] || "").trim(),
       };
 
-      // Send to backend API
+      // Calculate word counts for each task
+      const countWords = (text) => {
+        return text.split(/\s+/).filter((word) => word.length > 0).length;
+      };
+
+      // Send to backend API with full essay content
       const response = await fetch(
         `${API_CONFIG.BASE_URL}/api/test-sessions/submit-writing`,
         {
@@ -363,8 +368,13 @@ const WritingTestDashboard = () => {
           },
           body: JSON.stringify({
             participant_id: participantData.id,
+            participant_id_code: participantData.participant_id_code,
+            session_id: participantData.session_id,
             full_name: participantData.full_name,
+            phone_number: participantData.phone_number || "",
             writing_answers: formattedAnswers,
+            task_1_word_count: countWords(formattedAnswers[1]),
+            task_2_word_count: countWords(formattedAnswers[2]),
           }),
         }
       );

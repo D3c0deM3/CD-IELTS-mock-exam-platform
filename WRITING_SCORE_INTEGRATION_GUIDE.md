@@ -3,6 +3,7 @@
 ## Admin Workflow Integration
 
 ### Current AdminDashboard Tabs
+
 The system integrates seamlessly with existing tabs:
 
 ```
@@ -18,6 +19,7 @@ AdminDashboard
 ### Session Monitor Tab - Participant View
 
 **Current Display:**
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ Participants Table                                      │
@@ -29,7 +31,7 @@ AdminDashboard
 │ P1003   │ Mike   │ - │ - │ - │ - │ paused │ in_progress│
 └─────────────────────────────────────────────────────────┘
            ↓ Click "Scores"
-           
+
 ┌─────────────────────────────┐
 │ Set Scores Modal            │
 ├─────────────────────────────┤
@@ -41,6 +43,7 @@ AdminDashboard
 ```
 
 **New Information Added:**
+
 - ✅ `is_writing_scored` flag shows status
 - ✅ Writing score shows "pending" or actual score
 - ✅ Speaking score shows "pending" or actual score
@@ -49,6 +52,7 @@ AdminDashboard
 ### Workflow Steps
 
 #### Step 1: Monitor Test Session
+
 ```
 Admin logs in
   ↓
@@ -65,6 +69,7 @@ Sees status: Writing is_writing_scored column
 ```
 
 #### Step 2: Participant Submits Writing
+
 ```
 During test, participant submits writing
   ↓
@@ -80,6 +85,7 @@ Admin sees in real-time (via polling):
 ```
 
 #### Step 3: Admin Reviews & Sets Score
+
 ```
 Admin clicks "Scores" button
   ↓
@@ -105,6 +111,7 @@ Scores now visible in participant row
 ```
 
 #### Step 4: Save Session & Finalize
+
 ```
 When all participants scored:
   ↓
@@ -125,6 +132,7 @@ Students see their scores on login
 ## User Dashboard Integration
 
 ### Current Dashboard Structure
+
 ```
 Dashboard.js displays:
 ├── Latest Test Result
@@ -147,15 +155,16 @@ const normalized = (results || []).map((r) => {
   const writing = r.writing_score ?? r.writing_band ?? null;
   const speaking = r.speaking_score ?? r.speaking_band ?? null;
   const overall = computeOverallBand(listening, reading, writing, speaking);
-  
+
   return {
     ...r,
-    _norm: { listening, reading, writing, speaking, overall }
+    _norm: { listening, reading, writing, speaking, overall },
   };
 });
 ```
 
 **This automatically handles:**
+
 - ✅ Listening/Reading (auto-calculated from test)
 - ✅ Writing (from admin after submission)
 - ✅ Speaking (from admin after submission)
@@ -216,6 +225,7 @@ T=3: User refreshes Dashboard
 ### Key Tables
 
 **test_participants** (During test)
+
 ```
 id │ participant_id_code │ full_name │ L_score │ R_score │ W_score │ S_score │ is_W_scored │ is_S_scored
 1  │ P1001               │ John      │ 7.5     │ 8.0     │ 0       │ NULL    │ 1           │ 0
@@ -223,6 +233,7 @@ id │ participant_id_code │ full_name │ L_score │ R_score │ W_score │
 ```
 
 **user_test_results** (After session finalized)
+
 ```
 id │ student_id │ test_id │ L_score │ R_score │ W_score │ S_score │ overall │ created_at
 1  │ 101        │ 5       │ 7.5     │ 8.0     │ 7.5     │ 6.5     │ 7.375   │ 2025-12-18
@@ -239,14 +250,14 @@ id │ student_id │ test_id │ L_score │ R_score │ W_score │ S_score �
 async function getPendingScores(sessionId) {
   const response = await fetch(`/api/admin/pending-scores/${sessionId}`);
   const data = await response.json();
-  
+
   // Returns:
   // {
   //   pending_writing: [...],
   //   pending_speaking: [...],
   //   completed: [...]
   // }
-  
+
   // Can use to:
   // - Highlight rows needing attention
   // - Show progress bar (completed / total)
@@ -258,12 +269,12 @@ async function setScores(participantId, writing, speaking) {
   const response = await fetch(
     `/api/admin/participants/${participantId}/scores`,
     {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         writing_score: writing,
-        speaking_score: speaking
-      })
+        speaking_score: speaking,
+      }),
     }
   );
   return response.json();
@@ -325,7 +336,7 @@ Score Column in Admin Dashboard:
 // Could add new tab or section showing:
 function renderPendingScoresWidget(sessionId) {
   const data = await getPendingScores(sessionId);
-  
+
   return (
     <div className="pending-scores">
       <div className="stat">
@@ -350,6 +361,7 @@ function renderPendingScoresWidget(sessionId) {
 ## Data Validation Checkpoints
 
 ### At Submission (User)
+
 ```
 ✓ Participant exists
 ✓ Name matches registered name
@@ -359,6 +371,7 @@ function renderPendingScoresWidget(sessionId) {
 ```
 
 ### At Score Setting (Admin)
+
 ```
 ✓ Participant exists
 ✓ Writing score: 0-9 range
@@ -368,6 +381,7 @@ function renderPendingScoresWidget(sessionId) {
 ```
 
 ### At Session Finalization
+
 ```
 ✓ All participants have listening score
 ✓ All participants have reading score
@@ -378,6 +392,7 @@ function renderPendingScoresWidget(sessionId) {
 ```
 
 ### At Dashboard Display
+
 ```
 ✓ Scores exist in database
 ✓ All 4 bands present (none NULL)
@@ -391,6 +406,7 @@ function renderPendingScoresWidget(sessionId) {
 ## Error Handling
 
 ### User Submission Errors
+
 ```
 Scenario: Network fails during upload
 → Show: "Error: Connection failed. Please try again."
@@ -406,6 +422,7 @@ Scenario: Participant ID mismatch
 ```
 
 ### Admin Score Setting Errors
+
 ```
 Scenario: Invalid score (not 0-9)
 → Show: "Error: Score must be between 0 and 9"
@@ -421,6 +438,7 @@ Scenario: Participant not found
 ```
 
 ### Dashboard Display Errors
+
 ```
 Scenario: Scores not present
 → Show: "Score not available yet" (or blank)
@@ -438,6 +456,7 @@ Scenario: Invalid calculation
 ## Implementation Checklist
 
 Admin Workflow:
+
 - [ ] Test session created
 - [ ] Participants registered
 - [ ] Test monitoring started
@@ -451,6 +470,7 @@ Admin Workflow:
 - [ ] Scores appear in user dashboard
 
 User Workflow:
+
 - [ ] Login to account
 - [ ] Start test session
 - [ ] Complete listening section
@@ -470,6 +490,7 @@ User Workflow:
 ## Monitoring & Maintenance
 
 ### Admin Monitoring Points
+
 ```
 Real-time (via polling):
 - See writing submissions in real-time
@@ -484,6 +505,7 @@ Post-session:
 ```
 
 ### Troubleshooting Points
+
 ```
 If user scores not visible:
 → Check: test_participants.is_writing_scored = 1
@@ -503,6 +525,7 @@ If admin can't set scores:
 ## Performance Considerations
 
 ### Database Queries
+
 ```
 GET /api/admin/pending-scores/:session_id
 → Query: test_participants where session_id
@@ -521,6 +544,7 @@ GET /api/dashboard (user dashboard)
 ```
 
 ### Caching Strategy
+
 ```
 Admin Dashboard:
 - Polling interval: 3 seconds
@@ -538,6 +562,7 @@ User Dashboard:
 ## Security & Audit Trail
 
 ### Logged Events
+
 ```
 Event: Writing submission
   Logged: timestamp, participant_id, word_counts
@@ -553,6 +578,7 @@ Event: Session finalization
 ```
 
 ### Audit Trail
+
 ```sql
 -- Can add audit table if needed:
 CREATE TABLE audit_logs (
@@ -584,6 +610,7 @@ INSERT audit_logs VALUES (
 ## Integration Summary
 
 ✅ **Seamlessly integrates with:**
+
 - Existing AdminDashboard tabs and workflows
 - Existing Dashboard display logic
 - Existing database schema
@@ -591,6 +618,7 @@ INSERT audit_logs VALUES (
 - Existing API structure
 
 ✅ **No breaking changes to:**
+
 - User experience for completed tests
 - Admin management interface
 - Listening/Reading auto-calculation
@@ -598,6 +626,7 @@ INSERT audit_logs VALUES (
 - Results display format
 
 ✅ **Backward compatible with:**
+
 - Past test results (scores all present)
 - User accounts (no new fields needed)
 - Admin roles (existing permissions work)

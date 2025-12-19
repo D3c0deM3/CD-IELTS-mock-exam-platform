@@ -161,6 +161,24 @@ const saveAndEndSession = (session_id) => {
   return apiClient.post(`${API_URL}/sessions/${session_id}/save-and-end`, {});
 };
 
+// ==================== WRITING SUBMISSIONS ====================
+
+const getWritingSubmissions = (session_id) => {
+  return apiClient.get(`/api/test-sessions/${session_id}/writing-submissions`);
+};
+
+const reviewWritingSubmission = (
+  session_id,
+  submission_id,
+  writing_score,
+  admin_notes
+) => {
+  return apiClient.post(
+    `/api/test-sessions/${session_id}/writing-submissions/${submission_id}/review`,
+    { writing_score, admin_notes }
+  );
+};
+
 const adminService = {
   // User Management
   getUsers,
@@ -191,6 +209,9 @@ const adminService = {
   endAllTests,
   getSessionDashboard,
   saveAndEndSession,
+  // Writing Submissions
+  getWritingSubmissions,
+  reviewWritingSubmission,
 };
 
 export default adminService;

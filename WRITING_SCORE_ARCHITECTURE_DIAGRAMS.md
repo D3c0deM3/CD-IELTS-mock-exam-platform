@@ -352,7 +352,7 @@ ENDPOINT 4: Set Admin Scores
 
 Request:
   PUT /api/admin/participants/1/scores
-  Headers: 
+  Headers:
     - Content-Type: application/json
     - Authorization: Bearer [admin_token]
   Body: {
@@ -623,60 +623,60 @@ Initial State (Participant Registered)
 SCENARIO 1: Different Cases
   answers.json:
     "FREEZER"
-  
+
   User enters:
     "freezer"
-  
+
   normalizeText("freezer"):
     .trim()              → "freezer"
     .toUpperCase()       → "FREEZER"
     .replace(/\s+/g," ") → "FREEZER"
-  
+
   Comparison:
     "FREEZER" === "FREEZER" ✓ MATCH
 
 SCENARIO 2: Extra Whitespace
   answers.json:
     "FREEZER DOOR"
-  
+
   User enters:
     "  Freezer  Door  "
-  
+
   normalizeText("  Freezer  Door  "):
     .trim()              → "Freezer  Door"
     .toUpperCase()       → "FREEZER  DOOR"
     .replace(/\s+/g," ") → "FREEZER DOOR"
-  
+
   Comparison:
     "FREEZER DOOR" === "FREEZER DOOR" ✓ MATCH
 
 SCENARIO 3: No Normalization Needed
   answers.json:
     "CORRECT"
-  
+
   User enters:
     "CORRECT"
-  
+
   normalizeText("CORRECT"):
     .trim()              → "CORRECT"
     .toUpperCase()       → "CORRECT"
     .replace(/\s+/g," ") → "CORRECT"
-  
+
   Comparison:
     "CORRECT" === "CORRECT" ✓ MATCH
 
 SCENARIO 4: Wrong Answer
   answers.json:
     "FREEZER"
-  
+
   User enters:
     "friezer"
-  
+
   normalizeText("friezer"):
     .trim()              → "friezer"
     .toUpperCase()       → "FRIEZER"
     .replace(/\s+/g," ") → "FRIEZER"
-  
+
   Comparison:
     "FRIEZER" === "FREEZER" ✗ NO MATCH
 ```

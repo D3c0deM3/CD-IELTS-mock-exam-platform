@@ -3,6 +3,7 @@
 ## What Was Built
 
 A complete writing test scoring system that:
+
 1. ✅ **Captures** user-entered writing answers securely
 2. ✅ **Calculates** preliminary scores based on word count requirements
 3. ✅ **Stores** scores in database without displaying to users
@@ -86,9 +87,11 @@ A complete writing test scoring system that:
 ## New Files Created
 
 ### 1. `server/utils/scoreCalculator.js`
+
 **Purpose:** Core scoring calculation engine
 
 **Functions:**
+
 - `normalizeText()` - Uppercase & whitespace normalization
 - `calculateWritingScore()` - Word count analysis
 - `processWritingScore()` - Package for database storage
@@ -100,20 +103,26 @@ A complete writing test scoring system that:
 ## Modified Files
 
 ### 1. `server/routes/testSessions.js`
+
 **Added:**
+
 - `POST /api/test-sessions/submit-writing` - Save writing answers
 - `GET /api/test-sessions/participant/:id/scores` - Retrieve scores
 
 ---
 
 ### 2. `server/routes/admin.js`
+
 **Added:**
+
 - `GET /api/admin/pending-scores/:session_id` - List participants pending review
 
 ---
 
 ### 3. `client/src/pages/WritingTestDashboard.js`
+
 **Enhanced:**
+
 - `confirmSubmitTest()` - API call to submit writing answers
 - Added `isSubmitting` state for UI feedback
 - Disabled buttons during submission
@@ -124,6 +133,7 @@ A complete writing test scoring system that:
 ## Data Flow: Text Normalization
 
 ### Before (Raw User Input)
+
 ```
 User enters:
   "  Freezer  "
@@ -136,16 +146,18 @@ Multiple spaces:
 ```
 
 ### During Processing
+
 ```javascript
 const normalizeText = (text) => {
   return text
-    .trim()                    // Remove leading/trailing: "Freezer"
-    .toUpperCase()             // To uppercase: "FREEZER"
-    .replace(/\s+/g, " ");     // Normalize spaces: "FREEZER DOOR"
+    .trim() // Remove leading/trailing: "Freezer"
+    .toUpperCase() // To uppercase: "FREEZER"
+    .replace(/\s+/g, " "); // Normalize spaces: "FREEZER DOOR"
 };
 ```
 
 ### After (Normalized)
+
 ```
 All answers stored/compared as:
 "FREEZER"
@@ -164,14 +176,14 @@ Comparison works perfectly even if user typed:
 
 ### Columns Used in `test_participants`
 
-| Column | Type | Purpose | Set By |
-|--------|------|---------|--------|
-| `listening_score` | DECIMAL(5,2) | Listening band (0-9) | System (auto-calculated) |
-| `reading_score` | DECIMAL(5,2) | Reading band (0-9) | System (auto-calculated) |
-| `writing_score` | DECIMAL(5,2) | Writing band (0-9) | **Admin** |
-| `speaking_score` | DECIMAL(5,2) | Speaking band (0-9) | **Admin** |
-| `is_writing_scored` | BOOLEAN | Submission flag | System (on submit) |
-| `is_speaking_scored` | BOOLEAN | Review flag | Admin (on submit) |
+| Column               | Type         | Purpose              | Set By                   |
+| -------------------- | ------------ | -------------------- | ------------------------ |
+| `listening_score`    | DECIMAL(5,2) | Listening band (0-9) | System (auto-calculated) |
+| `reading_score`      | DECIMAL(5,2) | Reading band (0-9)   | System (auto-calculated) |
+| `writing_score`      | DECIMAL(5,2) | Writing band (0-9)   | **Admin**                |
+| `speaking_score`     | DECIMAL(5,2) | Speaking band (0-9)  | **Admin**                |
+| `is_writing_scored`  | BOOLEAN      | Submission flag      | System (on submit)       |
+| `is_speaking_scored` | BOOLEAN      | Review flag          | Admin (on submit)        |
 
 ### State Transitions
 
@@ -197,6 +209,7 @@ After admin sets score:
 ### New Endpoints
 
 #### 1. POST /api/test-sessions/submit-writing
+
 ```
 Request:
 {
@@ -223,6 +236,7 @@ Response:
 ```
 
 #### 2. GET /api/test-sessions/participant/:id/scores
+
 ```
 Response:
 {
@@ -237,6 +251,7 @@ Response:
 ```
 
 #### 3. GET /api/admin/pending-scores/:session_id
+
 ```
 Response:
 {
@@ -265,6 +280,7 @@ Response:
 ## User Experience Flow
 
 ### For Students/Test Takers
+
 ```
 1. Complete writing section
    - Type Task 1 essay (any case/spacing)
@@ -287,6 +303,7 @@ Response:
 ```
 
 ### For Admins
+
 ```
 1. Monitor test session
    - Go to "Session Monitoring" tab
@@ -314,6 +331,7 @@ Response:
 ### Writing Score Calculation
 
 **Example 1: Both tasks meet minimum**
+
 ```
 Task 1: 160 words (≥150) ✓
 Task 2: 280 words (≥250) ✓
@@ -322,6 +340,7 @@ Typical range: 6.5-8.5 depending on quality
 ```
 
 **Example 2: Task 1 insufficient**
+
 ```
 Task 1: 120 words (<150) ✗
 Task 2: 300 words (≥250) ✓
@@ -348,6 +367,7 @@ Overall = (7.5 + 8.0 + 7.5 + 6.5) / 4
 ## Security & Validation
 
 ### Input Validation
+
 - ✅ Participant ID verified
 - ✅ Participant name verified (must match database)
 - ✅ Writing score validated (0-9 range)
@@ -355,12 +375,14 @@ Overall = (7.5 + 8.0 + 7.5 + 6.5) / 4
 - ✅ Admin role verified for scoring endpoints
 
 ### Data Protection
+
 - ✅ All text stored as-is (no modification of user content)
 - ✅ Scores stored with timestamp
 - ✅ Audit trail via updated_at field
 - ✅ No direct database manipulation from client
 
 ### Case-Insensitive Comparison
+
 - ✅ Prevents "Freezer" vs "freezer" mismatches
 - ✅ Normalizes whitespace
 - ✅ Handles multi-word answers
@@ -371,6 +393,7 @@ Overall = (7.5 + 8.0 + 7.5 + 6.5) / 4
 ## Testing Instructions
 
 ### Test 1: Writing Submission
+
 ```
 1. Start test session
 2. Complete listening & reading sections
@@ -384,6 +407,7 @@ Overall = (7.5 + 8.0 + 7.5 + 6.5) / 4
 ```
 
 ### Test 2: Admin Score Setting
+
 ```
 1. Login as admin
 2. Go to test session
@@ -397,6 +421,7 @@ Overall = (7.5 + 8.0 + 7.5 + 6.5) / 4
 ```
 
 ### Test 3: User Dashboard Display
+
 ```
 1. Login as participant
 2. Navigate to Dashboard
@@ -416,18 +441,21 @@ Overall = (7.5 + 8.0 + 7.5 + 6.5) / 4
 ## Performance & Scalability
 
 ### Optimized For:
+
 - ✅ Word counting (simple string split)
 - ✅ Uppercase conversion (native JS)
 - ✅ Database queries (indexed lookups)
 - ✅ Concurrent submissions (connection pooling)
 
 ### Can Handle:
+
 - 1000+ participants in single session
 - 2MB+ essay submissions
 - Multiple simultaneous submissions
 - Admin concurrent score updates
 
 ### Benchmarks:
+
 - Word count: <1ms per essay
 - Submission processing: <100ms total
 - Score update: <50ms total
@@ -437,14 +465,14 @@ Overall = (7.5 + 8.0 + 7.5 + 6.5) / 4
 
 ## Troubleshooting Guide
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| Submission fails | Network error | Retry submission |
-| 403 Forbidden on scores endpoint | Not admin | Login with admin account |
-| Participant not found | Wrong ID | Verify participant_id matches |
-| Scores not displaying | Admin hasn't set | Wait for admin to set scores |
-| Case sensitivity issue | Text not normalized | Check normalizeText() function |
-| Word count wrong | Counting error | Verify regex split on whitespace |
+| Issue                            | Cause               | Solution                         |
+| -------------------------------- | ------------------- | -------------------------------- |
+| Submission fails                 | Network error       | Retry submission                 |
+| 403 Forbidden on scores endpoint | Not admin           | Login with admin account         |
+| Participant not found            | Wrong ID            | Verify participant_id matches    |
+| Scores not displaying            | Admin hasn't set    | Wait for admin to set scores     |
+| Case sensitivity issue           | Text not normalized | Check normalizeText() function   |
+| Word count wrong                 | Counting error      | Verify regex split on whitespace |
 
 ---
 
@@ -487,15 +515,18 @@ Documentation/
 ## Next Steps (Optional Enhancements)
 
 1. **Notifications**
+
    - Email admin when writing submitted
    - Email user when scores posted
 
 2. **Analytics**
+
    - Admin dashboard with score statistics
    - Band distribution charts
    - Performance trends
 
 3. **Advanced Scoring**
+
    - AI-powered preliminary writing score
    - Keyword detection
    - Automated feedback
