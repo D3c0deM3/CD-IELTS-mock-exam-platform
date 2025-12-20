@@ -72,6 +72,178 @@ function WritingStarter() {
     });
   };
 
+  // ==================== FULLSCREEN HELPER ====================
+  const enterFullscreen = async () => {
+    const elem = document.documentElement;
+    try {
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        await elem.webkitRequestFullscreen();
+      } else if (elem.mozRequestFullScreen) {
+        await elem.mozRequestFullScreen();
+      } else if (elem.msRequestFullscreen) {
+        await elem.msRequestFullscreen();
+      }
+    } catch (err) {
+      console.error("Fullscreen request failed:", err);
+    }
+  };
+
+  // ==================== FULLSCREEN PROTECTION ====================
+  useEffect(() => {
+    const blockRestrictedKeys = (e) => {
+      let shouldBlock = false;
+
+      // Block ESC and F11 with maximum prevention
+      if (
+        e.key === "Escape" ||
+        e.key === "F11" ||
+        e.keyCode === 122 ||
+        e.keyCode === 27
+      ) {
+        shouldBlock = true;
+      }
+      // Block F12 (Developer Tools)
+      else if (e.key === "F12" || e.keyCode === 123) {
+        shouldBlock = true;
+      }
+      // Block Ctrl+Shift+I (Developer Tools)
+      else if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.keyCode === 73)) {
+        shouldBlock = true;
+      }
+      // Block Ctrl+Shift+J (Console)
+      else if (e.ctrlKey && e.shiftKey && (e.key === "J" || e.keyCode === 74)) {
+        shouldBlock = true;
+      }
+      // Block Ctrl+Shift+C (Inspect Element)
+      else if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.keyCode === 67)) {
+        shouldBlock = true;
+      }
+      // Block Alt+Tab
+      else if (e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
+        shouldBlock = true;
+      }
+
+      if (shouldBlock) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+
+    const handleKeyDown = (e) => blockRestrictedKeys(e);
+    const handleKeyPress = (e) => blockRestrictedKeys(e);
+    const handleKeyUp = (e) => blockRestrictedKeys(e);
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+    };
+
+    // Continuous fullscreen monitor using requestAnimationFrame
+    let fullscreenMonitorId = null;
+
+    const monitorFullscreen = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+
+      // If not in fullscreen, immediately try to re-enter
+      if (!isCurrentlyFullscreen) {
+        enterFullscreen().catch(() => {});
+      }
+
+      // Schedule next check at screen refresh rate
+      fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
+    };
+
+    // Start the fullscreen monitor
+    fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
+
+    // Add keyboard listeners with both capture and bubble phases
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("keydown", handleKeyDown, false);
+    document.addEventListener("keypress", handleKeyPress, true);
+    document.addEventListener("keypress", handleKeyPress, false);
+    document.addEventListener("keyup", handleKeyUp, true);
+    document.addEventListener("keyup", handleKeyUp, false);
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keydown", handleKeyDown, false);
+    window.addEventListener("keypress", handleKeyPress, true);
+    window.addEventListener("keypress", handleKeyPress, false);
+    window.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("keyup", handleKeyUp, false);
+
+    if (document.body) {
+      document.body.addEventListener("keydown", handleKeyDown, true);
+      document.body.addEventListener("keydown", handleKeyDown, false);
+      document.body.addEventListener("keypress", handleKeyPress, true);
+      document.body.addEventListener("keypress", handleKeyPress, false);
+      document.body.addEventListener("keyup", handleKeyUp, true);
+      document.body.addEventListener("keyup", handleKeyUp, false);
+    }
+
+    const htmlElement = document.documentElement;
+    if (htmlElement) {
+      htmlElement.addEventListener("keydown", handleKeyDown, true);
+      htmlElement.addEventListener("keydown", handleKeyDown, false);
+      htmlElement.addEventListener("keypress", handleKeyPress, true);
+      htmlElement.addEventListener("keypress", handleKeyPress, false);
+      htmlElement.addEventListener("keyup", handleKeyUp, true);
+      htmlElement.addEventListener("keyup", handleKeyUp, false);
+    }
+
+    document.addEventListener("contextmenu", handleContextMenu);
+
+    return () => {
+      // Cancel the animation frame monitor
+      if (fullscreenMonitorId !== null) {
+        cancelAnimationFrame(fullscreenMonitorId);
+      }
+
+      // Remove all keyboard listeners
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("keydown", handleKeyDown, false);
+      document.removeEventListener("keypress", handleKeyPress, true);
+      document.removeEventListener("keypress", handleKeyPress, false);
+      document.removeEventListener("keyup", handleKeyUp, true);
+      document.removeEventListener("keyup", handleKeyUp, false);
+
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keydown", handleKeyDown, false);
+      window.removeEventListener("keypress", handleKeyPress, true);
+      window.removeEventListener("keypress", handleKeyPress, false);
+      window.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("keyup", handleKeyUp, false);
+
+      if (document.body) {
+        document.body.removeEventListener("keydown", handleKeyDown, true);
+        document.body.removeEventListener("keydown", handleKeyDown, false);
+        document.body.removeEventListener("keypress", handleKeyPress, true);
+        document.body.removeEventListener("keypress", handleKeyPress, false);
+        document.body.removeEventListener("keyup", handleKeyUp, true);
+        document.body.removeEventListener("keyup", handleKeyUp, false);
+      }
+
+      const htmlElement = document.documentElement;
+      if (htmlElement) {
+        htmlElement.removeEventListener("keydown", handleKeyDown, true);
+        htmlElement.removeEventListener("keydown", handleKeyDown, false);
+        htmlElement.removeEventListener("keypress", handleKeyPress, true);
+        htmlElement.removeEventListener("keypress", handleKeyPress, false);
+        htmlElement.removeEventListener("keyup", handleKeyUp, true);
+        htmlElement.removeEventListener("keyup", handleKeyUp, false);
+      }
+
+      document.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, []);
+
   const handleVideoClick = (e) => {
     e.stopPropagation();
     handlePlayPause();

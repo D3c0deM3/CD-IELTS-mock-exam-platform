@@ -440,7 +440,7 @@ function PendingScreen() {
                     type="checkbox"
                     checked={agreedToRules}
                     onChange={(e) => setAgreedToRules(e.target.checked)}
-                    disabled={isFullscreen}
+                    disabled={adminStarted}
                   />
                   <span>
                     I understand and agree to follow all the rules and
@@ -505,10 +505,12 @@ function PendingScreen() {
             <div className="action-section">
               <button
                 className={`start-btn ${
-                  isFullscreen && agreedToRules ? "ready" : "disabled"
+                  !isFullscreen || (isFullscreen && agreedToRules)
+                    ? "ready"
+                    : "disabled"
                 }`}
                 onClick={handleStartTest}
-                disabled={!isFullscreen && !agreedToRules}
+                disabled={isFullscreen && !agreedToRules}
               >
                 {isFullscreen ? "Ready for Test" : "Enter Fullscreen Mode"}
               </button>

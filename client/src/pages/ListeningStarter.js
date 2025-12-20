@@ -32,6 +32,35 @@ function ListeningStarter() {
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
+  // Enter fullscreen with cross-browser support
+  const enterFullscreen = async () => {
+    try {
+      if (
+        videoContainerRef.current &&
+        videoContainerRef.current.requestFullscreen
+      ) {
+        await videoContainerRef.current.requestFullscreen();
+      } else if (
+        videoContainerRef.current &&
+        videoContainerRef.current.webkitRequestFullscreen
+      ) {
+        await videoContainerRef.current.webkitRequestFullscreen();
+      } else if (
+        videoContainerRef.current &&
+        videoContainerRef.current.mozRequestFullScreen
+      ) {
+        await videoContainerRef.current.mozRequestFullScreen();
+      } else if (
+        videoContainerRef.current &&
+        videoContainerRef.current.msRequestFullscreen
+      ) {
+        await videoContainerRef.current.msRequestFullscreen();
+      }
+    } catch (err) {
+      console.error("Fullscreen request failed:", err);
+    }
+  };
+
   // Sync volume on component mount
   useEffect(() => {
     if (videoRef.current) {
@@ -58,16 +87,75 @@ function ListeningStarter() {
     };
   }, []);
 
-  // Fullscreen lock and exit prevention
+  // Fullscreen lock and comprehensive keyboard restrictions
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape" || e.key === "F11") {
+      // Block ESC and F11 with maximum prevention
+      if (e.key === "Escape" || e.key === "F11" || e.keyCode === 122) {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+      // Block F12 (Developer Tools)
+      if (e.key === "F12" || e.keyCode === 123) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+      // Block Ctrl+Shift+I (Developer Tools)
+      if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.keyCode === 73)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+      // Block Ctrl+Shift+J (Console)
+      if (e.ctrlKey && e.shiftKey && (e.key === "J" || e.keyCode === 74)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+      // Block Ctrl+Shift+C (Inspect Element)
+      if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.keyCode === 67)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+      // Block Alt+Tab
+      if (e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+    };
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+
+    // Use capture phase for keyboard events to catch them before they propagate
+    document.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
   useEffect(() => {
     const timer = setInterval(() => {
@@ -127,25 +215,6 @@ function ListeningStarter() {
       }
     }
   };
-
-  // Listen for fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(
-        !!document.fullscreenElement || !!document.webkitFullscreenElement
-      );
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener(
-        "webkitfullscreenchange",
-        handleFullscreenChange
-      );
-    };
-  }, []);
 
   // Handle video time update
   const handleTimeUpdate = () => {
@@ -252,7 +321,7 @@ function ListeningStarter() {
                 ref={videoRef}
                 width="100%"
                 height="auto"
-                controlsList="nodownload"
+                controlsList="nodownload nofullscreen"
                 style={{
                   borderRadius: "8px",
                   display: "block",

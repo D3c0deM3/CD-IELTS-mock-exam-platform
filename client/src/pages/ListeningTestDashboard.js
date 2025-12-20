@@ -32,6 +32,12 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
     <div className="visual-table">
       {tableData.title && <h3 className="table-title">{tableData.title}</h3>}
 
+      {tableData.note && (
+        <div className="table-note">
+          <strong>Note:</strong> {tableData.note}
+        </div>
+      )}
+
       <table className="ielts-table">
         <thead>
           <tr>
@@ -53,7 +59,7 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
                   <td key={`${rowIndex}-${colIndex}`}>
                     {parts.map((part, i) => {
                       if (!part) return null;
-                      // Filter out dot-only parts (no actual content)
+                      // Filter out parts that are only dots, ellipsis, underscores, or whitespace
                       if (part.match(/^[\.\u2026_\s]+$/)) return null;
                       // Match gap pattern: number followed by dots/ellipsis
                       const gapMatch = part.match(
@@ -95,7 +101,16 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
                         );
                       }
 
-                      return <span key={i}>{part}</span>;
+                      // Remove leading and trailing dots, ellipsis, underscores, and punctuation from text parts
+                      const cleanedPart = part
+                        .replace(
+                          /^[\s.\u2026_,;:!?\-()[\]{}]+|[\s.\u2026_,;:!?\-()[\]{}]+$/g,
+                          ""
+                        )
+                        .trim();
+                      if (!cleanedPart) return null;
+
+                      return <span key={i}>{cleanedPart}</span>;
                     })}
                   </td>
                 );
@@ -104,12 +119,6 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
           ))}
         </tbody>
       </table>
-
-      {tableData.note && (
-        <div className="table-note">
-          <strong>Note:</strong> {tableData.note}
-        </div>
-      )}
     </div>
   );
 };
@@ -141,7 +150,7 @@ const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
             <li key={index} className="note-item-with-gap">
               {parts.map((part, partIndex) => {
                 if (!part) return null;
-                // Filter out dot-only parts (no actual content)
+                // Filter out parts that are only dots, ellipsis, underscores, or whitespace
                 if (part.match(/^[\.\u2026_\s]+$/)) return null;
                 // Match gap pattern: number followed by dots/ellipsis
                 if (part.match(/^(\d+)\s*(?:\.{2,}|…+|_{2,})$/)) {
@@ -164,7 +173,16 @@ const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
                   );
                 }
 
-                return <span key={partIndex}>{part}</span>;
+                // Remove leading and trailing dots, ellipsis, underscores, and punctuation from text parts
+                const cleanedPart = part
+                  .replace(
+                    /^[\s.\u2026_,;:!?\-()[\]{}]+|[\s.\u2026_,;:!?\-()[\]{}]+$/g,
+                    ""
+                  )
+                  .trim();
+                if (!cleanedPart) return null;
+
+                return <span key={partIndex}>{cleanedPart}</span>;
               })}
             </li>
           );
@@ -205,7 +223,7 @@ const StructuredNotesRenderer = ({
                     <li key={itemIndex} className="structured-item-with-gap">
                       {parts.map((part, partIndex) => {
                         if (!part) return null;
-                        // Filter out dot-only parts (no actual content)
+                        // Filter out parts that are only dots, ellipsis, underscores, or whitespace
                         if (part.match(/^[\.\u2026_\s]+$/)) return null;
                         // Match gap pattern: number followed by dots/ellipsis
                         if (part.match(/^(\d+)\s*(?:\.{2,}|…+|_{2,})$/)) {
@@ -227,7 +245,17 @@ const StructuredNotesRenderer = ({
                             />
                           );
                         }
-                        return <span key={partIndex}>{part}</span>;
+
+                        // Remove leading and trailing dots, ellipsis, underscores, and punctuation from text parts
+                        const cleanedPart = part
+                          .replace(
+                            /^[\s.\u2026_,;:!?\-()[\]{}]+|[\s.\u2026_,;:!?\-()[\]{}]+$/g,
+                            ""
+                          )
+                          .trim();
+                        if (!cleanedPart) return null;
+
+                        return <span key={partIndex}>{cleanedPart}</span>;
                       })}
                     </li>
                   );
@@ -372,7 +400,13 @@ const MatchingTableRenderer = ({
           <div className="options-grid draggable-options">
             {matchingData.options_box.options.map((option, idx) => {
               const letter = option.charAt(0);
-              const isUsed = Object.values(answers).includes(letter);
+              // Only check if option is used by questions in THIS matching component
+              const matchingQuestionIds = matchingData.matching_pairs.map(
+                (pair) => pair.question_id
+              );
+              const isUsed = matchingQuestionIds.some(
+                (qId) => answers[qId] === letter
+              );
               return (
                 <div
                   key={idx}
@@ -891,19 +925,79 @@ const ListeningTestDashboard = () => {
   // ==================== SUBMIT CONFIRMATION ====================
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
+  // ==================== FULLSCREEN HELPER ====================
+  const enterFullscreen = async () => {
+    const elem = document.documentElement;
+    try {
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        await elem.webkitRequestFullscreen();
+      } else if (elem.mozRequestFullScreen) {
+        await elem.mozRequestFullScreen();
+      } else if (elem.msRequestFullscreen) {
+        await elem.msRequestFullscreen();
+      }
+    } catch (err) {
+      console.error("Fullscreen request failed:", err);
+    }
+  };
+
   // ==================== FULLSCREEN AND EXIT PREVENTION ====================
   useEffect(() => {
     // Note: Fullscreen can only be triggered by user gesture, not automatically
     // The browser will prevent automatic fullscreen requests for security reasons
 
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape" || e.key === "F11") {
-        e.preventDefault();
+    const blockRestrictedKeys = (e) => {
+      let shouldBlock = false;
+
+      // Block ESC and F11 with maximum prevention
+      if (
+        e.key === "Escape" ||
+        e.key === "F11" ||
+        e.keyCode === 122 ||
+        e.keyCode === 27
+      ) {
+        shouldBlock = true;
+        console.log("Blocked:", e.key || `keyCode ${e.keyCode}`);
       }
-      if (e.altKey && e.key === "Tab") {
+      // Block F12 (Developer Tools)
+      else if (e.key === "F12" || e.keyCode === 123) {
+        shouldBlock = true;
+        console.log("Blocked F12");
+      }
+      // Block Ctrl+Shift+I (Developer Tools)
+      else if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.keyCode === 73)) {
+        shouldBlock = true;
+        console.log("Blocked Ctrl+Shift+I");
+      }
+      // Block Ctrl+Shift+J (Console)
+      else if (e.ctrlKey && e.shiftKey && (e.key === "J" || e.keyCode === 74)) {
+        shouldBlock = true;
+        console.log("Blocked Ctrl+Shift+J");
+      }
+      // Block Ctrl+Shift+C (Inspect Element)
+      else if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.keyCode === 67)) {
+        shouldBlock = true;
+        console.log("Blocked Ctrl+Shift+C");
+      }
+      // Block Alt+Tab
+      else if (e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
+        shouldBlock = true;
+        console.log("Blocked Alt+Tab");
+      }
+
+      if (shouldBlock) {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
       }
     };
+
+    const handleKeyDown = (e) => blockRestrictedKeys(e);
+    const handleKeyPress = (e) => blockRestrictedKeys(e);
+    const handleKeyUp = (e) => blockRestrictedKeys(e);
 
     const handleBeforeUnload = (e) => {
       e.preventDefault();
@@ -912,26 +1006,150 @@ const ListeningTestDashboard = () => {
     };
 
     const handleFullscreenChange = () => {
-      setTimeout(() => {
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      // Check all fullscreen states for cross-browser support
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+
+      if (!isCurrentlyFullscreen) {
+        // User tried to exit fullscreen, immediately re-enter with minimal delay
+        setTimeout(() => {
           enterFullscreen().catch(() => {});
-        }
-      }, 100);
+        }, 10);
+      }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    // Continuous fullscreen monitor using requestAnimationFrame - runs at screen refresh rate (~60Hz)
+    // This ensures fullscreen is checked and restored as fast as possible
+    let fullscreenMonitorId = null;
+
+    const monitorFullscreen = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+
+      // If not in fullscreen, immediately try to re-enter
+      if (!isCurrentlyFullscreen) {
+        enterFullscreen().catch(() => {});
+      }
+
+      // Schedule next check at screen refresh rate
+      fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
+    };
+
+    // Start the fullscreen monitor
+    fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
+
+    // Block right-click context menu
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+    };
+
+    // Use capture phase to catch events before they propagate
+    // Block on all key event types to ensure maximum coverage
+    // Add to document, window, and document.body with BOTH capture and bubble phases
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("keydown", handleKeyDown, false);
+    document.addEventListener("keypress", handleKeyPress, true);
+    document.addEventListener("keypress", handleKeyPress, false);
+    document.addEventListener("keyup", handleKeyUp, true);
+    document.addEventListener("keyup", handleKeyUp, false);
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keydown", handleKeyDown, false);
+    window.addEventListener("keypress", handleKeyPress, true);
+    window.addEventListener("keypress", handleKeyPress, false);
+    window.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("keyup", handleKeyUp, false);
+
+    // Also bind to document.body and html element
+    if (document.body) {
+      document.body.addEventListener("keydown", handleKeyDown, true);
+      document.body.addEventListener("keydown", handleKeyDown, false);
+      document.body.addEventListener("keypress", handleKeyPress, true);
+      document.body.addEventListener("keypress", handleKeyPress, false);
+      document.body.addEventListener("keyup", handleKeyUp, true);
+      document.body.addEventListener("keyup", handleKeyUp, false);
+    }
+
+    const htmlElement = document.documentElement;
+    if (htmlElement) {
+      htmlElement.addEventListener("keydown", handleKeyDown, true);
+      htmlElement.addEventListener("keydown", handleKeyDown, false);
+      htmlElement.addEventListener("keypress", handleKeyPress, true);
+      htmlElement.addEventListener("keypress", handleKeyPress, false);
+      htmlElement.addEventListener("keyup", handleKeyUp, true);
+      htmlElement.addEventListener("keyup", handleKeyUp, false);
+    }
+
     window.addEventListener("beforeunload", handleBeforeUnload);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+    document.addEventListener("contextmenu", handleContextMenu);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      // Cancel the animation frame monitor
+      if (fullscreenMonitorId !== null) {
+        cancelAnimationFrame(fullscreenMonitorId);
+      }
+
+      // Remove all keyboard listeners
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("keydown", handleKeyDown, false);
+      document.removeEventListener("keypress", handleKeyPress, true);
+      document.removeEventListener("keypress", handleKeyPress, false);
+      document.removeEventListener("keyup", handleKeyUp, true);
+      document.removeEventListener("keyup", handleKeyUp, false);
+
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keydown", handleKeyDown, false);
+      window.removeEventListener("keypress", handleKeyPress, true);
+      window.removeEventListener("keypress", handleKeyPress, false);
+      window.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("keyup", handleKeyUp, false);
+
+      if (document.body) {
+        document.body.removeEventListener("keydown", handleKeyDown, true);
+        document.body.removeEventListener("keydown", handleKeyDown, false);
+        document.body.removeEventListener("keypress", handleKeyPress, true);
+        document.body.removeEventListener("keypress", handleKeyPress, false);
+        document.body.removeEventListener("keyup", handleKeyUp, true);
+        document.body.removeEventListener("keyup", handleKeyUp, false);
+      }
+
+      const htmlElement = document.documentElement;
+      if (htmlElement) {
+        htmlElement.removeEventListener("keydown", handleKeyDown, true);
+        htmlElement.removeEventListener("keydown", handleKeyDown, false);
+        htmlElement.removeEventListener("keypress", handleKeyPress, true);
+        htmlElement.removeEventListener("keypress", handleKeyPress, false);
+        htmlElement.removeEventListener("keyup", handleKeyUp, true);
+        htmlElement.removeEventListener("keyup", handleKeyUp, false);
+      }
+
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener(
         "webkitfullscreenchange",
         handleFullscreenChange
       );
+      document.removeEventListener(
+        "mozfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "MSFullscreenChange",
+        handleFullscreenChange
+      );
+      document.removeEventListener("contextmenu", handleContextMenu);
     };
   }, []);
 

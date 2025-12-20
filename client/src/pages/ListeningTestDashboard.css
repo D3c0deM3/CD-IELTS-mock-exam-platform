@@ -573,7 +573,7 @@
 .gap-fill-input,
 .answer-input {
   padding: 4px 8px; /* slightly reduced padding to make inputs more compact */
-  border: 2px solid rgba(59, 130, 246, 0.95);
+  border: 2px solid #dc2626;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
@@ -598,7 +598,7 @@
 [data-theme="dark"] .answer-input {
   background: #2f353b;
   color: #e6f0ff;
-  border-color: rgba(96, 165, 250, 0.95);
+  border-color: #ff5252;
 }
 
 .table-gap-input:focus,
@@ -607,9 +607,9 @@
 .gap-fill-input:focus,
 .answer-input:focus {
   outline: none;
-  border-color: #1e40af;
-  box-shadow: 0 8px 22px rgba(30, 64, 175, 0.12);
-  background: #f0f9ff;
+  border-color: #b91c1c;
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.12);
+  background: #fef2f2;
 }
 
 [data-theme="dark"] .table-gap-input:focus,
@@ -617,9 +617,9 @@
 [data-theme="dark"] .structured-gap-input:focus,
 [data-theme="dark"] .gap-fill-input:focus,
 [data-theme="dark"] .answer-input:focus {
-  border-color: rgba(147, 197, 253, 0.95);
-  background: #2b3440;
-  box-shadow: 0 8px 22px rgba(59, 130, 246, 0.12);
+  border-color: #ff7f7f;
+  background: #3d2626;
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.12);
 }
 
 .table-gap-input::placeholder,
@@ -2037,19 +2037,15 @@
 /* Text Highlight */
 .text-highlight {
   background-color: #ffff00;
-  color: #000000;
-  font-weight: 600;
-  padding: 2px 4px;
-  border-radius: 2px;
+  font-weight: 500 !important;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
   position: relative;
+  display: inline;
 }
 
 .text-highlight:hover {
   background-color: #ffd700;
-  color: #000000;
-  box-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
 }
 
 .text-highlight::after {
