@@ -91,12 +91,11 @@ function ListeningStarter() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Only block if not typing in an input field
-      const isInputElement = 
-        e.target.tagName === 'INPUT' || 
-        e.target.tagName === 'TEXTAREA';
+      const isInputElement =
+        e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
 
       // For keypress events, never block - they're for text input
-      if (e.type === 'keypress') {
+      if (e.type === "keypress") {
         return;
       }
 

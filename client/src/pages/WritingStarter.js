@@ -93,35 +93,38 @@ function WritingStarter() {
   // ==================== FULLSCREEN PROTECTION ====================
   useEffect(() => {
     const blockRestrictedKeys = (e) => {
+      const isInputElement =
+        e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
+
+      // Skip blocking on keypress events - they handle text input
+      if (e.type === "keypress") {
+        return;
+      }
+
       let shouldBlock = false;
 
       // Block ESC and F11 with maximum prevention
-      if (
-        e.key === "Escape" ||
-        e.key === "F11" ||
-        e.keyCode === 122 ||
-        e.keyCode === 27
-      ) {
+      if (e.keyCode === 122 || e.keyCode === 27) {
         shouldBlock = true;
       }
       // Block F12 (Developer Tools)
-      else if (e.key === "F12" || e.keyCode === 123) {
+      else if (e.keyCode === 123) {
         shouldBlock = true;
       }
-      // Block Ctrl+Shift+I (Developer Tools)
-      else if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.keyCode === 73)) {
+      // Block Ctrl+Shift+I (Developer Tools) - only outside input fields
+      else if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 73) {
         shouldBlock = true;
       }
-      // Block Ctrl+Shift+J (Console)
-      else if (e.ctrlKey && e.shiftKey && (e.key === "J" || e.keyCode === 74)) {
+      // Block Ctrl+Shift+J (Console) - only outside input fields
+      else if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 74) {
         shouldBlock = true;
       }
-      // Block Ctrl+Shift+C (Inspect Element)
-      else if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.keyCode === 67)) {
+      // Block Ctrl+Shift+C (Inspect Element) - only outside input fields
+      else if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 67) {
         shouldBlock = true;
       }
       // Block Alt+Tab
-      else if (e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
+      else if (e.altKey && e.keyCode === 9) {
         shouldBlock = true;
       }
 

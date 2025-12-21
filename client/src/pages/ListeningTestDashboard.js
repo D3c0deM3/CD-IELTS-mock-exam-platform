@@ -950,12 +950,11 @@ const ListeningTestDashboard = () => {
 
     const blockRestrictedKeys = (e) => {
       // Only block if not typing in an input field
-      const isInputElement = 
-        e.target.tagName === 'INPUT' || 
-        e.target.tagName === 'TEXTAREA';
+      const isInputElement =
+        e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
 
       // For keypress events, never block - they're for text input
-      if (e.type === 'keypress') {
+      if (e.type === "keypress") {
         return;
       }
 
@@ -992,7 +991,11 @@ const ListeningTestDashboard = () => {
         console.log("Blocked Ctrl+Shift+C");
       }
       // Block Alt+Tab - only if not in input field
-      else if (!isInputElement && e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
+      else if (
+        !isInputElement &&
+        e.altKey &&
+        (e.key === "Tab" || e.keyCode === 9)
+      ) {
         shouldBlock = true;
         console.log("Blocked Alt+Tab");
       }
