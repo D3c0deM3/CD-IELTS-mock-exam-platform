@@ -949,6 +949,16 @@ const ListeningTestDashboard = () => {
     // The browser will prevent automatic fullscreen requests for security reasons
 
     const blockRestrictedKeys = (e) => {
+      // Only block if not typing in an input field
+      const isInputElement = 
+        e.target.tagName === 'INPUT' || 
+        e.target.tagName === 'TEXTAREA';
+
+      // For keypress events, never block - they're for text input
+      if (e.type === 'keypress') {
+        return;
+      }
+
       let shouldBlock = false;
 
       // Block ESC and F11 with maximum prevention
@@ -966,23 +976,23 @@ const ListeningTestDashboard = () => {
         shouldBlock = true;
         console.log("Blocked F12");
       }
-      // Block Ctrl+Shift+I (Developer Tools)
-      else if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.keyCode === 73)) {
+      // Block Ctrl+Shift+I (Developer Tools) - only if not in input
+      else if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 73) {
         shouldBlock = true;
         console.log("Blocked Ctrl+Shift+I");
       }
-      // Block Ctrl+Shift+J (Console)
-      else if (e.ctrlKey && e.shiftKey && (e.key === "J" || e.keyCode === 74)) {
+      // Block Ctrl+Shift+J (Console) - only if not in input
+      else if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 74) {
         shouldBlock = true;
         console.log("Blocked Ctrl+Shift+J");
       }
-      // Block Ctrl+Shift+C (Inspect Element)
-      else if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.keyCode === 67)) {
+      // Block Ctrl+Shift+C (Inspect Element) - only if not in input
+      else if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 67) {
         shouldBlock = true;
         console.log("Blocked Ctrl+Shift+C");
       }
-      // Block Alt+Tab
-      else if (e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
+      // Block Alt+Tab - only if not in input field
+      else if (!isInputElement && e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
         shouldBlock = true;
         console.log("Blocked Alt+Tab");
       }

@@ -90,6 +90,16 @@ function ListeningStarter() {
   // Fullscreen lock and comprehensive keyboard restrictions
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Only block if not typing in an input field
+      const isInputElement = 
+        e.target.tagName === 'INPUT' || 
+        e.target.tagName === 'TEXTAREA';
+
+      // For keypress events, never block - they're for text input
+      if (e.type === 'keypress') {
+        return;
+      }
+
       // Block ESC and F11 with maximum prevention
       if (e.key === "Escape" || e.key === "F11" || e.keyCode === 122) {
         e.preventDefault();
@@ -104,29 +114,29 @@ function ListeningStarter() {
         e.stopImmediatePropagation();
         return false;
       }
-      // Block Ctrl+Shift+I (Developer Tools)
-      if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.keyCode === 73)) {
+      // Block Ctrl+Shift+I (Developer Tools) - only if not in input
+      if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 73) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         return false;
       }
-      // Block Ctrl+Shift+J (Console)
-      if (e.ctrlKey && e.shiftKey && (e.key === "J" || e.keyCode === 74)) {
+      // Block Ctrl+Shift+J (Console) - only if not in input
+      if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 74) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         return false;
       }
-      // Block Ctrl+Shift+C (Inspect Element)
-      if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.keyCode === 67)) {
+      // Block Ctrl+Shift+C (Inspect Element) - only if not in input
+      if (!isInputElement && e.ctrlKey && e.shiftKey && e.keyCode === 67) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         return false;
       }
-      // Block Alt+Tab
-      if (e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
+      // Block Alt+Tab - only if not in input field
+      if (!isInputElement && e.altKey && (e.key === "Tab" || e.keyCode === 9)) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
