@@ -1,9 +1,106 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
 import "./ReadingTestDashboard.css";
 import testDataJson from "./mock_2.json";
+
+// ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
+const reapplyHighlights = (highlightsList, passageContent, onRemoveHighlight) => {
+  if (!highlightsList || highlightsList.length === 0 || !passageContent) return;
+
+  try {
+    // Collect all text nodes first
+    const textNodes = [];
+    const walker = document.createTreeWalker(
+      passageContent,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      textNodes.push(node);
+    }
+
+    // Sort highlights by position to apply them in order
+    const sortedHighlights = highlightsList.sort((a, b) => {
+      const aPos = passageContent.textContent.indexOf(a.text);
+      const bPos = passageContent.textContent.indexOf(b.text);
+      return aPos - bPos;
+    });
+
+    // Track which occurrences we've already highlighted
+    const occurrenceCount = {};
+
+    sortedHighlights.forEach((highlight) => {
+      const text = highlight.text;
+      if (!text) return;
+
+      // Count how many times we've highlighted this text
+      occurrenceCount[text] = (occurrenceCount[text] || 0) + 1;
+      const targetOccurrence = occurrenceCount[text];
+
+      let currentOccurrence = 0;
+
+      try {
+        textNodes.forEach((textNode) => {
+          if (currentOccurrence >= targetOccurrence) return;
+
+          const nodeText = textNode.textContent;
+          if (!nodeText.includes(text)) return;
+
+          // Only process if this is still a valid text node
+          if (textNode.parentNode === null) return;
+
+          const index = nodeText.indexOf(text);
+          if (index < 0) return;
+
+          currentOccurrence++;
+
+          if (currentOccurrence !== targetOccurrence) return;
+
+          // Create range
+          const range = document.createRange();
+          range.setStart(textNode, index);
+          range.setEnd(textNode, index + text.length);
+
+          const span = document.createElement("span");
+          span.className = "text-highlight";
+          span.style.backgroundColor = "#FFFF00";
+          span.style.cursor = "pointer";
+          span.style.fontWeight = "bold";
+          span.style.color = "#000";
+          span.dataset.highlightId = highlight.id;
+
+          range.surroundContents(span);
+
+          // Add click handler
+          span.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (e.ctrlKey || e.metaKey) {
+              const parent = span.parentNode;
+              if (parent) {
+                while (span.firstChild) {
+                  parent.insertBefore(span.firstChild, span);
+                }
+                parent.removeChild(span);
+              }
+              if (onRemoveHighlight) {
+                onRemoveHighlight(highlight.id);
+              }
+            }
+          });
+        });
+      } catch (err) {
+        // Silently fail for this specific highlight
+      }
+    });
+  } catch (err) {
+    console.warn("Error re-applying highlights:", err);
+  }
+};
 
 // ==================== HELPER FUNCTION ====================
 const extractInstructionsForRange = (fullInstructions, questionIds) => {
@@ -30,39 +127,41 @@ const extractInstructionsForRange = (fullInstructions, questionIds) => {
 };
 
 // ==================== PASSAGE RENDERER ====================
-const PassageRenderer = ({ passage, highlights, onContextMenu }) => {
-  if (!passage) return null;
+const PassageRenderer = React.forwardRef(
+  ({ passage, highlights, onContextMenu }, ref) => {
+    if (!passage) return null;
 
-  return (
-    <div className="reading-passage" onContextMenu={onContextMenu}>
-      <h2 className="passage-title">{passage.title}</h2>
-      <div className="passage-content">
-        {passage.formatted_content.split("\n\n").map((paragraph, idx) => {
-          // Check if paragraph starts with a letter marker (A-Z) followed by space
-          const markerMatch = paragraph.match(/^([A-Z])\s+(.*)$/s);
+    return (
+      <div ref={ref} className="reading-passage" onContextMenu={onContextMenu}>
+        <h2 className="passage-title">{passage.title}</h2>
+        <div className="passage-content">
+          {passage.formatted_content.split("\n\n").map((paragraph, idx) => {
+            // Check if paragraph starts with a letter marker (A-Z) followed by space
+            const markerMatch = paragraph.match(/^([A-Z])\s+(.*)$/s);
 
-          if (markerMatch) {
-            const [, marker, rest] = markerMatch;
+            if (markerMatch) {
+              const [, marker, rest] = markerMatch;
+              return (
+                <div key={idx}>
+                  <p className="passage-paragraph-marker">
+                    <strong className="paragraph-marker">{marker}</strong>
+                  </p>
+                  <p className="passage-paragraph">{rest}</p>
+                </div>
+              );
+            }
+
             return (
-              <div key={idx}>
-                <p className="passage-paragraph-marker">
-                  <strong className="paragraph-marker">{marker}</strong>
-                </p>
-                <p className="passage-paragraph">{rest}</p>
-              </div>
+              <p key={idx} className="passage-paragraph">
+                {paragraph}
+              </p>
             );
-          }
-
-          return (
-            <p key={idx} className="passage-paragraph">
-              {paragraph}
-            </p>
-          );
-        })}
+          })}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
 
 // ==================== QUESTIONS RENDERER ====================
 const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
@@ -284,6 +383,7 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
 // ==================== MAIN DASHBOARD COMPONENT ====================
 const ReadingTestDashboard = () => {
   const navigate = useNavigate();
+  const passageContentRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";
   });
@@ -292,7 +392,7 @@ const ReadingTestDashboard = () => {
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentPassageIndex, setCurrentPassageIndex] = useState(0);
-  const [highlights, setHighlights] = useState([]);
+  const [highlightsByPassage, setHighlightsByPassage] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedText, setSelectedText] = useState("");
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -622,13 +722,33 @@ const ReadingTestDashboard = () => {
     try {
       range.surroundContents(span);
 
+      // Capture context around the highlighted text to identify specific occurrence
+      const rangeClone = range.cloneRange();
+      rangeClone.setStart(passageContentRef.current, 0);
+      const precedingText = rangeClone.toString();
+      const contextBefore = precedingText.slice(Math.max(0, precedingText.length - 30));
+
+      const rangeClone2 = range.cloneRange();
+      rangeClone2.setEnd(passageContentRef.current, passageContentRef.current.childNodes.length);
+      const followingText = rangeClone2.toString().slice(selection.toString().length);
+      const contextAfter = followingText.slice(0, 30);
+
       const highlight = {
         id: Date.now(),
         text: selection.toString(),
+        contextBefore,
+        contextAfter,
         timestamp: new Date().toLocaleTimeString(),
       };
 
-      setHighlights([...highlights, highlight]);
+      // Get current passage key (using passage number as identifier)
+      const passageKey = `passage_${currentPassageIndex}`;
+      const currentPassageHighlights = highlightsByPassage[passageKey] || [];
+      
+      setHighlightsByPassage({
+        ...highlightsByPassage,
+        [passageKey]: [...currentPassageHighlights, highlight],
+      });
 
       span.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -638,7 +758,20 @@ const ReadingTestDashboard = () => {
             parent.insertBefore(span.firstChild, span);
           }
           parent.removeChild(span);
-          setHighlights(highlights.filter((h) => h.id !== highlight.id));
+          
+          const passageKey = `passage_${currentPassageIndex}`;
+          const updatedHighlights = (highlightsByPassage[passageKey] || []).filter((h) => h.id !== highlight.id);
+          
+          if (updatedHighlights.length === 0) {
+            const newHighlightsByPassage = { ...highlightsByPassage };
+            delete newHighlightsByPassage[passageKey];
+            setHighlightsByPassage(newHighlightsByPassage);
+          } else {
+            setHighlightsByPassage({
+              ...highlightsByPassage,
+              [passageKey]: updatedHighlights,
+            });
+          }
         }
       });
     } catch (err) {
@@ -649,6 +782,28 @@ const ReadingTestDashboard = () => {
     selection.removeAllRanges();
   };
 
+  // ==================== HANDLE HIGHLIGHT REMOVAL ====================
+  const handleRemoveHighlight = useCallback(
+    (highlightId) => {
+      const passageKey = `passage_${currentPassageIndex}`;
+      const updatedHighlights = (highlightsByPassage[passageKey] || []).filter(
+        (h) => h.id !== highlightId
+      );
+
+      if (updatedHighlights.length === 0) {
+        const newHighlightsByPassage = { ...highlightsByPassage };
+        delete newHighlightsByPassage[passageKey];
+        setHighlightsByPassage(newHighlightsByPassage);
+      } else {
+        setHighlightsByPassage({
+          ...highlightsByPassage,
+          [passageKey]: updatedHighlights,
+        });
+      }
+    },
+    [currentPassageIndex, highlightsByPassage]
+  );
+
   // Close context menu on click anywhere
   useEffect(() => {
     const handleClick = () => {
@@ -658,6 +813,41 @@ const ReadingTestDashboard = () => {
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, []);
+
+  // ==================== RE-APPLY HIGHLIGHTS ON PASSAGE CHANGE ====================
+  useEffect(() => {
+    if (!passageContentRef.current || !testData || testData.passages.length === 0) return;
+
+    const passageKey = `passage_${currentPassageIndex}`;
+    const currentHighlights = highlightsByPassage[passageKey] || [];
+
+    // Clear any existing highlight spans
+    const existingHighlights = passageContentRef.current.querySelectorAll(
+      ".text-highlight"
+    );
+    existingHighlights.forEach((span) => {
+      const parent = span.parentNode;
+      if (parent) {
+        while (span.firstChild) {
+          parent.insertBefore(span.firstChild, span);
+        }
+        parent.removeChild(span);
+      }
+    });
+
+    // Re-apply highlights for this passage - with a small delay to ensure DOM is ready
+    if (currentHighlights.length > 0) {
+      const timeoutId = setTimeout(() => {
+        reapplyHighlights(
+          currentHighlights,
+          passageContentRef.current,
+          handleRemoveHighlight
+        );
+      }, 50);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [currentPassageIndex, testData, handleRemoveHighlight]);
 
   // ==================== SUBMIT TEST HANDLER ====================
   const handleSubmitTest = useCallback(() => {
@@ -812,8 +1002,9 @@ const ReadingTestDashboard = () => {
         {/* LEFT COLUMN - PASSAGE */}
         <div className="passage-column">
           <PassageRenderer
+            ref={passageContentRef}
             passage={currentPassage}
-            highlights={highlights}
+            highlights={highlightsByPassage[`passage_${currentPassageIndex}`] || []}
             onContextMenu={handleContextMenu}
           />
         </div>

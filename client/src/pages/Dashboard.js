@@ -3,8 +3,9 @@ import dashboardService from "../services/dashboardService";
 import TestRegistrationModal from "../components/TestRegistrationModal";
 import Navbar from "../components/Navbar";
 import ThemeToggle from "../components/ThemeToggle";
-import { Link } from "react-router-dom";
-import { FiCalendar, FiChevronRight, FiUser, FiDownload } from "react-icons/fi";
+import { Link, useNavigate } from "react-router-dom";
+import { FiCalendar, FiChevronRight, FiUser, FiDownload, FiLogOut } from "react-icons/fi";
+import API_CONFIG from "../config/api";
 import "./Dashboard.css";
 
 /* -------------------------
@@ -150,6 +151,7 @@ const Donut = ({ band }) => {
    Main Dashboard component
    ------------------------- */
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [tests, setTests] = useState([]);
   const [results, setResults] = useState([]); // raw backend objects
@@ -163,6 +165,43 @@ const Dashboard = () => {
   // Admin contact info
   const ADMIN_EMAIL = "https://t.me/cdimock_test";
   const ADMIN_PHONE = "+99891581-77-11";
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Call logout endpoint to invalidate session
+      if (token) {
+        await fetch(`${API_CONFIG.BASE_URL}/api/users/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token }),
+        });
+      }
+
+      // Clear all user data from localStorage
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("currentParticipant");
+      localStorage.removeItem("ielts_mock_theme");
+
+      // Redirect to signup page
+      navigate("/");
+      
+      // Force page refresh to ensure clean state
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Error during logout:", err);
+      // Still clear local data even if backend call fails
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("currentParticipant");
+      navigate("/");
+      window.location.href = "/";
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -300,6 +339,14 @@ const Dashboard = () => {
                 <FiUser />
                 <span>{profile?.full_name || "Account"}</span>
               </Link>
+              <button 
+                onClick={handleLogout} 
+                className="action-ghost logout-button"
+                title="Logout"
+                aria-label="Logout"
+              >
+                <FiLogOut />
+              </button>
             </div>
           </div>
 

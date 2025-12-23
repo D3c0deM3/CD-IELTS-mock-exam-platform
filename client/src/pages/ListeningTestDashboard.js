@@ -6,6 +6,101 @@ import audioService from "../services/audioService";
 import "./ListeningTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
+// ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
+const reapplyHighlights = (highlightsList, containerElement, onRemoveHighlight) => {
+  if (!highlightsList || highlightsList.length === 0 || !containerElement) return;
+
+  try {
+    // Collect all text nodes first
+    const textNodes = [];
+    const walker = document.createTreeWalker(
+      containerElement,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      textNodes.push(node);
+    }
+
+    // Sort highlights by position to apply them in order
+    const sortedHighlights = highlightsList.sort((a, b) => {
+      const aPos = containerElement.textContent.indexOf(a.text);
+      const bPos = containerElement.textContent.indexOf(b.text);
+      return aPos - bPos;
+    });
+
+    // Track which occurrences we've already highlighted
+    const occurrenceCount = {};
+
+    sortedHighlights.forEach((highlight) => {
+      const text = highlight.text;
+      if (!text) return;
+
+      // Count how many times we've highlighted this text
+      occurrenceCount[text] = (occurrenceCount[text] || 0) + 1;
+      const targetOccurrence = occurrenceCount[text];
+
+      let currentOccurrence = 0;
+
+      try {
+        textNodes.forEach((textNode) => {
+          if (currentOccurrence >= targetOccurrence) return;
+
+          const nodeText = textNode.textContent;
+          if (!nodeText.includes(text)) return;
+
+          // Only process if this is still a valid text node
+          if (textNode.parentNode === null) return;
+
+          const index = nodeText.indexOf(text);
+          if (index < 0) return;
+
+          currentOccurrence++;
+
+          if (currentOccurrence !== targetOccurrence) return;
+
+          // Create range
+          const range = document.createRange();
+          range.setStart(textNode, index);
+          range.setEnd(textNode, index + text.length);
+
+          const span = document.createElement("span");
+          span.className = "text-highlight";
+          span.style.backgroundColor = "#FFFF00";
+          span.style.cursor = "pointer";
+          span.dataset.highlightId = highlight.id;
+
+          range.surroundContents(span);
+
+          // Add click handler
+          span.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (e.ctrlKey || e.metaKey) {
+              const parent = span.parentNode;
+              if (parent) {
+                while (span.firstChild) {
+                  parent.insertBefore(span.firstChild, span);
+                }
+                parent.removeChild(span);
+              }
+              if (onRemoveHighlight) {
+                onRemoveHighlight(highlight.id);
+              }
+            }
+          });
+        });
+      } catch (err) {
+        // Silently fail for this specific highlight
+      }
+    });
+  } catch (err) {
+    console.warn("Error re-applying highlights:", err);
+  }
+};
+
 // ==================== HELPER FUNCTION ====================
 // Helper function to extract gap number and clean content
 const extractGapContent = (text) => {
@@ -899,6 +994,7 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
 // ==================== MAIN DASHBOARD COMPONENT ====================
 const ListeningTestDashboard = () => {
   const navigate = useNavigate();
+  const visualStructureRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";
   });
@@ -918,7 +1014,7 @@ const ListeningTestDashboard = () => {
   const [volume, setVolume] = useState(75);
 
   // ==================== TEXT HIGHLIGHTING ====================
-  const [highlights, setHighlights] = useState([]);
+  const [highlightsByPart, setHighlightsByPart] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedText, setSelectedText] = useState("");
 
@@ -1453,14 +1549,34 @@ const ListeningTestDashboard = () => {
     try {
       range.surroundContents(span);
 
+      // Capture context around the highlighted text to identify specific occurrence
+      const rangeClone = range.cloneRange();
+      rangeClone.setStart(visualStructureRef.current, 0);
+      const precedingText = rangeClone.toString();
+      const contextBefore = precedingText.slice(Math.max(0, precedingText.length - 30));
+
+      const rangeClone2 = range.cloneRange();
+      rangeClone2.setEnd(visualStructureRef.current, visualStructureRef.current.childNodes.length);
+      const followingText = rangeClone2.toString().slice(selection.toString().length);
+      const contextAfter = followingText.slice(0, 30);
+
       // Store highlight info
       const highlight = {
         id: Date.now(),
         text: selection.toString(),
+        contextBefore,
+        contextAfter,
         timestamp: new Date().toLocaleTimeString(),
       };
 
-      setHighlights([...highlights, highlight]);
+      // Get current part key (using part number as identifier)
+      const partKey = `part_${currentPartIndex}`;
+      const currentPartHighlights = highlightsByPart[partKey] || [];
+      
+      setHighlightsByPart({
+        ...highlightsByPart,
+        [partKey]: [...currentPartHighlights, highlight],
+      });
 
       // Add click handler to remove highlight
       span.addEventListener("click", (e) => {
@@ -1471,7 +1587,20 @@ const ListeningTestDashboard = () => {
             parent.insertBefore(span.firstChild, span);
           }
           parent.removeChild(span);
-          setHighlights(highlights.filter((h) => h.id !== highlight.id));
+          
+          const partKey = `part_${currentPartIndex}`;
+          const updatedHighlights = (highlightsByPart[partKey] || []).filter((h) => h.id !== highlight.id);
+          
+          if (updatedHighlights.length === 0) {
+            const newHighlightsByPart = { ...highlightsByPart };
+            delete newHighlightsByPart[partKey];
+            setHighlightsByPart(newHighlightsByPart);
+          } else {
+            setHighlightsByPart({
+              ...highlightsByPart,
+              [partKey]: updatedHighlights,
+            });
+          }
         }
       });
     } catch (err) {
@@ -1482,6 +1611,28 @@ const ListeningTestDashboard = () => {
     selection.removeAllRanges();
   };
 
+  // ==================== HANDLE HIGHLIGHT REMOVAL ====================
+  const handleRemoveHighlight = useCallback(
+    (highlightId) => {
+      const partKey = `part_${currentPartIndex}`;
+      const updatedHighlights = (highlightsByPart[partKey] || []).filter(
+        (h) => h.id !== highlightId
+      );
+
+      if (updatedHighlights.length === 0) {
+        const newHighlightsByPart = { ...highlightsByPart };
+        delete newHighlightsByPart[partKey];
+        setHighlightsByPart(newHighlightsByPart);
+      } else {
+        setHighlightsByPart({
+          ...highlightsByPart,
+          [partKey]: updatedHighlights,
+        });
+      }
+    },
+    [currentPartIndex, highlightsByPart]
+  );
+
   // Close context menu on click anywhere
   useEffect(() => {
     const handleClick = () => {
@@ -1491,6 +1642,41 @@ const ListeningTestDashboard = () => {
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, []);
+
+  // ==================== RE-APPLY HIGHLIGHTS ON PART CHANGE ====================
+  useEffect(() => {
+    if (!visualStructureRef.current || !testData || testData.parts.length === 0) return;
+
+    const partKey = `part_${currentPartIndex}`;
+    const currentHighlights = highlightsByPart[partKey] || [];
+
+    // Clear any existing highlight spans
+    const existingHighlights = visualStructureRef.current.querySelectorAll(
+      ".text-highlight"
+    );
+    existingHighlights.forEach((span) => {
+      const parent = span.parentNode;
+      if (parent) {
+        while (span.firstChild) {
+          parent.insertBefore(span.firstChild, span);
+        }
+        parent.removeChild(span);
+      }
+    });
+
+    // Re-apply highlights for this part - with a small delay to ensure DOM is ready
+    if (currentHighlights.length > 0) {
+      const timeoutId = setTimeout(() => {
+        reapplyHighlights(
+          currentHighlights,
+          visualStructureRef.current,
+          handleRemoveHighlight
+        );
+      }, 50);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [currentPartIndex, testData, handleRemoveHighlight]);
 
   // ==================== FORMAT TIME ====================
   const formatTime = (seconds) => {
@@ -1606,7 +1792,7 @@ const ListeningTestDashboard = () => {
         </div>
 
         {/* Visual Structure Renderer - Instructions moved inside components */}
-        <div className="visual-structure-container">
+        <div ref={visualStructureRef} className="visual-structure-container">
           <VisualStructureRenderer
             visualStructure={currentPart.visual_structure}
             questions={currentPart.questions}

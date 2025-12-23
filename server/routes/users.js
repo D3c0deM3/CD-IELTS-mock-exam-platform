@@ -228,4 +228,30 @@ router.post("/create-admin", async (req, res) => {
   }
 });
 
+// POST /api/users/logout - Logout a user (invalidate session)
+router.post("/logout", async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ error: "Missing token" });
+  }
+
+  try {
+    // Delete the session from the database
+    const [result] = await db.execute(
+      "DELETE FROM user_sessions WHERE token = ?",
+      [token]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;

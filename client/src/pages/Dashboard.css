@@ -612,3 +612,22 @@ html[data-theme="dark"] .bc-grid-skel {
     width: 100%;
   }
 }
+/* Logout button styling */
+.logout-button {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-button:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.logout-button:active {
+  transform: scale(0.95);
+}
