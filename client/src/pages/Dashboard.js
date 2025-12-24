@@ -4,7 +4,13 @@ import TestRegistrationModal from "../components/TestRegistrationModal";
 import Navbar from "../components/Navbar";
 import ThemeToggle from "../components/ThemeToggle";
 import { Link, useNavigate } from "react-router-dom";
-import { FiCalendar, FiChevronRight, FiUser, FiDownload, FiLogOut } from "react-icons/fi";
+import {
+  FiCalendar,
+  FiChevronRight,
+  FiUser,
+  FiDownload,
+  FiLogOut,
+} from "react-icons/fi";
 import API_CONFIG from "../config/api";
 import "./Dashboard.css";
 
@@ -169,7 +175,7 @@ const Dashboard = () => {
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem("token");
-      
+
       // Call logout endpoint to invalidate session
       if (token) {
         await fetch(`${API_CONFIG.BASE_URL}/api/users/logout`, {
@@ -189,7 +195,7 @@ const Dashboard = () => {
 
       // Redirect to signup page
       navigate("/");
-      
+
       // Force page refresh to ensure clean state
       window.location.href = "/";
     } catch (err) {
@@ -339,8 +345,8 @@ const Dashboard = () => {
                 <FiUser />
                 <span>{profile?.full_name || "Account"}</span>
               </Link>
-              <button 
-                onClick={handleLogout} 
+              <button
+                onClick={handleLogout}
                 className="action-ghost logout-button"
                 title="Logout"
                 aria-label="Logout"

@@ -7,8 +7,13 @@ import "./ListeningTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
 // ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
-const reapplyHighlights = (highlightsList, containerElement, onRemoveHighlight) => {
-  if (!highlightsList || highlightsList.length === 0 || !containerElement) return;
+const reapplyHighlights = (
+  highlightsList,
+  containerElement,
+  onRemoveHighlight
+) => {
+  if (!highlightsList || highlightsList.length === 0 || !containerElement)
+    return;
 
   try {
     // Collect all text nodes first
@@ -1553,11 +1558,18 @@ const ListeningTestDashboard = () => {
       const rangeClone = range.cloneRange();
       rangeClone.setStart(visualStructureRef.current, 0);
       const precedingText = rangeClone.toString();
-      const contextBefore = precedingText.slice(Math.max(0, precedingText.length - 30));
+      const contextBefore = precedingText.slice(
+        Math.max(0, precedingText.length - 30)
+      );
 
       const rangeClone2 = range.cloneRange();
-      rangeClone2.setEnd(visualStructureRef.current, visualStructureRef.current.childNodes.length);
-      const followingText = rangeClone2.toString().slice(selection.toString().length);
+      rangeClone2.setEnd(
+        visualStructureRef.current,
+        visualStructureRef.current.childNodes.length
+      );
+      const followingText = rangeClone2
+        .toString()
+        .slice(selection.toString().length);
       const contextAfter = followingText.slice(0, 30);
 
       // Store highlight info
@@ -1572,7 +1584,7 @@ const ListeningTestDashboard = () => {
       // Get current part key (using part number as identifier)
       const partKey = `part_${currentPartIndex}`;
       const currentPartHighlights = highlightsByPart[partKey] || [];
-      
+
       setHighlightsByPart({
         ...highlightsByPart,
         [partKey]: [...currentPartHighlights, highlight],
@@ -1587,10 +1599,12 @@ const ListeningTestDashboard = () => {
             parent.insertBefore(span.firstChild, span);
           }
           parent.removeChild(span);
-          
+
           const partKey = `part_${currentPartIndex}`;
-          const updatedHighlights = (highlightsByPart[partKey] || []).filter((h) => h.id !== highlight.id);
-          
+          const updatedHighlights = (highlightsByPart[partKey] || []).filter(
+            (h) => h.id !== highlight.id
+          );
+
           if (updatedHighlights.length === 0) {
             const newHighlightsByPart = { ...highlightsByPart };
             delete newHighlightsByPart[partKey];
@@ -1645,15 +1659,15 @@ const ListeningTestDashboard = () => {
 
   // ==================== RE-APPLY HIGHLIGHTS ON PART CHANGE ====================
   useEffect(() => {
-    if (!visualStructureRef.current || !testData || testData.parts.length === 0) return;
+    if (!visualStructureRef.current || !testData || testData.parts.length === 0)
+      return;
 
     const partKey = `part_${currentPartIndex}`;
     const currentHighlights = highlightsByPart[partKey] || [];
 
     // Clear any existing highlight spans
-    const existingHighlights = visualStructureRef.current.querySelectorAll(
-      ".text-highlight"
-    );
+    const existingHighlights =
+      visualStructureRef.current.querySelectorAll(".text-highlight");
     existingHighlights.forEach((span) => {
       const parent = span.parentNode;
       if (parent) {

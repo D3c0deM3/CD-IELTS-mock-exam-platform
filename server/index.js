@@ -30,6 +30,7 @@ const corsOrigins =
     ? [
         "https://cd-ielts.netlify.app",
         "https://cd-ielts-mock-exam-platform-production.up.railway.app",
+        "https://cd-ielts-mock-exam-platform.vercel.app",
         process.env.RAILWAY_PUBLIC_DOMAIN,
       ].filter(Boolean)
     : ["http://localhost:3000", "http://localhost:3001"];

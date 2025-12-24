@@ -6,7 +6,11 @@ import "./ReadingTestDashboard.css";
 import testDataJson from "./mock_2.json";
 
 // ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
-const reapplyHighlights = (highlightsList, passageContent, onRemoveHighlight) => {
+const reapplyHighlights = (
+  highlightsList,
+  passageContent,
+  onRemoveHighlight
+) => {
   if (!highlightsList || highlightsList.length === 0 || !passageContent) return;
 
   try {
@@ -726,11 +730,18 @@ const ReadingTestDashboard = () => {
       const rangeClone = range.cloneRange();
       rangeClone.setStart(passageContentRef.current, 0);
       const precedingText = rangeClone.toString();
-      const contextBefore = precedingText.slice(Math.max(0, precedingText.length - 30));
+      const contextBefore = precedingText.slice(
+        Math.max(0, precedingText.length - 30)
+      );
 
       const rangeClone2 = range.cloneRange();
-      rangeClone2.setEnd(passageContentRef.current, passageContentRef.current.childNodes.length);
-      const followingText = rangeClone2.toString().slice(selection.toString().length);
+      rangeClone2.setEnd(
+        passageContentRef.current,
+        passageContentRef.current.childNodes.length
+      );
+      const followingText = rangeClone2
+        .toString()
+        .slice(selection.toString().length);
       const contextAfter = followingText.slice(0, 30);
 
       const highlight = {
@@ -744,7 +755,7 @@ const ReadingTestDashboard = () => {
       // Get current passage key (using passage number as identifier)
       const passageKey = `passage_${currentPassageIndex}`;
       const currentPassageHighlights = highlightsByPassage[passageKey] || [];
-      
+
       setHighlightsByPassage({
         ...highlightsByPassage,
         [passageKey]: [...currentPassageHighlights, highlight],
@@ -758,10 +769,12 @@ const ReadingTestDashboard = () => {
             parent.insertBefore(span.firstChild, span);
           }
           parent.removeChild(span);
-          
+
           const passageKey = `passage_${currentPassageIndex}`;
-          const updatedHighlights = (highlightsByPassage[passageKey] || []).filter((h) => h.id !== highlight.id);
-          
+          const updatedHighlights = (
+            highlightsByPassage[passageKey] || []
+          ).filter((h) => h.id !== highlight.id);
+
           if (updatedHighlights.length === 0) {
             const newHighlightsByPassage = { ...highlightsByPassage };
             delete newHighlightsByPassage[passageKey];
@@ -816,15 +829,19 @@ const ReadingTestDashboard = () => {
 
   // ==================== RE-APPLY HIGHLIGHTS ON PASSAGE CHANGE ====================
   useEffect(() => {
-    if (!passageContentRef.current || !testData || testData.passages.length === 0) return;
+    if (
+      !passageContentRef.current ||
+      !testData ||
+      testData.passages.length === 0
+    )
+      return;
 
     const passageKey = `passage_${currentPassageIndex}`;
     const currentHighlights = highlightsByPassage[passageKey] || [];
 
     // Clear any existing highlight spans
-    const existingHighlights = passageContentRef.current.querySelectorAll(
-      ".text-highlight"
-    );
+    const existingHighlights =
+      passageContentRef.current.querySelectorAll(".text-highlight");
     existingHighlights.forEach((span) => {
       const parent = span.parentNode;
       if (parent) {
@@ -1004,7 +1021,9 @@ const ReadingTestDashboard = () => {
           <PassageRenderer
             ref={passageContentRef}
             passage={currentPassage}
-            highlights={highlightsByPassage[`passage_${currentPassageIndex}`] || []}
+            highlights={
+              highlightsByPassage[`passage_${currentPassageIndex}`] || []
+            }
             onContextMenu={handleContextMenu}
           />
         </div>
