@@ -9,6 +9,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("sessions");
   const [sessions, setSessions] = useState([]);
   const [tests, setTests] = useState([]);
+  const [testMaterials, setTestMaterials] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,6 +41,7 @@ const AdminDashboard = () => {
   const [testForm, setTestForm] = useState({ name: "", description: "" });
   const [sessionForm, setSessionForm] = useState({
     test_id: "",
+    test_materials_id: 2,
     session_date: "",
     location: "",
     max_capacity: "",
@@ -58,6 +60,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchSessions();
     fetchTests();
+    fetchTestMaterials();
   }, []);
 
   // Fetch participants when session is selected
@@ -159,6 +162,16 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchTestMaterials = async () => {
+    try {
+      const response = await adminService.getTestMaterials();
+      setTestMaterials(response.materials || response);
+    } catch (err) {
+      console.error("Failed to fetch test materials:", err);
+      setError("Failed to fetch test materials");
+    }
+  };
+
   const fetchWritingSubmissions = async (sessionId) => {
     try {
       setLoading(true);
@@ -219,6 +232,7 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (
       !sessionForm.test_id ||
+      !sessionForm.test_materials_id ||
       !sessionForm.session_date ||
       !sessionForm.location
     ) {
@@ -233,7 +247,8 @@ const AdminDashboard = () => {
         sessionForm.session_date,
         sessionForm.location,
         sessionForm.max_capacity,
-        sessionForm.admin_notes
+        sessionForm.admin_notes,
+        sessionForm.test_materials_id
       );
       setSessionForm({
         test_id: "",
@@ -241,6 +256,7 @@ const AdminDashboard = () => {
         location: "",
         max_capacity: "",
         admin_notes: "",
+        test_materials_id: 2,
       });
       setShowCreateSessionModal(false);
       fetchSessions();
@@ -1467,6 +1483,27 @@ const AdminDashboard = () => {
                   {tests.map((test) => (
                     <option key={test.id} value={test.id}>
                       {test.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Test Materials *</label>
+                <select
+                  className="form-select"
+                  value={sessionForm.test_materials_id}
+                  onChange={(e) =>
+                    setSessionForm({
+                      ...sessionForm,
+                      test_materials_id: parseInt(e.target.value) || "",
+                    })
+                  }
+                  required
+                >
+                  <option value="">Select test materials</option>
+                  {testMaterials.map((material) => (
+                    <option key={material.mock_id} value={material.mock_id}>
+                      {material.name}
                     </option>
                   ))}
                 </select>

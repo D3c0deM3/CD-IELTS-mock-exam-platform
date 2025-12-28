@@ -1,31 +1,69 @@
 /**
  * Audio Service - Handles audio loading, caching, and playback for listening tests
- * Imports audio file directly from pages folder
+ * Supports multiple test audio files with dynamic loading based on test_id
  */
 
+// Import all available audio files
 import listeningAudio from "../pages/listening_test.mp3";
+import listeningAudio3 from "../pages/listening_test3.mp3";
 
 let audioCache = null;
 let audioDuration = null;
 let isPreloading = false;
 let preloadPromise = null;
+let currentTestId = null;
+
+/**
+ * Get the audio file URL for a specific test
+ * @param {number} testId - The test ID (2, 3, etc.)
+ * @returns {string} - The audio file URL
+ */
+const getAudioFileForTest = (testMaterialsId) => {
+  switch (testMaterialsId) {
+    case 2:
+      return listeningAudio;
+    case 3:
+      return listeningAudio3;
+    default:
+      console.warn(
+        `No audio file found for test materials ${testMaterialsId}, defaulting to listening_test.mp3`
+      );
+      return listeningAudio;
+  }
+};
 
 /**
  * Preload audio file with dev tools protection
  * Returns cached audio if already preloaded
+ * @param {number} testId - The test ID (2, 3, etc.). If not provided, uses test from localStorage
  * @returns {Promise<{duration: number, audio: HTMLAudioElement}>}
  */
-export const preloadAudio = async () => {
-  // If already preloading, wait for that to complete
-  if (isPreloading) {
+export const preloadAudio = async (testMaterialsId) => {
+  // Determine which test materials to load
+  let test = testMaterialsId;
+  if (!test) {
+    try {
+      const participant = JSON.parse(
+        localStorage.getItem("currentParticipant") || "{}"
+      );
+      test = participant.test_materials_id || 2;
+    } catch {
+      test = 2;
+    }
+  }
+
+  // If already preloading the same test, wait for that to complete
+  if (isPreloading && currentTestId === test) {
     console.log("Audio preload already in progress, waiting...");
     return preloadPromise;
   }
 
-  // If already preloaded, return cached version
-  if (audioCache && audioDuration) {
+  // If already preloaded the same test, return cached version
+  if (audioCache && audioDuration && currentTestId === test) {
     console.log(
-      `✓ Audio already cached. Duration: ${audioDuration.toFixed(2)}s`
+      `✓ Audio for test materials ${test} already cached. Duration: ${audioDuration.toFixed(
+        2
+      )}s`
     );
     return {
       duration: audioDuration,
@@ -34,6 +72,7 @@ export const preloadAudio = async () => {
   }
 
   isPreloading = true;
+  currentTestId = test;
 
   preloadPromise = new Promise((resolve, reject) => {
     try {
@@ -42,6 +81,9 @@ export const preloadAudio = async () => {
       // Prevent user manipulation via dev tools
       audio.controlsList = "nodownload";
       audio.crossOrigin = "anonymous";
+
+      // Get the correct audio file for this test
+      const audioUrl = getAudioFileForTest(test);
 
       // Load metadata to get duration
       const handleLoadedMetadata = () => {
@@ -68,7 +110,7 @@ export const preloadAudio = async () => {
         });
 
         console.log(
-          `✓ Audio preloaded successfully. Duration: ${audioDuration.toFixed(
+          `✓ Audio for test ${test} preloaded successfully. Duration: ${audioDuration.toFixed(
             2
           )}s`
         );
@@ -85,10 +127,10 @@ export const preloadAudio = async () => {
         audio.removeEventListener("error", handleError);
 
         console.error(
-          "✗ Audio loading error:",
+          `✗ Audio loading error for test ${test}:`,
           e.type,
           "Source:",
-          listeningAudio
+          audioUrl
         );
         reject(new Error(`Failed to load audio: ${e.type}`));
       };
@@ -98,8 +140,8 @@ export const preloadAudio = async () => {
       });
       audio.addEventListener("error", handleError, { once: true });
 
-      // Start loading using imported audio URL
-      audio.src = listeningAudio;
+      // Start loading the appropriate audio file
+      audio.src = audioUrl;
       audio.load();
     } catch (err) {
       isPreloading = false;
@@ -210,6 +252,9 @@ export const clearAudioCache = () => {
   }
   audioCache = null;
   audioDuration = null;
+  currentTestId = null;
+  isPreloading = false;
+  preloadPromise = null;
 };
 
 export default {

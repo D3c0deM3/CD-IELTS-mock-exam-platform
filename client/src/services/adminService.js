@@ -26,6 +26,10 @@ const getTests = () => {
   return apiClient.get(`${API_URL}/tests`);
 };
 
+const getTestMaterials = () => {
+  return apiClient.get(`${API_URL}/test-materials`);
+};
+
 // Test Config Management
 const setTestConfig = (
   test_id,
@@ -53,7 +57,8 @@ const createSession = (
   session_date,
   location,
   max_capacity,
-  admin_notes
+  admin_notes,
+  test_materials_id
 ) => {
   return apiClient.post(`${API_URL}/sessions`, {
     test_id,
@@ -61,6 +66,7 @@ const createSession = (
     location,
     max_capacity,
     admin_notes,
+    test_materials_id,
   });
 };
 
@@ -199,7 +205,17 @@ const adminService = {
   registerParticipants,
   getSessionParticipants,
   updateParticipantScores,
-  // Test Control
+  // Test Management
+  createTest,
+  getTests,
+  getTestMaterials,
+  setTestConfig,
+  getTestConfig,
+  // Test Sessions
+  createSession,
+  getSessions,
+  deleteSession,
+  updateSessionStatus,
   startAllTests,
   pauseParticipantTest,
   restartParticipantTest,

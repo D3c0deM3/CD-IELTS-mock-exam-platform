@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
 import "./WritingTestDashboard.css";
-import testDataJson from "./mock_2.json";
+import testDataJson2 from "./mock_2.json";
+import testDataJson3 from "./mock_3.json";
 
 // ==================== CHART RENDERER ====================
 const ChartRenderer = ({ graphData }) => {
@@ -52,22 +53,110 @@ const ChartRenderer = ({ graphData }) => {
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
 
+    // Determine axis labels - support both old and new formats
+    const xAxisLabel = graphData.x_axis?.title || graphData.x_axis || "X Axis";
+    const yAxisLabel = graphData.y_axis?.title || graphData.y_axis || "Y Axis";
+
     // X-axis label
-    ctx.fillText(
-      graphData.x_axis || "X Axis",
-      canvas.width / 2,
-      canvas.height - 10
-    );
+    ctx.fillText(xAxisLabel, canvas.width / 2, canvas.height - 10);
 
     // Y-axis label
     ctx.save();
     ctx.translate(20, canvas.height / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText(graphData.y_axis || "Y Axis", 0, 0);
+    ctx.fillText(yAxisLabel, 0, 0);
     ctx.restore();
 
-    // Plot data
-    if (graphData.data && graphData.data.length > 0) {
+    // Determine data structure - support both old and new formats
+    let chartData = [];
+    const colors = ["#2563eb", "#dc2626", "#2ca02c", "#d62728"];
+    let seriesNames = [];
+
+    // Check if new format (with series array)
+    if (graphData.series && Array.isArray(graphData.series)) {
+      // New format: convert series to plottable format
+      chartData = graphData.series.map((series, idx) => ({
+        name: series.name,
+        points: series.points,
+        color: series.color_suggestion || colors[idx],
+      }));
+      seriesNames = chartData.map((s) => s.name);
+
+      // Handle categorical x-axis
+      const xLabels = graphData.x_axis?.labels || [];
+      const yMin = graphData.y_axis?.min || 0;
+      const yMax = graphData.y_axis?.max || 10;
+
+      // Draw grid and Y-axis numbers
+      ctx.strokeStyle =
+        document.documentElement.getAttribute("data-theme") === "dark"
+          ? "#333"
+          : "#eee";
+      ctx.lineWidth = 0.5;
+      ctx.fillStyle =
+        document.documentElement.getAttribute("data-theme") === "dark"
+          ? "#999"
+          : "#666";
+      ctx.font = "11px Arial";
+      ctx.textAlign = "right";
+
+      // Draw Y-axis grid and numbers
+      const yStep = graphData.y_axis?.step || (yMax - yMin) / 5;
+      for (let value = yMin; value <= yMax; value += yStep) {
+        const y =
+          canvas.height - padding - ((value - yMin) / (yMax - yMin)) * height;
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(canvas.width - padding, y);
+        ctx.stroke();
+
+        ctx.fillText(value, padding - 12, y + 4);
+      }
+
+      // Draw X-axis labels
+      ctx.textAlign = "center";
+      const xStep = Math.max(1, Math.floor(xLabels.length / 6));
+      xLabels.forEach((label, idx) => {
+        const x = padding + (idx / (xLabels.length - 1 || 1)) * width;
+        if (idx % xStep === 0 || idx === xLabels.length - 1) {
+          ctx.fillText(label, x, canvas.height - padding + 20);
+        }
+      });
+
+      // Draw each series
+      chartData.forEach((series) => {
+        ctx.strokeStyle = series.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let first = true;
+
+        series.points.forEach((value, idx) => {
+          const x = padding + (idx / (series.points.length - 1 || 1)) * width;
+          const y =
+            canvas.height - padding - ((value - yMin) / (yMax - yMin)) * height;
+
+          if (first) {
+            ctx.moveTo(x, y);
+            first = false;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+
+        // Draw points
+        ctx.fillStyle = series.color;
+        series.points.forEach((value, idx) => {
+          const x = padding + (idx / (series.points.length - 1 || 1)) * width;
+          const y =
+            canvas.height - padding - ((value - yMin) / (yMax - yMin)) * height;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+    } else if (graphData.data && graphData.data.length > 0) {
+      // Old format: simple two-series chart
       const maxYear = Math.max(...graphData.data.map((d) => d.year));
       const minYear = Math.min(...graphData.data.map((d) => d.year));
       const maxValue = Math.max(
@@ -190,6 +279,25 @@ const ChartRenderer = ({ graphData }) => {
           ? "#ccc"
           : "#333";
       ctx.fillText("Cat Owners", canvas.width - 130, 50);
+    }
+
+    // Draw legend for new format series
+    if (chartData.length > 0 && seriesNames.length > 0) {
+      ctx.font = "12px Arial";
+      ctx.textAlign = "left";
+
+      seriesNames.forEach((name, idx) => {
+        const color = chartData[idx]?.color || colors[idx];
+        const yPos = 20 + idx * 20;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(canvas.width - 150, yPos, 12, 12);
+        ctx.fillStyle =
+          document.documentElement.getAttribute("data-theme") === "dark"
+            ? "#ccc"
+            : "#333";
+        ctx.fillText(name, canvas.width - 130, yPos + 10);
+      });
     }
   }, [graphData]);
 
@@ -499,7 +607,29 @@ const WritingTestDashboard = () => {
   // ==================== LOAD TEST DATA ====================
   useEffect(() => {
     try {
-      const writingSection = testDataJson.sections.find(
+      // Get test_materials_id from participant data stored in localStorage
+      const participant = JSON.parse(
+        localStorage.getItem("currentParticipant") || "{}"
+      );
+      const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
+
+      // Select the correct test data based on test_materials_id
+      let selectedTestData;
+      switch (testMaterialsId) {
+        case 2:
+          selectedTestData = testDataJson2;
+          break;
+        case 3:
+          selectedTestData = testDataJson3;
+          break;
+        default:
+          console.warn(
+            `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
+          );
+          selectedTestData = testDataJson2;
+      }
+
+      const writingSection = selectedTestData.sections.find(
         (s) => s.type === "writing"
       );
 

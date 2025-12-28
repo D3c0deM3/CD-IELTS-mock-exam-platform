@@ -85,6 +85,79 @@ router.delete("/users/:id", async (req, res) => {
 
 // ==================== TEST MANAGEMENT ====================
 
+// GET /api/admin/test-materials - Get available test materials (mocks)
+router.get("/test-materials", async (req, res) => {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+
+    // Check what answer files exist in the routes directory
+    // This tells us what test materials are available
+    const routesDir = path.join(__dirname, "./");
+    const files = fs.readdirSync(routesDir);
+
+    const materials = [];
+
+    // Look for answers_*.json files to determine available materials
+    // answers.json = mock 2, answers_3.json = mock 3, etc.
+    files.forEach((file) => {
+      if (file.startsWith("answers") && file.endsWith(".json")) {
+        let mockId = 2; // default
+        let mockName = "Mock 2 - Authentic Test 1";
+
+        if (file === "answers.json") {
+          mockId = 2;
+          mockName = "Mock 2 - Authentic Test 1";
+        } else if (file === "answers_3.json") {
+          mockId = 3;
+          mockName = "Mock 3 - Authentic Test 2";
+        } else {
+          // Parse other answer files like answers_4.json, answers_5.json, etc.
+          const match = file.match(/answers_(\d+)\.json/);
+          if (match) {
+            mockId = parseInt(match[1]);
+            mockName = `Mock ${mockId} - Authentic Test ${mockId - 1}`;
+          }
+        }
+
+        materials.push({
+          mock_id: mockId,
+          name: mockName,
+          file: file,
+        });
+      }
+    });
+
+    // Sort by mock_id
+    materials.sort((a, b) => a.mock_id - b.mock_id);
+
+    res.json({
+      materials:
+        materials.length > 0
+          ? materials
+          : [
+              {
+                mock_id: 2,
+                name: "Mock 2 - Authentic Test 1",
+                file: "answers.json",
+              },
+            ],
+    });
+  } catch (err) {
+    console.error("Error getting test materials:", err);
+    res.json({
+      materials: [
+        { mock_id: 2, name: "Mock 2 - Authentic Test 1", file: "answers.json" },
+        {
+          mock_id: 3,
+          name: "Mock 3 - Authentic Test 2",
+          file: "answers_3.json",
+        },
+      ],
+    });
+  }
+});
+
 // POST /api/admin/tests - Create a new test
 router.post("/tests", async (req, res) => {
   const { name, description } = req.body;
@@ -217,8 +290,14 @@ router.get("/tests/:id/config", async (req, res) => {
 
 // POST /api/admin/sessions - Create a test session
 router.post("/sessions", async (req, res) => {
-  const { test_id, session_date, location, max_capacity, admin_notes } =
-    req.body;
+  const {
+    test_id,
+    session_date,
+    location,
+    max_capacity,
+    admin_notes,
+    test_materials_id,
+  } = req.body;
 
   if (!test_id || !session_date || !location) {
     return res
@@ -227,6 +306,11 @@ router.post("/sessions", async (req, res) => {
   }
 
   try {
+    // Combine admin_notes with test_materials_id
+    const notesWithMaterials = admin_notes
+      ? `[MOCK_ID:${test_materials_id || 2}] ${admin_notes}`
+      : `[MOCK_ID:${test_materials_id || 2}]`;
+
     const [result] = await db.execute(
       "INSERT INTO test_sessions (test_id, session_date, location, max_capacity, admin_notes, created_by) VALUES (?, ?, ?, ?, ?, ?)",
       [
@@ -234,7 +318,7 @@ router.post("/sessions", async (req, res) => {
         session_date,
         location,
         max_capacity || null,
-        admin_notes || "",
+        notesWithMaterials,
         req.user.id,
       ]
     );
@@ -242,6 +326,7 @@ router.post("/sessions", async (req, res) => {
     res.status(201).json({
       message: "Test session created successfully",
       sessionId: result.insertId,
+      test_materials_id: test_materials_id || 2,
     });
   } catch (err) {
     console.error("DB error:", err);

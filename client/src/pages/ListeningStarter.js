@@ -72,8 +72,16 @@ function ListeningStarter() {
   useEffect(() => {
     const preloadTestAudio = async () => {
       try {
-        await audioService.preloadAudio();
-        console.log("Audio preloaded successfully during starter screen");
+        // Get test_materials_id from participant data stored in localStorage
+        const participant = JSON.parse(
+          localStorage.getItem("currentParticipant") || "{}"
+        );
+        const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
+
+        await audioService.preloadAudio(testMaterialsId);
+        console.log(
+          `Audio for test materials ${testMaterialsId} preloaded successfully during starter screen`
+        );
       } catch (err) {
         console.error("Failed to preload audio:", err);
       }

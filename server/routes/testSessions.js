@@ -266,7 +266,7 @@ router.post("/check-in-participant", async (req, res) => {
   try {
     // Find participant by ID code
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, ts.test_id, t.name as test_name
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, ts.test_id, t.name as test_name, ts.admin_notes
        FROM test_participants tp
        JOIN test_sessions ts ON tp.session_id = ts.id
        JOIN tests t ON ts.test_id = t.id
@@ -301,6 +301,15 @@ router.post("/check-in-participant", async (req, res) => {
       [participant.id]
     );
 
+    // Extract test_materials_id from admin_notes if available
+    let test_materials_id = 2; // Default to mock 2
+    if (participant.admin_notes) {
+      const mockIdMatch = participant.admin_notes.match(/\[MOCK_ID:(\d+)\]/);
+      if (mockIdMatch) {
+        test_materials_id = parseInt(mockIdMatch[1]);
+      }
+    }
+
     res.json({
       message: "Check-in successful",
       participant: {
@@ -310,6 +319,7 @@ router.post("/check-in-participant", async (req, res) => {
         session_id: participant.session_id,
         test_id: participant.test_id,
         test_name: participant.test_name,
+        test_materials_id: test_materials_id,
         listening_score: participant.listening_score,
         reading_score: participant.reading_score,
         writing_score: participant.writing_score,
@@ -445,9 +455,9 @@ router.post("/submit-listening", async (req, res) => {
   }
 
   try {
-    // Verify participant exists
+    // Verify participant exists and get test_id and admin_notes for test_materials_id
     const [participantRows] = await db.execute(
-      "SELECT id, full_name FROM test_participants WHERE id = ?",
+      "SELECT tp.id, tp.full_name, ts.test_id, ts.admin_notes FROM test_participants tp JOIN test_sessions ts ON tp.session_id = ts.id WHERE tp.id = ?",
       [participant_id]
     );
 
@@ -456,6 +466,16 @@ router.post("/submit-listening", async (req, res) => {
     }
 
     const participant = participantRows[0];
+    const testId = participant.test_id || 2; // Default to test 2 if not found
+
+    // Extract test_materials_id from admin_notes if available
+    let testMaterialsId = 2; // Default to mock 2
+    if (participant.admin_notes) {
+      const mockIdMatch = participant.admin_notes.match(/\[MOCK_ID:(\d+)\]/);
+      if (mockIdMatch) {
+        testMaterialsId = parseInt(mockIdMatch[1]);
+      }
+    }
 
     // Verify name matches
     const registeredName = (participant.full_name || "").trim().toLowerCase();
@@ -467,9 +487,9 @@ router.post("/submit-listening", async (req, res) => {
       });
     }
 
-    // Calculate listening score (returns { rawScore, bandScore })
+    // Calculate listening score using the correct test materials' answer key
     const { rawScore: listeningRawScore, bandScore: listeningBandScore } =
-      calculateListeningScore(listening_answers);
+      calculateListeningScore(listening_answers, testMaterialsId);
 
     // Save raw listening score to database (for admin dashboard display)
     await db.execute(
@@ -486,6 +506,7 @@ router.post("/submit-listening", async (req, res) => {
       listening_raw_score: listeningRawScore,
       listening_band_score: listeningBandScore,
       total_questions: 40,
+      test_materials_id: testMaterialsId,
     });
   } catch (err) {
     console.error("Error submitting listening answers:", err);
@@ -509,9 +530,9 @@ router.post("/submit-reading", async (req, res) => {
   }
 
   try {
-    // Verify participant exists
+    // Verify participant exists and get test_id and admin_notes for test_materials_id
     const [participantRows] = await db.execute(
-      "SELECT id, full_name FROM test_participants WHERE id = ?",
+      "SELECT tp.id, tp.full_name, ts.test_id, ts.admin_notes FROM test_participants tp JOIN test_sessions ts ON tp.session_id = ts.id WHERE tp.id = ?",
       [participant_id]
     );
 
@@ -520,6 +541,16 @@ router.post("/submit-reading", async (req, res) => {
     }
 
     const participant = participantRows[0];
+    const testId = participant.test_id || 2; // Default to test 2 if not found
+
+    // Extract test_materials_id from admin_notes if available
+    let testMaterialsId = 2; // Default to mock 2
+    if (participant.admin_notes) {
+      const mockIdMatch = participant.admin_notes.match(/\[MOCK_ID:(\d+)\]/);
+      if (mockIdMatch) {
+        testMaterialsId = parseInt(mockIdMatch[1]);
+      }
+    }
 
     // Verify name matches
     const registeredName = (participant.full_name || "").trim().toLowerCase();
@@ -531,9 +562,9 @@ router.post("/submit-reading", async (req, res) => {
       });
     }
 
-    // Calculate reading score (returns { rawScore, bandScore })
+    // Calculate reading score using the correct test materials' answer key
     const { rawScore: readingRawScore, bandScore: readingBandScore } =
-      calculateReadingScore(reading_answers);
+      calculateReadingScore(reading_answers, testMaterialsId);
 
     // Save raw reading score to database (for admin dashboard display)
     await db.execute(
@@ -550,6 +581,7 @@ router.post("/submit-reading", async (req, res) => {
       reading_raw_score: readingRawScore,
       reading_band_score: readingBandScore,
       total_questions: 40,
+      test_materials_id: testMaterialsId,
     });
   } catch (err) {
     console.error("Error submitting reading answers:", err);

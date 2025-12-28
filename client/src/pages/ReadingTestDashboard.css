@@ -148,15 +148,21 @@
   text-align: justify;
 }
 
-.passage-paragraph-marker {
-  margin-bottom: 4px;
+.paragraph-with-marker {
+  margin-top: 12px;
+}
+
+.paragraph-with-marker .passage-paragraph {
   margin-top: 0;
+  margin-bottom: 8px;
 }
 
 .paragraph-marker {
-  font-weight: 700;
-  font-size: 16px;
+  font-weight: 800;
+  font-size: 18px;
   color: #1a1a1a;
+  letter-spacing: 1px;
+  margin-right: 6px;
 }
 
 [data-theme="dark"] .paragraph-marker {
@@ -424,6 +430,41 @@
 }
 
 [data-theme="dark"] .matching-select:focus {
+  border-color: #ff5252;
+  box-shadow: 0 0 4px rgba(255, 82, 82, 0.2);
+}
+
+/* ==================== SUMMARY COMPLETION SELECT ==================== */
+.gap-select-container {
+  display: inline-block;
+  margin: 0 4px;
+}
+
+.summary-completion-select {
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 60px;
+}
+
+[data-theme="dark"] .summary-completion-select {
+  background: #3a3a3a;
+  border-color: #373737;
+  color: #e0e0e0;
+}
+
+.summary-completion-select:focus {
+  outline: none;
+  border-color: #dc2626;
+  box-shadow: 0 0 4px rgba(220, 38, 38, 0.2);
+}
+
+[data-theme="dark"] .summary-completion-select:focus {
   border-color: #ff5252;
   box-shadow: 0 0 4px rgba(255, 82, 82, 0.2);
 }

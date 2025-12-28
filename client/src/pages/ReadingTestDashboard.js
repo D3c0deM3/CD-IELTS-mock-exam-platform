@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
 import "./ReadingTestDashboard.css";
-import testDataJson from "./mock_2.json";
+import testDataJson2 from "./mock_2.json";
+import testDataJson3 from "./mock_3.json";
 
 // ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
 const reapplyHighlights = (
@@ -146,11 +147,11 @@ const PassageRenderer = React.forwardRef(
             if (markerMatch) {
               const [, marker, rest] = markerMatch;
               return (
-                <div key={idx}>
-                  <p className="passage-paragraph-marker">
-                    <strong className="paragraph-marker">{marker}</strong>
+                <div key={idx} className="paragraph-with-marker">
+                  <p className="passage-paragraph">
+                    <strong className="paragraph-marker">{marker}.</strong>{" "}
+                    {rest}
                   </p>
-                  <p className="passage-paragraph">{rest}</p>
                 </div>
               );
             }
@@ -178,9 +179,14 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
   if (questionGroups_raw.length > 0) {
     questionGroups_raw.forEach((group) => {
       questionGroups.push({
+        type: group.type,
         instructions: group.instructions,
         questionIds: group.question_ids || [],
         title: group.title,
+        steps: group.steps,
+        options_box: group.options_box,
+        labels: group.labels,
+        diagram_description: group.diagram_description,
       });
     });
   } else {
@@ -212,171 +218,312 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
               </div>
             )}
 
-            {/* Questions in this group */}
-            {groupQuestions.map((question) => {
-              const answer = answers[question.id];
+            {/* Render flowchart if group type is flowchart */}
+            {group.type === "flowchart" && group.steps && (
+              <div className="visual-flowchart">
+                <div className="flowchart-steps">
+                  {group.steps.map((step, stepIndex) => {
+                    const questionId = group.questionIds?.[stepIndex];
+                    const answer = answers[questionId];
 
-              return (
-                <div key={question.id} className="question-card">
-                  <div className="question-header">
-                    <span className="question-number">{question.id}</span>
-                  </div>
-
-                  {question.type === "true_false_ng" &&
-                    question.statement &&
-                    question.options && (
-                      <div className="question-content">
-                        <p className="question-statement">
-                          {question.statement}
-                        </p>
-                        <div className="tfng-options">
-                          {question.options.map((option, idx) => (
-                            <label key={idx} className="tfng-option">
-                              <input
-                                type="radio"
-                                name={`question-${question.id}`}
-                                value={option}
-                                checked={answer === option}
-                                onChange={(e) =>
-                                  onAnswerChange(question.id, e.target.value)
-                                }
-                              />
-                              <span>{option}</span>
-                            </label>
-                          ))}
+                    return (
+                      <div key={stepIndex} className="flowchart-step-item">
+                        <div className="step-content">
+                          <div className="step-text-with-gap">
+                            {step.split(/(\d+\.{2,})/g).map((part, partIdx) => {
+                              if (part.match(/^(\d+)\.{2,}$/)) {
+                                return (
+                                  <span
+                                    key={partIdx}
+                                    className="gap-input-container"
+                                  >
+                                    <input
+                                      type="text"
+                                      className="gap-fill-input"
+                                      value={answer || ""}
+                                      onChange={(e) =>
+                                        onAnswerChange(
+                                          questionId,
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder={`Q${questionId}`}
+                                      maxLength={40}
+                                      autoComplete="off"
+                                    />
+                                  </span>
+                                );
+                              }
+                              return <span key={partIdx}>{part}</span>;
+                            })}
+                          </div>
                         </div>
+                        {stepIndex < group.steps.length - 1 && (
+                          <div className="flowchart-arrow">↓</div>
+                        )}
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-                  {question.type === "yes_no_ng" &&
-                    question.statement &&
-                    question.options && (
-                      <div className="question-content">
-                        <p className="question-statement">
-                          {question.statement}
-                        </p>
-                        <div className="tfng-options">
-                          {question.options.map((option, idx) => (
-                            <label key={idx} className="tfng-option">
-                              <input
-                                type="radio"
-                                name={`question-${question.id}`}
-                                value={option}
-                                checked={answer === option}
-                                onChange={(e) =>
-                                  onAnswerChange(question.id, e.target.value)
-                                }
-                              />
-                              <span>{option}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+            {/* Render diagram labeling if group type is diagram_labeling */}
+            {group.type === "diagram_labeling" && group.labels && (
+              <div className="diagram-labeling-section">
+                {group.diagram_description && (
+                  <p className="diagram-description">
+                    {group.diagram_description}
+                  </p>
+                )}
+                <div className="diagram-labels">
+                  {group.labels.map((label, labelIdx) => {
+                    const questionId = group.questionIds?.[labelIdx];
+                    const answer = answers[questionId];
 
-                  {question.type === "gap_fill" && question.prompt && (
-                    <div className="question-content">
-                      <p className="question-prompt">
-                        {question.prompt
-                          .split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/)
-                          .map((part, i) => {
-                            if (!part) return null;
-                            // Filter out dot-only parts (no actual content)
-                            if (part.match(/^[\.\u2026_\s]+$/)) return null;
-                            // Match gap pattern: number followed by dots/ellipsis (at start and end of part)
-                            const gapMatch = part.match(
-                              /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
-                            );
-
-                            if (gapMatch) {
-                              return (
-                                <span key={i} className="gap-input-container">
-                                  <input
-                                    type="text"
-                                    className="gap-fill-input"
-                                    value={answer || ""}
-                                    onChange={(e) =>
-                                      onAnswerChange(
-                                        question.id,
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder={question.id}
-                                    maxLength={
-                                      question.word_limit &&
-                                      typeof question.word_limit === "string" &&
-                                      question.word_limit.includes("ONE WORD")
-                                        ? 20
-                                        : 40
-                                    }
-                                    autoComplete="off"
-                                  />
-                                </span>
-                              );
-                            }
-
-                            return <span key={i}>{part}</span>;
-                          })}
-                      </p>
-                    </div>
-                  )}
-
-                  {question.type === "paragraph_matching" &&
-                    question.prompt && (
-                      <div className="question-content">
-                        <p className="question-prompt">{question.prompt}</p>
-                        <div className="matching-select-wrapper">
-                          <select
-                            className="matching-select"
+                    return (
+                      <div key={labelIdx} className="label-item">
+                        <p className="label-prompt">{label.prompt}</p>
+                        <span className="gap-input-container">
+                          <input
+                            type="text"
+                            className="gap-fill-input"
                             value={answer || ""}
                             onChange={(e) =>
-                              onAnswerChange(question.id, e.target.value)
+                              onAnswerChange(questionId, e.target.value)
                             }
-                          >
-                            <option value="">-- Select paragraph --</option>
-                            {["A", "B", "C", "D", "E", "F", "G", "H"].map(
-                              (letter) => (
-                                <option key={letter} value={letter}>
-                                  {letter}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
+                            placeholder={`Q${questionId}`}
+                            maxLength={40}
+                            autoComplete="off"
+                          />
+                        </span>
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-                  {question.type === "matching" &&
-                    (question.question || question.prompt) &&
-                    question.matching_options && (
+            {/* Questions in this group - skip if flowchart or diagram_labeling type */}
+            {group.type !== "flowchart" &&
+              group.type !== "diagram_labeling" &&
+              groupQuestions.map((question) => {
+                const answer = answers[question.id];
+
+                return (
+                  <div key={question.id} className="question-card">
+                    <div className="question-header">
+                      <span className="question-number">{question.id}</span>
+                    </div>
+
+                    {question.type === "true_false_ng" &&
+                      question.statement &&
+                      question.options && (
+                        <div className="question-content">
+                          <p className="question-statement">
+                            {question.statement}
+                          </p>
+                          <div className="tfng-options">
+                            {question.options.map((option, idx) => (
+                              <label key={idx} className="tfng-option">
+                                <input
+                                  type="radio"
+                                  name={`question-${question.id}`}
+                                  value={option}
+                                  checked={answer === option}
+                                  onChange={(e) =>
+                                    onAnswerChange(question.id, e.target.value)
+                                  }
+                                />
+                                <span>{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {question.type === "yes_no_ng" &&
+                      question.statement &&
+                      question.options && (
+                        <div className="question-content">
+                          <p className="question-statement">
+                            {question.statement}
+                          </p>
+                          <div className="tfng-options">
+                            {question.options.map((option, idx) => (
+                              <label key={idx} className="tfng-option">
+                                <input
+                                  type="radio"
+                                  name={`question-${question.id}`}
+                                  value={option}
+                                  checked={answer === option}
+                                  onChange={(e) =>
+                                    onAnswerChange(question.id, e.target.value)
+                                  }
+                                />
+                                <span>{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {question.type === "gap_fill" && question.prompt && (
                       <div className="question-content">
                         <p className="question-prompt">
-                          {question.question || question.prompt}
-                        </p>
-                        <div className="matching-select-wrapper">
-                          <select
-                            className="matching-select"
-                            value={answer || ""}
-                            onChange={(e) =>
-                              onAnswerChange(question.id, e.target.value)
-                            }
-                          >
-                            <option value="">-- Select an answer --</option>
-                            {question.matching_options.map((option, idx) => {
-                              const letter = option.split(" ")[0];
-                              return (
-                                <option key={idx} value={letter}>
-                                  {option}
-                                </option>
+                          {question.prompt
+                            .split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/)
+                            .map((part, i) => {
+                              if (!part) return null;
+                              // Filter out dot-only parts (no actual content)
+                              if (part.match(/^[\.\u2026_\s]+$/)) return null;
+                              // Match gap pattern: number followed by dots/ellipsis (at start and end of part)
+                              const gapMatch = part.match(
+                                /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
                               );
+
+                              if (gapMatch) {
+                                return (
+                                  <span key={i} className="gap-input-container">
+                                    <input
+                                      type="text"
+                                      className="gap-fill-input"
+                                      value={answer || ""}
+                                      onChange={(e) =>
+                                        onAnswerChange(
+                                          question.id,
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder={question.id}
+                                      maxLength={
+                                        question.word_limit &&
+                                        typeof question.word_limit ===
+                                          "string" &&
+                                        question.word_limit.includes("ONE WORD")
+                                          ? 20
+                                          : 40
+                                      }
+                                      autoComplete="off"
+                                    />
+                                  </span>
+                                );
+                              }
+
+                              return <span key={i}>{part}</span>;
                             })}
-                          </select>
-                        </div>
+                        </p>
                       </div>
                     )}
-                </div>
-              );
-            })}
+
+                    {question.type === "paragraph_matching" &&
+                      question.prompt && (
+                        <div className="question-content">
+                          <p className="question-prompt">{question.prompt}</p>
+                          <div className="matching-select-wrapper">
+                            <select
+                              className="matching-select"
+                              value={answer || ""}
+                              onChange={(e) =>
+                                onAnswerChange(question.id, e.target.value)
+                              }
+                            >
+                              <option value="">-- Select paragraph --</option>
+                              {["A", "B", "C", "D", "E", "F", "G", "H"].map(
+                                (letter) => (
+                                  <option key={letter} value={letter}>
+                                    {letter}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                    {question.type === "matching" &&
+                      (question.question || question.prompt) &&
+                      question.matching_options && (
+                        <div className="question-content">
+                          <p className="question-prompt">
+                            {question.question || question.prompt}
+                          </p>
+                          <div className="matching-select-wrapper">
+                            <select
+                              className="matching-select"
+                              value={answer || ""}
+                              onChange={(e) =>
+                                onAnswerChange(question.id, e.target.value)
+                              }
+                            >
+                              <option value="">-- Select an answer --</option>
+                              {question.matching_options.map((option, idx) => {
+                                const letter = option.split(" ")[0];
+                                return (
+                                  <option key={idx} value={letter}>
+                                    {option}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                    {question.type === "summary_completion" &&
+                      question.prompt &&
+                      question.options && (
+                        <div className="question-content">
+                          <p className="question-prompt">
+                            {question.prompt
+                              .split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/)
+                              .map((part, i) => {
+                                if (!part) return null;
+                                // Filter out dot-only parts (no actual content)
+                                if (part.match(/^[\.\u2026_\s]+$/)) return null;
+                                // Match gap pattern: number followed by dots/ellipsis
+                                const gapMatch = part.match(
+                                  /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
+                                );
+
+                                if (gapMatch) {
+                                  return (
+                                    <span
+                                      key={i}
+                                      className="gap-select-container"
+                                    >
+                                      <select
+                                        className="summary-completion-select"
+                                        value={answer || ""}
+                                        onChange={(e) =>
+                                          onAnswerChange(
+                                            question.id,
+                                            e.target.value
+                                          )
+                                        }
+                                      >
+                                        <option value="">--</option>
+                                        {question.options.map((option, idx) => {
+                                          const letter = option.split(" ")[0];
+                                          return (
+                                            <option key={idx} value={letter}>
+                                              {option}
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+                                    </span>
+                                  );
+                                }
+
+                                return <span key={i}>{part}</span>;
+                              })}
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                );
+              })}
           </div>
         );
       })}
@@ -645,7 +792,29 @@ const ReadingTestDashboard = () => {
   // ==================== LOAD TEST DATA ====================
   useEffect(() => {
     try {
-      const readingSection = testDataJson.sections.find(
+      // Get test_materials_id from participant data stored in localStorage
+      const participant = JSON.parse(
+        localStorage.getItem("currentParticipant") || "{}"
+      );
+      const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
+
+      // Select the correct test data based on test_materials_id
+      let selectedTestData;
+      switch (testMaterialsId) {
+        case 2:
+          selectedTestData = testDataJson2;
+          break;
+        case 3:
+          selectedTestData = testDataJson3;
+          break;
+        default:
+          console.warn(
+            `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
+          );
+          selectedTestData = testDataJson2;
+      }
+
+      const readingSection = selectedTestData.sections.find(
         (s) => s.type === "reading"
       );
 

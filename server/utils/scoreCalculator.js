@@ -7,16 +7,33 @@ const fs = require("fs");
 const path = require("path");
 
 /**
- * Load the correct answers from answers.json
+ * Load the correct answers from the appropriate answers file based on test_materials_id
+ * @param {number} testMaterialsId - The test materials ID (2 or 3 for now)
  * @returns {Object} The answers data
  */
-const loadAnswersKey = () => {
+const loadAnswersKey = (testMaterialsId = 2) => {
   try {
-    const answersPath = path.join(__dirname, "../routes/answers.json");
+    // Map test_materials_id to answer file
+    let answersFileName;
+    switch (testMaterialsId) {
+      case 2:
+        answersFileName = "answers.json";
+        break;
+      case 3:
+        answersFileName = "answers_3.json";
+        break;
+      default:
+        console.warn(
+          `No answer file for test materials ${testMaterialsId}, using answers.json`
+        );
+        answersFileName = "answers.json";
+    }
+
+    const answersPath = path.join(__dirname, "../routes", answersFileName);
     const answersData = fs.readFileSync(answersPath, "utf8");
     return JSON.parse(answersData);
   } catch (error) {
-    console.error("Error loading answers.json:", error);
+    console.error("Error loading answers file:", error);
     throw new Error("Failed to load answer key");
   }
 };
@@ -234,9 +251,9 @@ const normalizeAnswer = (answer) => {
  * @param {Object} userAnswers - User's listening answers { question_number: answer }
  * @returns {Object} { rawScore, bandScore }
  */
-const calculateListeningScore = (userAnswers) => {
+const calculateListeningScore = (userAnswers, testId = 2) => {
   try {
-    const answersKey = loadAnswersKey();
+    const answersKey = loadAnswersKey(testId);
     const correctAnswers = answersKey.answers.listening;
 
     let correctCount = 0;
@@ -254,7 +271,9 @@ const calculateListeningScore = (userAnswers) => {
       }
     });
 
-    console.log(`Listening score calculation: ${correctCount}/40 correct`);
+    console.log(
+      `Listening score calculation for test ${testId}: ${correctCount}/40 correct`
+    );
     const bandScore = calculateBandScore(correctCount, "listening");
     console.log(`Listening band score: ${bandScore}`);
     return { rawScore: correctCount, bandScore: bandScore };
@@ -267,11 +286,12 @@ const calculateListeningScore = (userAnswers) => {
 /**
  * Calculate reading score and return both raw and band score
  * @param {Object} userAnswers - User's reading answers { question_number: answer }
+ * @param {number} testId - The test ID (2 or 3 for now)
  * @returns {Object} { rawScore, bandScore }
  */
-const calculateReadingScore = (userAnswers) => {
+const calculateReadingScore = (userAnswers, testId = 2) => {
   try {
-    const answersKey = loadAnswersKey();
+    const answersKey = loadAnswersKey(testId);
     const correctAnswers = answersKey.answers.reading;
 
     let correctCount = 0;
@@ -289,7 +309,9 @@ const calculateReadingScore = (userAnswers) => {
       }
     });
 
-    console.log(`Reading score calculation: ${correctCount}/40 correct`);
+    console.log(
+      `Reading score calculation for test ${testId}: ${correctCount}/40 correct`
+    );
     const bandScore = calculateBandScore(correctCount, "reading");
     console.log(`Reading band score: ${bandScore}`);
     return { rawScore: correctCount, bandScore: bandScore };

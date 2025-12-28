@@ -4,7 +4,10 @@ import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
 import audioService from "../services/audioService";
 import "./ListeningTestDashboard.css";
-import testDataJson from "./mock_2.json";
+
+// Import all available test data files for dynamic loading
+import testData2 from "./mock_2.json";
+import testData3 from "./mock_3.json";
 
 // ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
 const reapplyHighlights = (
@@ -587,6 +590,10 @@ const MatchingListRenderer = ({
 }) => {
   if (!matchingData) return null;
 
+  const handleSelectChange = (questionId, value) => {
+    onAnswerChange(questionId, value);
+  };
+
   return (
     <div className="visual-matching-list">
       <h3 className="matching-list-title">{matchingData.title}</h3>
@@ -594,34 +601,25 @@ const MatchingListRenderer = ({
         {matchingData.instructions}
       </div>
 
-      {matchingData.options_box && (
-        <div className="matching-list-options">
-          <h4>{matchingData.options_box.title}</h4>
-          <div className="options-list">
-            {matchingData.options_box.options.map((option, idx) => (
-              <div key={idx} className="option-list-item">
-                {option}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="matching-items-list">
         {matchingData.items.map((item, idx) => {
           const question = questions.find((q) => q.id === item.question_id);
+          const selectedAnswer = answers[question?.id];
+          const selectedOption = matchingData.options_box?.options.find(
+            (opt) => opt.charAt(0) === selectedAnswer
+          );
+
           return (
-            <div key={idx} className="matching-item-row">
+            <div key={idx} className="matching-list-item-row">
               <span className="item-label">{item.label}</span>
               <select
-                className="matching-list-select"
-                value={answers[question?.id] || ""}
-                onChange={(e) => {
-                  if (!question) return;
-                  onAnswerChange(question.id, e.target.value);
-                }}
+                className="matching-select"
+                value={selectedAnswer || ""}
+                onChange={(e) =>
+                  handleSelectChange(question?.id, e.target.value)
+                }
               >
-                <option value="">Choose answer</option>
+                <option value="">-- Select an option --</option>
                 {matchingData.options_box?.options.map((option, optIdx) => {
                   const letter = option.charAt(0);
                   return (
@@ -680,6 +678,308 @@ const MultipleChoiceBlockRenderer = ({
             </div>
           </div>
         ))}
+    </div>
+  );
+};
+
+const FormRenderer = ({ formData, questions, answers, onAnswerChange }) => {
+  if (!formData) return null;
+
+  return (
+    <div className="visual-form">
+      {formData.title && <h3 className="form-title">{formData.title}</h3>}
+
+      {formData.sections.map((section, sectionIdx) => (
+        <div key={sectionIdx} className="form-section">
+          {section.title && (
+            <h4 className="form-section-title">{section.title}</h4>
+          )}
+
+          <ul className="form-items">
+            {section.items.map((item, itemIdx) => {
+              if (item.type === "question") {
+                const question = questions.find(
+                  (q) => q.id === item.question_id
+                );
+                if (!question) return null;
+
+                return (
+                  <li key={itemIdx} className="form-item-row question-row">
+                    <label className="form-item-label">{item.label}</label>
+                    <input
+                      type="text"
+                      className="form-input gap-fill-input"
+                      value={answers[question.id] || ""}
+                      onChange={(e) =>
+                        onAnswerChange(question.id, e.target.value)
+                      }
+                      placeholder={question.id}
+                      maxLength={
+                        question.word_limit?.includes("ONE WORD") ? 15 : 30
+                      }
+                      autoComplete="off"
+                    />
+                  </li>
+                );
+              } else if (item.type === "given") {
+                return (
+                  <li key={itemIdx} className="form-item-row given-row">
+                    <label className="form-item-label">{item.label}</label>
+                    <span className="form-given-value">{item.value}</span>
+                  </li>
+                );
+              } else if (item.type === "example") {
+                return (
+                  <li key={itemIdx} className="form-item-row example-row">
+                    <label className="form-item-label">{item.label}</label>
+                    <span className="form-example-value">{item.example}</span>
+                  </li>
+                );
+              } else if (item.type === "continuation") {
+                return (
+                  <li key={itemIdx} className="form-item-row continuation-row">
+                    <span className="form-continuation">{item.label}</span>
+                  </li>
+                );
+              }
+              return null;
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const FlowchartRenderer = ({
+  flowchartData,
+  questions,
+  answers,
+  onAnswerChange,
+}) => {
+  const [draggedOption, setDraggedOption] = useState(null);
+  const scrollIntervalRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const scrollDirectionRef = useRef(null);
+  const SCROLL_THRESHOLD = 120;
+  const SCROLL_SPEED = 20;
+
+  if (!flowchartData) return null;
+
+  // Set up drag auto-scroll listener
+  useEffect(() => {
+    const handleGlobalDragOver = (e) => {
+      if (!isDraggingRef.current) return;
+
+      const clientY = e.clientY;
+      const viewportHeight = window.innerHeight;
+
+      let newDirection = null;
+      if (clientY < SCROLL_THRESHOLD) {
+        newDirection = "up";
+      } else if (clientY > viewportHeight - SCROLL_THRESHOLD) {
+        newDirection = "down";
+      }
+
+      scrollDirectionRef.current = newDirection;
+
+      if (!scrollIntervalRef.current && newDirection) {
+        scrollIntervalRef.current = setInterval(() => {
+          const direction = scrollDirectionRef.current;
+          if (direction === "up") {
+            window.scrollBy(0, -SCROLL_SPEED);
+          } else if (direction === "down") {
+            window.scrollBy(0, SCROLL_SPEED);
+          }
+        }, 16);
+      }
+
+      if (!newDirection && scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+        scrollDirectionRef.current = null;
+      }
+    };
+
+    const handleDragEnd = () => {
+      isDraggingRef.current = false;
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+      scrollDirectionRef.current = null;
+    };
+
+    // Add listeners to both document and window with capture phase
+    document.addEventListener("dragover", handleGlobalDragOver, true);
+    document.addEventListener("dragend", handleDragEnd, true);
+    window.addEventListener("dragover", handleGlobalDragOver, true);
+    window.addEventListener("dragend", handleDragEnd, true);
+
+    return () => {
+      document.removeEventListener("dragover", handleGlobalDragOver, true);
+      document.removeEventListener("dragend", handleDragEnd, true);
+      window.removeEventListener("dragover", handleGlobalDragOver, true);
+      window.removeEventListener("dragend", handleDragEnd, true);
+      if (scrollIntervalRef && scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleDragStart = (e, option, isUsed) => {
+    if (isUsed) {
+      e.preventDefault();
+      return;
+    }
+    const letter = option.charAt(0);
+    setDraggedOption(letter);
+    isDraggingRef.current = true;
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = (e, questionId) => {
+    e.preventDefault();
+    isDraggingRef.current = false;
+
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+
+    if (draggedOption) {
+      onAnswerChange(questionId, draggedOption);
+    }
+    setDraggedOption(null);
+  };
+
+  const handleDragEnd = () => {
+    isDraggingRef.current = false;
+
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+
+    setDraggedOption(null);
+  };
+
+  const handleClearAnswer = (questionId) => {
+    onAnswerChange(questionId, "");
+  };
+
+  return (
+    <div className="visual-flowchart">
+      <h3 className="flowchart-title">{flowchartData.title}</h3>
+
+      {flowchartData.options_box && (
+        <div className="flowchart-options-box drag-enabled">
+          <h4>{flowchartData.options_box.title}</h4>
+          <div className="flowchart-options draggable-options">
+            {flowchartData.options_box.options.map((option, idx) => {
+              const letter = option.charAt(0);
+              const flowchartQuestionIds = flowchartData.question_ids || [];
+              const isUsed = flowchartQuestionIds.some(
+                (qId) => answers[qId] === letter
+              );
+              return (
+                <div
+                  key={idx}
+                  className={`option-tag draggable ${isUsed ? "used" : ""}`}
+                  draggable={!isUsed}
+                  onDragStart={(e) => handleDragStart(e, option, isUsed)}
+                  onDragEnd={handleDragEnd}
+                  title={
+                    isUsed
+                      ? "Already used for another question"
+                      : "Drag to match with a question"
+                  }
+                >
+                  {option}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flowchart-steps">
+        {flowchartData.steps.map((step, stepIndex) => {
+          const questionId = flowchartData.question_ids?.[stepIndex];
+          const question = questions.find((q) => q.id === questionId);
+
+          let matchedQuestion = question;
+          if (!matchedQuestion) {
+            const gapMatch = step.match(/(\d+)\.{2,}/);
+            if (gapMatch) {
+              const stepQuestionId = parseInt(gapMatch[1], 10);
+              matchedQuestion = questions.find((q) => q.id === stepQuestionId);
+            }
+          }
+
+          const selectedAnswer = answers[matchedQuestion?.id];
+          const selectedOption = flowchartData.options_box?.options.find(
+            (opt) => opt.charAt(0) === selectedAnswer
+          );
+
+          return (
+            <div key={stepIndex} className="flowchart-step-item">
+              <div className="step-content">
+                {matchedQuestion ? (
+                  <div className="step-text-with-gap">
+                    {step.split(/(\d+\.{2,})/g).map((part, partIdx) => {
+                      if (part.match(/^(\d+)\.{2,}$/)) {
+                        return (
+                          <div
+                            key={partIdx}
+                            className="drop-zone-flowchart"
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, matchedQuestion.id)}
+                          >
+                            {selectedAnswer ? (
+                              <div className="matched-answer">
+                                <span className="answer-letter">
+                                  {selectedAnswer}
+                                </span>
+                                <span className="answer-text">
+                                  {selectedOption}
+                                </span>
+                                <button
+                                  className="clear-btn"
+                                  onClick={() =>
+                                    handleClearAnswer(matchedQuestion.id)
+                                  }
+                                  title="Clear this match"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="drop-hint">Drop here</span>
+                            )}
+                          </div>
+                        );
+                      }
+                      return <span key={partIdx}>{part}</span>;
+                    })}
+                  </div>
+                ) : (
+                  <span className="step-text">{step}</span>
+                )}
+              </div>
+              {stepIndex < flowchartData.steps.length - 1 && (
+                <div className="flowchart-arrow">↓</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -771,6 +1071,9 @@ const VisualStructureRenderer = ({
               componentQuestionIds = questions
                 .filter((q) => q.type === "multiple_choice")
                 .map((q) => q.id);
+            } else if (component.type === "flowchart") {
+              // For flowchart, use the question_ids array
+              componentQuestionIds = component.question_ids || [];
             }
 
             // Filter questions for this component
@@ -841,6 +1144,14 @@ const VisualStructureRenderer = ({
                     onAnswerChange={onAnswerChange}
                   />
                 )}
+                {component.type === "flowchart" && (
+                  <FlowchartRenderer
+                    flowchartData={component}
+                    questions={componentQuestions}
+                    answers={answers}
+                    onAnswerChange={onAnswerChange}
+                  />
+                )}
               </div>
             );
           })}
@@ -863,6 +1174,29 @@ const VisualStructureRenderer = ({
           )}
           <StructuredNotesRenderer
             structuredData={visualStructure}
+            questions={questions}
+            answers={answers}
+            onAnswerChange={onAnswerChange}
+          />
+        </>
+      );
+
+    case "form":
+      return (
+        <>
+          {partInstructions && (
+            <div className="test-instructions">
+              <h2>Instructions</h2>
+              <p>{partInstructions}</p>
+              {partContext && (
+                <p className="context-text">
+                  <strong>Context:</strong> {partContext}
+                </p>
+              )}
+            </div>
+          )}
+          <FormRenderer
+            formData={visualStructure}
             questions={questions}
             answers={answers}
             onAnswerChange={onAnswerChange}
@@ -1483,7 +1817,29 @@ const ListeningTestDashboard = () => {
   // ==================== LOAD TEST DATA ====================
   useEffect(() => {
     try {
-      const listeningSection = testDataJson.sections.find(
+      // Get test_materials_id from participant data stored in localStorage
+      const participant = JSON.parse(
+        localStorage.getItem("currentParticipant") || "{}"
+      );
+      const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
+
+      // Select the correct test data based on test_materials_id
+      let selectedTestData;
+      switch (testMaterialsId) {
+        case 2:
+          selectedTestData = testData2;
+          break;
+        case 3:
+          selectedTestData = testData3;
+          break;
+        default:
+          console.warn(
+            `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
+          );
+          selectedTestData = testData2;
+      }
+
+      const listeningSection = selectedTestData.sections.find(
         (s) => s.type === "listening"
       );
 

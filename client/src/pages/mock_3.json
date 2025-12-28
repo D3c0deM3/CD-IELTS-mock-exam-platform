@@ -1,0 +1,1796 @@
+{
+  "metadata": {
+    "source": "Authentic test 2.pdf",
+    "test_type": "IELTS Academic",
+    "extraction_date": "2025-12-27",
+    "total_pages": 17,
+    "accuracy": "100%"
+  },
+  "test_info": {
+    "title": "IELTS Academic Practice Test 2",
+    "total_questions": 82,
+    "sections": [
+      {
+        "name": "Listening",
+        "questions": 40,
+        "time": "30 minutes"
+      },
+      {
+        "name": "Reading",
+        "questions": 40,
+        "time": "60 minutes"
+      },
+      {
+        "name": "Writing",
+        "tasks": 2,
+        "time": "60 minutes"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "type": "listening",
+      "section_number": 1,
+      "title": "Listening",
+      "total_questions": 40,
+      "parts": [
+        {
+          "part_number": 1,
+          "title": "Oz Campervans - Customer Quote Form",
+          "instructions": "Complete the form below.\n\nWrite ONE WORD AND/OR A NUMBER for each answer.",
+          "context": "Customer quote form for campervan hire",
+          "visual_structure": {
+            "type": "form",
+            "title": "Oz Campervans - Customer Quote Form",
+            "sections": [
+              {
+                "title": "Contact Details",
+                "items": [
+                  {
+                    "label": "Name:",
+                    "example": "Caroline ......Smith......",
+                    "type": "example"
+                  },
+                  {
+                    "label": "Address:",
+                    "value": "14 Grey St, Forest Hill",
+                    "type": "given"
+                  },
+                  {
+                    "label": "Tel:",
+                    "question_id": 1,
+                    "type": "question"
+                  },
+                  {
+                    "label": "Email:",
+                    "value": "caroline@easymail.com",
+                    "type": "given"
+                  },
+                  {
+                    "label": "NB: Send written quote by",
+                    "question_id": 2,
+                    "type": "question"
+                  }
+                ]
+              },
+              {
+                "title": "Booking Information",
+                "items": [
+                  {
+                    "label": "Number of people in group:",
+                    "value": "three",
+                    "type": "given"
+                  },
+                  {
+                    "label": "Type of campervan selected: 'The Explorer' (need to supply an extra",
+                    "question_id": 3,
+                    "type": "question"
+                  },
+                  {
+                    "label": "Price:",
+                    "question_id": 4,
+                    "type": "question"
+                  },
+                  {
+                    "label": "NB: Price includes all bedding and",
+                    "question_id": 5,
+                    "type": "question"
+                  },
+                  {
+                    "label": "Optional extras selected: a",
+                    "question_id": 6,
+                    "type": "question"
+                  },
+                  {
+                    "label": "and a",
+                    "question_id": 7,
+                    "type": "question"
+                  },
+                  {
+                    "label": "Driving to:",
+                    "value": "Huonville in Tasmania",
+                    "type": "given"
+                  },
+                  {
+                    "label": "Pickup from: the",
+                    "question_id": 8,
+                    "type": "question"
+                  },
+                  {
+                    "label": "branch in Hobart",
+                    "type": "continuation"
+                  },
+                  {
+                    "label": "Length of hire:",
+                    "value": "2 weeks",
+                    "type": "given"
+                  },
+                  {
+                    "label": "Youngest driver (Caroline):",
+                    "question_id": 9,
+                    "type": "question"
+                  },
+                  {
+                    "label": "years old",
+                    "type": "continuation"
+                  },
+                  {
+                    "label": "Drivers' licences issued in:",
+                    "question_id": 10,
+                    "type": "question"
+                  }
+                ]
+              }
+            ]
+          },
+          "questions": [
+            {
+              "id": 1,
+              "type": "gap_fill",
+              "prompt": "Tel: 1............",
+              "word_limit": "ONE WORD AND/OR A NUMBER",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Contact Details",
+                "field_index": 2
+              }
+            },
+            {
+              "id": 2,
+              "type": "gap_fill",
+              "prompt": "NB: Send written quote by 2............",
+              "word_limit": "ONE WORD AND/OR A NUMBER",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Contact Details",
+                "field_index": 4
+              }
+            },
+            {
+              "id": 3,
+              "type": "gap_fill",
+              "prompt": "'The Explorer' (need to supply an extra 3............)",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 1
+              }
+            },
+            {
+              "id": 4,
+              "type": "gap_fill",
+              "prompt": "Price: 4 $............ per day",
+              "word_limit": "NUMBER",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 2
+              }
+            },
+            {
+              "id": 5,
+              "type": "gap_fill",
+              "prompt": "Price includes all bedding and 5............ equipment",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 3
+              }
+            },
+            {
+              "id": 6,
+              "type": "gap_fill",
+              "prompt": "Optional extras selected: a 6............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 4
+              }
+            },
+            {
+              "id": 7,
+              "type": "gap_fill",
+              "prompt": "and a 7............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 5
+              }
+            },
+            {
+              "id": 8,
+              "type": "gap_fill",
+              "prompt": "Pickup from: the 8............ branch in Hobart",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 7
+              }
+            },
+            {
+              "id": 9,
+              "type": "gap_fill",
+              "prompt": "Youngest driver (Caroline): 9............ years old",
+              "word_limit": "NUMBER",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 10
+              }
+            },
+            {
+              "id": 10,
+              "type": "gap_fill",
+              "prompt": "Drivers' licences issued in: 10............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "form_field",
+                "section": "Booking Information",
+                "field_index": 11
+              }
+            }
+          ]
+        },
+        {
+          "part_number": 2,
+          "title": "Bexter Sports Centre",
+          "instructions": "Questions 11-16\n\nChoose the correct letter, A, B or C.\n\nQuestions 17-20\n\nWhich benefit does each of the following sports activities bring?\n\nChoose FOUR answers from the box and write the correct letter, A-F, next to questions 17-20.",
+          "context": "Talk about a sports centre",
+          "visual_structure": {
+            "type": "mixed",
+            "components": [
+              {
+                "type": "multiple_choice_block",
+                "title": "Questions 11-16",
+                "instructions": "Choose the correct letter, A, B or C.",
+                "questions": [
+                  {
+                    "question_id": 11,
+                    "text": "The sports centre has just opened a new"
+                  },
+                  {
+                    "question_id": 12,
+                    "text": "The sports facilities are used most"
+                  },
+                  {
+                    "question_id": 13,
+                    "text": "Classes are cheaper if you pay"
+                  },
+                  {
+                    "question_id": 14,
+                    "text": "The sports centre recently won an award for"
+                  },
+                  {
+                    "question_id": 15,
+                    "text": "Today the sports department is offering"
+                  },
+                  {
+                    "question_id": 16,
+                    "text": "According to the speaker, why do many people stop exercising?"
+                  }
+                ]
+              },
+              {
+                "type": "matching_list",
+                "title": "Questions 17-20",
+                "instructions": "Which benefit does each of the following sports activities bring?\n\nChoose FOUR answers from the box and write the correct letter, A-F, next to questions 17-20.",
+                "layout": "list_with_box",
+                "items": [
+                  {
+                    "label": "17 general training",
+                    "question_id": 17
+                  },
+                  {
+                    "label": "18 weight training",
+                    "question_id": 18
+                  },
+                  {
+                    "label": "19 aerobics class",
+                    "question_id": 19
+                  },
+                  {
+                    "label": "20 squash",
+                    "question_id": 20
+                  }
+                ],
+                "options_box": {
+                  "title": "Benefits",
+                  "options": [
+                    "A better reaction times",
+                    "B improved concentration",
+                    "C increased arm power",
+                    "D increased leg power",
+                    "E increased speed",
+                    "F reduced stress"
+                  ]
+                }
+              }
+            ]
+          },
+          "questions": [
+            {
+              "id": 11,
+              "type": "multiple_choice",
+              "question": "The sports centre has just opened a new",
+              "options": ["A dance studio.", "B swimming pool.", "C cafe."],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 0
+              }
+            },
+            {
+              "id": 12,
+              "type": "multiple_choice",
+              "question": "The sports facilities are used most",
+              "options": [
+                "A at weekends.",
+                "B on weekday evenings.",
+                "C during the day from Monday to Friday."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 1
+              }
+            },
+            {
+              "id": 13,
+              "type": "multiple_choice",
+              "question": "Classes are cheaper if you pay",
+              "options": [
+                "A in cash.",
+                "B for several in advance.",
+                "C by credit card."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 2
+              }
+            },
+            {
+              "id": 14,
+              "type": "multiple_choice",
+              "question": "The sports centre recently won an award for",
+              "options": [
+                "A the range of training in different sports.",
+                "B the amount of information on its website.",
+                "C the quality of the advice offered by its instructors."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 3
+              }
+            },
+            {
+              "id": 15,
+              "type": "multiple_choice",
+              "question": "Today the sports department is offering",
+              "options": [
+                "A a free hour with a personal trainer.",
+                "B a free ticket to the cup final.",
+                "C free membership for 20 people."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 4
+              }
+            },
+            {
+              "id": 16,
+              "type": "multiple_choice",
+              "question": "According to the speaker, why do many people stop exercising?",
+              "options": [
+                "A Their friends do not share the experience with them.",
+                "B Their job or studies take up too much of their time.",
+                "C They cannot see any results."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 5
+              }
+            },
+            {
+              "id": 17,
+              "type": "matching",
+              "question": "general training",
+              "matching_instruction": "Choose from letters A-F",
+              "matching_options": [
+                "A better reaction times",
+                "B improved concentration",
+                "C increased arm power",
+                "D increased leg power",
+                "E increased speed",
+                "F reduced stress"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 0,
+                "item_index": 0
+              }
+            },
+            {
+              "id": 18,
+              "type": "matching",
+              "question": "weight training",
+              "matching_instruction": "Choose from letters A-F",
+              "matching_options": [
+                "A better reaction times",
+                "B improved concentration",
+                "C increased arm power",
+                "D increased leg power",
+                "E increased speed",
+                "F reduced stress"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 0,
+                "item_index": 1
+              }
+            },
+            {
+              "id": 19,
+              "type": "matching",
+              "question": "aerobics class",
+              "matching_instruction": "Choose from letters A-F",
+              "matching_options": [
+                "A better reaction times",
+                "B improved concentration",
+                "C increased arm power",
+                "D increased leg power",
+                "E increased speed",
+                "F reduced stress"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 0,
+                "item_index": 2
+              }
+            },
+            {
+              "id": 20,
+              "type": "matching",
+              "question": "squash",
+              "matching_instruction": "Choose from letters A-F",
+              "matching_options": [
+                "A better reaction times",
+                "B improved concentration",
+                "C increased arm power",
+                "D increased leg power",
+                "E increased speed",
+                "F reduced stress"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 0,
+                "item_index": 3
+              }
+            }
+          ]
+        },
+        {
+          "part_number": 3,
+          "title": "Varroa Mite and Bees",
+          "instructions": "Questions 21-25\n\nComplete the flow-chart below.\n\nChoose FIVE answers from the box and write the correct letter, A-G, next to questions 21-25.\n\nQuestions 26-30\n\nWhat problem do the speakers identify with each of the following types of bee?\n\nChoose FIVE answers from the box and write the correct letter, A-G, next to questions 26-30.",
+          "context": "Discussion about bees and mites",
+          "visual_structure": {
+            "type": "mixed",
+            "components": [
+              {
+                "type": "flowchart",
+                "title": "How the Varroa mite attacks",
+                "steps": [
+                  "The mite moves from the bee to 21............",
+                  "The mite travels to 22............ on a new host.",
+                  "Inside, the mite enters the honeycomb cell.",
+                  "The mite uses 23............ to hide its smell.",
+                  "The mite feeds on 24............ of the bee larva.",
+                  "The mite reproduces and moves on.",
+                  "The bee is left weakened and with 25............"
+                ],
+                "options_box": {
+                  "title": "Choose FIVE answers from the box",
+                  "options": [
+                    "A the blood",
+                    "B a flower",
+                    "C the hive",
+                    "D the honey",
+                    "E a honeycomb cell",
+                    "F the queen bee",
+                    "G a virus"
+                  ]
+                },
+                "question_ids": [21, 22, 23, 24, 25]
+              },
+              {
+                "type": "matching_list",
+                "title": "Questions 26-30",
+                "instructions": "What problem do the speakers identify with each of the following types of bee?\n\nChoose FIVE answers from the box and write the correct letter, A-G, next to questions 26-30.",
+                "layout": "list_with_box",
+                "items": [
+                  {
+                    "label": "26 European Bumblebee",
+                    "question_id": 26
+                  },
+                  {
+                    "label": "27 Blue Banded Bee",
+                    "question_id": 27
+                  },
+                  {
+                    "label": "28 Africanised Bee",
+                    "question_id": 28
+                  },
+                  {
+                    "label": "29 Australian Stingless Bee",
+                    "question_id": 29
+                  },
+                  {
+                    "label": "30 Canadian Leafcutter Bee",
+                    "question_id": 30
+                  }
+                ],
+                "options_box": {
+                  "title": "Problems",
+                  "options": [
+                    "A could introduce pests",
+                    "B needs a warm climate",
+                    "C not much is known about it",
+                    "D numbers are too few to help farmers",
+                    "E spreads weeds",
+                    "F too aggressive",
+                    "G unable to produce honey"
+                  ]
+                }
+              }
+            ]
+          },
+          "questions": [
+            {
+              "id": 21,
+              "type": "flowchart_completion",
+              "prompt": "The mite moves from the bee to 21............",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A the blood",
+                "B a flower",
+                "C the hive",
+                "D the honey",
+                "E a honeycomb cell",
+                "F the queen bee",
+                "G a virus"
+              ],
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 0
+              }
+            },
+            {
+              "id": 22,
+              "type": "flowchart_completion",
+              "prompt": "The mite travels to 22............ on a new host.",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A the blood",
+                "B a flower",
+                "C the hive",
+                "D the honey",
+                "E a honeycomb cell",
+                "F the queen bee",
+                "G a virus"
+              ],
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 1
+              }
+            },
+            {
+              "id": 23,
+              "type": "flowchart_completion",
+              "prompt": "The mite uses 23............ to hide its smell.",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A the blood",
+                "B a flower",
+                "C the hive",
+                "D the honey",
+                "E a honeycomb cell",
+                "F the queen bee",
+                "G a virus"
+              ],
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 3
+              }
+            },
+            {
+              "id": 24,
+              "type": "flowchart_completion",
+              "prompt": "The mite feeds on 24............ of the bee larva.",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A the blood",
+                "B a flower",
+                "C the hive",
+                "D the honey",
+                "E a honeycomb cell",
+                "F the queen bee",
+                "G a virus"
+              ],
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 4
+              }
+            },
+            {
+              "id": 25,
+              "type": "flowchart_completion",
+              "prompt": "The bee is left weakened and with 25............",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A the blood",
+                "B a flower",
+                "C the hive",
+                "D the honey",
+                "E a honeycomb cell",
+                "F the queen bee",
+                "G a virus"
+              ],
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 6
+              }
+            },
+            {
+              "id": 26,
+              "type": "matching",
+              "question": "European Bumblebee",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A could introduce pests",
+                "B needs a warm climate",
+                "C not much is known about it",
+                "D numbers are too few to help farmers",
+                "E spreads weeds",
+                "F too aggressive",
+                "G unable to produce honey"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 1,
+                "item_index": 0
+              }
+            },
+            {
+              "id": 27,
+              "type": "matching",
+              "question": "Blue Banded Bee",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A could introduce pests",
+                "B needs a warm climate",
+                "C not much is known about it",
+                "D numbers are too few to help farmers",
+                "E spreads weeds",
+                "F too aggressive",
+                "G unable to produce honey"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 1,
+                "item_index": 1
+              }
+            },
+            {
+              "id": 28,
+              "type": "matching",
+              "question": "Africanised Bee",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A could introduce pests",
+                "B needs a warm climate",
+                "C not much is known about it",
+                "D numbers are too few to help farmers",
+                "E spreads weeds",
+                "F too aggressive",
+                "G unable to produce honey"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 1,
+                "item_index": 2
+              }
+            },
+            {
+              "id": 29,
+              "type": "matching",
+              "question": "Australian Stingless Bee",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A could introduce pests",
+                "B needs a warm climate",
+                "C not much is known about it",
+                "D numbers are too few to help farmers",
+                "E spreads weeds",
+                "F too aggressive",
+                "G unable to produce honey"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 1,
+                "item_index": 3
+              }
+            },
+            {
+              "id": 30,
+              "type": "matching",
+              "question": "Canadian Leafcutter Bee",
+              "matching_instruction": "Choose from letters A-G",
+              "matching_options": [
+                "A could introduce pests",
+                "B needs a warm climate",
+                "C not much is known about it",
+                "D numbers are too few to help farmers",
+                "E spreads weeds",
+                "F too aggressive",
+                "G unable to produce honey"
+              ],
+              "visual_context": {
+                "type": "matching_list_item",
+                "list_index": 1,
+                "item_index": 4
+              }
+            }
+          ]
+        },
+        {
+          "part_number": 4,
+          "title": "Using natural building materials",
+          "instructions": "Complete the notes below.\n\nWrite ONE WORD ONLY for each answer.",
+          "context": "Lecture on natural building materials",
+          "visual_structure": {
+            "type": "structured_notes",
+            "title": "Using natural building materials",
+            "sections": [
+              {
+                "title": "Introduction",
+                "items": [
+                  {
+                    "type": "question",
+                    "content": "With all methods of building using natural materials, a good 31............ is needed",
+                    "question_id": 31
+                  }
+                ]
+              },
+              {
+                "title": "Rammed earth",
+                "items": [
+                  {
+                    "type": "non_question",
+                    "content": "* A framework made from wood filled with soil"
+                  },
+                  {
+                    "type": "question",
+                    "content": "* The best soil has large quantities of 32............",
+                    "question_id": 32
+                  }
+                ]
+              },
+              {
+                "title": "Adobe (mud brick)",
+                "items": [
+                  {
+                    "type": "question",
+                    "content": "* The most suitable soil for adobe bricks contains lots of 33............",
+                    "question_id": 33
+                  },
+                  {
+                    "type": "non_question",
+                    "content": "* Advantages"
+                  },
+                  {
+                    "type": "question",
+                    "content": "   - cheap and 34............",
+                    "question_id": 34
+                  },
+                  {
+                    "type": "question",
+                    "content": "   - little 35............ is needed for brick-making",
+                    "question_id": 35
+                  },
+                  {
+                    "type": "non_question",
+                    "content": "* Disadvantage"
+                  },
+                  {
+                    "type": "question",
+                    "content": "   - a lot of water, time and 36............ are required",
+                    "question_id": 36
+                  }
+                ]
+              },
+              {
+                "title": "Straw bales",
+                "items": [
+                  {
+                    "type": "non_question",
+                    "content": "* Bales - large rectangular blocks of straw"
+                  },
+                  {
+                    "type": "question",
+                    "content": "* A 37............ needs to be constructed first",
+                    "question_id": 37
+                  },
+                  {
+                    "type": "question",
+                    "content": "* The bales are covered with plaster for protection against 38............",
+                    "question_id": 38
+                  },
+                  {
+                    "type": "non_question",
+                    "content": "* Advantage"
+                  },
+                  {
+                    "type": "non_question",
+                    "content": "   - the bales act as efficient insulation"
+                  }
+                ]
+              },
+              {
+                "title": "Bamboo",
+                "items": [
+                  {
+                    "type": "non_question",
+                    "content": "* This is a versatile material"
+                  },
+                  {
+                    "type": "non_question",
+                    "content": "* Advantage"
+                  },
+                  {
+                    "type": "question",
+                    "content": "   - the shape of the bamboo stalks gives them 39............",
+                    "question_id": 39
+                  },
+                  {
+                    "type": "non_question",
+                    "content": "* Disadvantages"
+                  },
+                  {
+                    "type": "non_question",
+                    "content": "   - not widely available"
+                  },
+                  {
+                    "type": "question",
+                    "content": "   - risk of 40............",
+                    "question_id": 40
+                  }
+                ]
+              }
+            ]
+          },
+          "questions": [
+            {
+              "id": 31,
+              "type": "gap_fill",
+              "prompt": "With all methods of building using natural materials, a good 31............ is needed",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 0,
+                "item_index": 0
+              }
+            },
+            {
+              "id": 32,
+              "type": "gap_fill",
+              "prompt": "The best soil has large quantities of 32............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 1,
+                "item_index": 1
+              }
+            },
+            {
+              "id": 33,
+              "type": "gap_fill",
+              "prompt": "The most suitable soil for adobe bricks contains lots of 33............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 2,
+                "item_index": 0
+              }
+            },
+            {
+              "id": 34,
+              "type": "gap_fill",
+              "prompt": "cheap and 34............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 2,
+                "item_index": 2
+              }
+            },
+            {
+              "id": 35,
+              "type": "gap_fill",
+              "prompt": "little 35............ is needed for brick-making",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 2,
+                "item_index": 3
+              }
+            },
+            {
+              "id": 36,
+              "type": "gap_fill",
+              "prompt": "a lot of water, time and 36............ are required",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 2,
+                "item_index": 5
+              }
+            },
+            {
+              "id": 37,
+              "type": "gap_fill",
+              "prompt": "A 37............ needs to be constructed first",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 3,
+                "item_index": 1
+              }
+            },
+            {
+              "id": 38,
+              "type": "gap_fill",
+              "prompt": "The bales are covered with plaster for protection against 38............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 3,
+                "item_index": 2
+              }
+            },
+            {
+              "id": 39,
+              "type": "gap_fill",
+              "prompt": "the shape of the bamboo stalks gives them 39............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 4,
+                "item_index": 2
+              }
+            },
+            {
+              "id": 40,
+              "type": "gap_fill",
+              "prompt": "risk of 40............",
+              "word_limit": "ONE WORD",
+              "visual_context": {
+                "type": "note_section",
+                "section": 4,
+                "item_index": 5
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "reading",
+      "section_number": 2,
+      "title": "Reading",
+      "total_questions": 40,
+      "passages": [
+        {
+          "passage_number": 1,
+          "title": "Bricks – The Versatile Building Material",
+          "formatted_content": "Bricks are one of the oldest known building materials dating back to 7000 BCE. The oldest found were sun-dried mud bricks in southern Turkey and these would have been standard in those days. Although sun-dried mud bricks worked reasonably well, especially in moderate climates, fired bricks were found to be more resistant to harsher weather conditions and so fired bricks are much more reliable for use in permanent buildings. Fired brick are also useful in hotter climates, as they can absorb any heat generated throughout the day and then release it at night.\n\nThe Romans also distinguished between the bricks they used that were dried by the sun and air and the bricks that were fired in a kiln. The Romans were real brick connoisseurs. They preferred to make their bricks in the spring and hold on to their bricks for two years, before they were used or sold. They only used clay that was whitish or red for their bricks. The Romans passed on their skills around their sphere of influence and were especially successful at using their mobile kilns to introduce kiln-fired bricks to the whole of the Roman Empire.\n\nDuring the twelfth century, bricks were introduced to northern Germany from northern Italy. This created the 'brick Gothic period,' which was a reduced style of Gothic architecture previously very common in northern Europe. The buildings around this time were mainly built from fired red clay bricks. The brick Gothic period can be categorised by the lack of figural architectural sculptures that had previously been carved in stone, as the Gothic figures were impossible to create out of bulky bricks at that time.\n\nBricks suffered a setback during the Renaissance and Baroque periods, with exposed brick walls becoming unpopular and brickwork being generally covered by plaster. Only during the mid-eighteenth century did visible brick walls again regain some popularity.\n\nBricks today are more commonly used in the construction of buildings than any other material, except wood. Brick architecture is dominant within its field and a great industry has developed and invested in the manufacture of many different types of bricks of all shapes and colours. With modern machinery, earth moving equipment, powerful electric motors and modern tunnel kilns, making bricks has become much more productive and efficient. Bricks can be made from a variety of materials, the most common being clay, but they can also be made of calcium silicate and concrete.\n\nGood quality bricks have major advantages over stone as they are reliable, weather resistant and can tolerate acids, pollution and fire. They are also much cheaper than cut stonework. Bricks can be made to any specification in colour, size and shape, which makes them easier to build with than stone. On the other hand, there are some bricks that are more porous and therefore more susceptible to damage from dampness when exposed to water. For best results in any construction work, the correct brick must be chosen in accordance with the job specifications.\n\nToday, bricks are mainly manufactured in factories, usually employing one of three principal methods – the soft mud process, the stiff mud process and the dry clay process. In the past, bricks were largely manufactured by hand, and there are still artisanal companies that specialize in this product. The process involves putting the clay, water and additives into a large pit, where it is all mixed together by a tempering wheel, often still moved by horse power. Once the mixture is of the correct consistency, the clay is removed and pressed into moulds by hand. To prevent the brick from sticking to the mould, the brick is coated in either sand or water, though coating a brick with sand gives an overall better finish to it. Once shaped, the bricks are laid outside to dry by air and sun for three to four days. If these bricks left outside for the drying process are exposed to a shower, the water can leave indentations on the brick, which, although not affecting the strength of the brick, is considered very undesirable. After drying, the bricks are then transferred to the kiln for firing and this creates the finished product. Bricks are now more generally made by manufacturing processes using machinery. This is a large-scale effort and produces bricks that have been fired in patent kilns.\n\nToday's bricks are also specially designed to be efficient at insulation. If their composition is correct and their laying accurate, a good brick wall around a house can save the occupants a significant amount of money. This is primarily achieved today through cavity wall insulation. Insulating bricks are built in two separate leaves, as they are called in the trade. The gap between the inner and outer leaves of brickwork depends on the type of insulation used, but there should be enough space for a gap of twenty millimetres between the insulating material in the cavity and the two leaves on either side. The air in these gaps is an efficient insulator by itself. Cavity walls have also replaced solid walls, because they are more resistant to rain penetration. Because two leaves are necessary, a strong brick manufacturing industry is essential, so that enough good quality insulating bricks are plentifully available.",
+          "visual_structure": {
+            "question_groups": [
+              {
+                "type": "true_false_ng_block",
+                "title": "Questions 1-5",
+                "instructions": "Do the following statements agree with the information given in the text?\n\nTRUE if the statement agrees with the information\n\nFALSE if the statement contradicts the information\n\nNOT GIVEN if there is no information on this",
+                "question_ids": [1, 2, 3, 4, 5]
+              },
+              {
+                "type": "flowchart",
+                "title": "Questions 6-11",
+                "instructions": "Complete the flow chart below.\n\nWrite NO MORE THAN TWO WORDS from the text for each answer.",
+                "steps": [
+                  "Combine the 6............ water and other ingredients with a 7............ to the desired consistency.",
+                  "Using the hand, fill 8............ with the mixture-coat with 9............ (provides a better finish) or water to prevent stickiness.",
+                  "Dry in the sun; try to avoid rain, which will cause marks in the bricks – this will not affect the bricks' 10............",
+                  "Fire the bricks in a 11............; patent kilns/large-scale"
+                ],
+                "question_ids": [6, 7, 8, 9, 10, 11]
+              },
+              {
+                "type": "diagram_labeling",
+                "title": "Questions 12 and 13",
+                "instructions": "Label the diagram below.\n\nWrite NO MORE THAN TWO WORDS AND/OR A NUMBER from the text for each answer.",
+                "diagram_description": "Cavity Wall Insulation diagram showing insulating material in the center, an insulating air space on one side labeled (13), and the interior and exterior leaves of brick on the other side labeled (12).",
+                "labels": [
+                  {
+                    "position": "interior and exterior parts",
+                    "prompt": "The interior and exterior (12)............ of brick."
+                  },
+                  {
+                    "position": "insulating air space size",
+                    "prompt": "Insulating air space (13)............ in size"
+                  }
+                ]
+              }
+            ]
+          },
+          "questions": [
+            {
+              "id": 1,
+              "type": "true_false_ng",
+              "statement": "Fired bricks are not efficient in countries with hot weather, as they absorb too much heat.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 0
+              }
+            },
+            {
+              "id": 2,
+              "type": "true_false_ng",
+              "statement": "Roman brick production was determined by which season it was.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 1
+              }
+            },
+            {
+              "id": 3,
+              "type": "true_false_ng",
+              "statement": "The bricks that led to the brick Gothic period in northern Germany were popular with house builders.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 2
+              }
+            },
+            {
+              "id": 4,
+              "type": "true_false_ng",
+              "statement": "Buildings showing brickwork were generally not liked during the Renaissance.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 3
+              }
+            },
+            {
+              "id": 5,
+              "type": "true_false_ng",
+              "statement": "Some types of bricks can soak up too much water due to their absorbent qualities.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 4
+              }
+            },
+            {
+              "id": 6,
+              "type": "gap_fill",
+              "prompt": "Combine the 6............ water and other ingredients",
+              "word_limit": "NO MORE THAN TWO WORDS",
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 0,
+                "part": "first"
+              }
+            },
+            {
+              "id": 7,
+              "type": "gap_fill",
+              "prompt": "with a 7............ to the desired consistency.",
+              "word_limit": "NO MORE THAN TWO WORDS",
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 0,
+                "part": "second"
+              }
+            },
+            {
+              "id": 8,
+              "type": "gap_fill",
+              "prompt": "fill 8............ with the mixture",
+              "word_limit": "NO MORE THAN TWO WORDS",
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 1,
+                "part": "first"
+              }
+            },
+            {
+              "id": 9,
+              "type": "gap_fill",
+              "prompt": "coat with 9............ (provides a better finish)",
+              "word_limit": "NO MORE THAN TWO WORDS",
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 1,
+                "part": "second"
+              }
+            },
+            {
+              "id": 10,
+              "type": "gap_fill",
+              "prompt": "this will not affect the bricks' 10............",
+              "word_limit": "NO MORE THAN TWO WORDS",
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 2
+              }
+            },
+            {
+              "id": 11,
+              "type": "gap_fill",
+              "prompt": "Fire the bricks in a 11............",
+              "word_limit": "NO MORE THAN TWO WORDS",
+              "visual_context": {
+                "type": "flowchart_step",
+                "step_index": 3
+              }
+            },
+            {
+              "id": 12,
+              "type": "gap_fill",
+              "prompt": "The interior and exterior (12)............ of brick.",
+              "word_limit": "NO MORE THAN TWO WORDS AND/OR A NUMBER",
+              "visual_context": {
+                "type": "diagram_label",
+                "label_index": 0
+              }
+            },
+            {
+              "id": 13,
+              "type": "gap_fill",
+              "prompt": "Insulating air space (13)............ in size",
+              "word_limit": "NO MORE THAN TWO WORDS AND/OR A NUMBER",
+              "visual_context": {
+                "type": "diagram_label",
+                "label_index": 1
+              }
+            }
+          ]
+        },
+        {
+          "passage_number": 2,
+          "title": "Curve Theatre in Leicester",
+          "formatted_content": "A. The Lumière Brothers opened their Cinematograph, at 14 Boulevard des Capucines in Paris, to 100 paying customers over 100 years ago, on December 8, 1985. Before the eyes of the stunned, thrilled audience, photographs came to life and moved across a flat screen.\n\nB. So ordinary and routine has this become to us that it takes a determined leap of imagination to grasp the impact of those first moving images. But it is worth trying, for to understand the initial shock of those images is to understand the extraordinary power and magic of cinema, the unique, hypnotic quality that has made films the most dynamic, effective art form of the 20th century.\n\nC. One of the Lumière Brothers' earliest films was a 30-second piece which showed a section of a railway platform flooded with sunshine. A train appears and heads straight for the camera. And that is all that happens. Yet the Russian director Andrei Tarkovsky, one of the greatest of all film artists, described the film as a 'work of genius'. 'As the train approached,' wrote Tarkovsky, 'panic started in the theatre: people jumped and ran away. That was the moment when cinema was born. The frightened audience could not accept that they were watching a mere picture. Pictures were still, only reality moved; this must, therefore, be reality. In their confusion, they feared that a real train was about to crush them.'\n\nD. Early cinema audiences often experienced the same confusion. In time, the idea of films became familiar, the magic was accepted- but it never stopped being magic. Film has never lost its unique power to embrace its audience and transport them to a different world. For Tarkovsky, the key to that magic dynamic image of the real flow of events. A still picture could only imply the existence of time, while time in a novel passed at the whim of the reader. But in cinema, the real, objective flow of time was captured.\n\nE. One effect of this realism was to educate the world about itself. For cinema makes the world smaller. Long before people travelled to America or anywhere else, they knew what other places looked like; they knew how other people worked and lived. Overwhelmingly, the lives recorded at least in film fiction- have been American. From the earliest days of the industry, Hollywood has dominated the world film market. American imagery-the cars, the cities, the cowboys became the primary imagery of film. Film carried American life and values around the globe.\n\nF. And, thanks to film, future generations will know the 20-th century more intimately than any other period. We can only imagine what life was like in the 14th century or in classical Rome. But the life of the modern world has been recorded on film in massive encyclopedic detail. We shall be known better than any preceding generations.\n\nG. The 'star' was another natural consequence of cinema. The cinema star was effectively born in 1910. Film personalities have such an immediate presence that inevitably, they become super-real. Because we watch them so closely and because everybody in the world seems to know who they are, they appear more real to us than we do ourselves. The star as magnified human self is one of cinema's most strange and enduring legacies.\n\nH. Cinema has also given a new lease of life to the idea of the story. When the Lumiere Brothers and other pioneers began showing off this new invention, it was by no means obvious how it would be used. All that mattered at first was the wonder of movement. Indeed, some said that, once this novelty had worn off, cinema would fade away. It was no more than a passing gimmick, a fairground attraction.\n\nI. Cinema might, for example, have become primarily a documentary form. Or it might have developed like television -as a strange noisy transfer of music, information and narrative. But what happened was that it became, overwhelmingly, a medium for telling stories. Originally these were conceived as short stories- early producers doubted the ability of audiences to concentrate for more than the length of a reel. Then, in 1912, an Italian 2-hour film was hugely successful, and Hollywood settled upon the novel-length narrative that remains the dominant cinematic convention of today.\n\nJ. And it has all happened so quickly. Almost unbelievably, it is a mere 100 years since that train arrived and the audience screamed and fled, convinced by the dangerous reality of what they saw, and, perhaps, suddenly aware that the world could never be the same again -that, maybe, it could be better, brighter, more astonishing, more real than reality.",
+          "visual_structure": {
+            "question_groups": [
+              {
+                "type": "paragraph_matching_block",
+                "title": "Questions 14-18",
+                "instructions": "Reading Passage has ten paragraphs, A-J.\n\nWhich paragraph contains the following information?",
+                "question_ids": [14, 15, 16, 17, 18]
+              },
+              {
+                "type": "true_false_ng_block",
+                "title": "Questions 19-22",
+                "instructions": "TRUE if the statement agrees with the views of the writer\n\nFALSE if the statement contradicts the views of the writer\n\nNOT GIVEN if it is impossible to say what the writer thinks about this",
+                "question_ids": [19, 20, 21, 22]
+              },
+              {
+                "type": "multiple_choice_block",
+                "title": "Questions 23-26",
+                "instructions": "Choose the correct letter, A, B, C or D.",
+                "questions": [
+                  {
+                    "question_id": 23,
+                    "text": "The writer refers to the film of the train in order to demonstrate"
+                  },
+                  {
+                    "question_id": 24,
+                    "text": "In Tarkovsky's opinion, the attraction of the cinema is that it"
+                  },
+                  {
+                    "question_id": 25,
+                    "text": "When cinema first began, people thought that"
+                  },
+                  {
+                    "question_id": 26,
+                    "text": "What is the best title for this passage?"
+                  }
+                ]
+              }
+            ]
+          },
+          "questions": [
+            {
+              "id": 14,
+              "type": "paragraph_matching",
+              "instruction": "Which paragraph contains the following information?",
+              "prompt": "The location of the first cinema",
+              "visual_context": {
+                "type": "paragraph_matching",
+                "index": 0
+              }
+            },
+            {
+              "id": 15,
+              "type": "paragraph_matching",
+              "instruction": "Which paragraph contains the following information?",
+              "prompt": "How cinema came to focus on stories",
+              "visual_context": {
+                "type": "paragraph_matching",
+                "index": 1
+              }
+            },
+            {
+              "id": 16,
+              "type": "paragraph_matching",
+              "instruction": "Which paragraph contains the following information?",
+              "prompt": "The speed with which cinema has changed",
+              "visual_context": {
+                "type": "paragraph_matching",
+                "index": 2
+              }
+            },
+            {
+              "id": 17,
+              "type": "paragraph_matching",
+              "instruction": "Which paragraph contains the following information?",
+              "prompt": "How cinema teaches us about other cultures",
+              "visual_context": {
+                "type": "paragraph_matching",
+                "index": 3
+              }
+            },
+            {
+              "id": 18,
+              "type": "paragraph_matching",
+              "instruction": "Which paragraph contains the following information?",
+              "prompt": "The attraction of actors in films",
+              "visual_context": {
+                "type": "paragraph_matching",
+                "index": 4
+              }
+            },
+            {
+              "id": 19,
+              "type": "true_false_ng",
+              "statement": "It is important to understand how the first audiences reacted to the cinema.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 0
+              }
+            },
+            {
+              "id": 20,
+              "type": "true_false_ng",
+              "statement": "The Lumiere Brothers' film about the train was one of the greatest films ever made.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 1
+              }
+            },
+            {
+              "id": 21,
+              "type": "true_false_ng",
+              "statement": "Cinema presents a biased view of other countries.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 2
+              }
+            },
+            {
+              "id": 22,
+              "type": "true_false_ng",
+              "statement": "Storylines were important in very early cinema.",
+              "options": ["TRUE", "FALSE", "NOT GIVEN"],
+              "visual_context": {
+                "type": "tfng_block",
+                "index": 3
+              }
+            },
+            {
+              "id": 23,
+              "type": "multiple_choice",
+              "question": "The writer refers to the film of the train in order to demonstrate",
+              "options": [
+                "A. The simplicity of early films.",
+                "B. The impact of early films.",
+                "C. How short early films were.",
+                "D. How imaginative early films were."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 0
+              }
+            },
+            {
+              "id": 24,
+              "type": "multiple_choice",
+              "question": "In Tarkovsky's opinion, the attraction of the cinema is that it",
+              "options": [
+                "A. Aims to impress its audience.",
+                "B. Tells stories better through books.",
+                "C. Illustrates the passing of time.",
+                "D. Describes familiar events."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 1
+              }
+            },
+            {
+              "id": 25,
+              "type": "multiple_choice",
+              "question": "When cinema first began, people thought that",
+              "options": [
+                "A. It would always tell stories.",
+                "B. It should be used in fairgrounds.",
+                "C. US audiences were unappreciative.",
+                "D. Its future was uncertain."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 2
+              }
+            },
+            {
+              "id": 26,
+              "type": "multiple_choice",
+              "question": "What is the best title for this passage?",
+              "options": [
+                "A. The rise of the cinema star",
+                "B. Cinema and novels compared",
+                "C. The domination of Hollywood",
+                "D. The power of the big screen"
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 3
+              }
+            }
+          ]
+        },
+        {
+          "passage_number": 3,
+          "title": "The art of deception",
+          "formatted_content": "Do tiny changes of facial expression show whether someone is telling lies?\n\nForty years ago, the research psychologist Dr Paul Ekman was addressing a group of young psychiatrists in training when he was asked a question, the answer to which has kept him busy ever since. Suppose the group wanted to know, a particular patient swears they are telling the truth. They look and sound sincere. So here is the question: is there any way you can be sure they are telling the truth? Ekman did not know the answer then, but wanted to find out.\n\nAs part of his research, he had already filmed a series of 12-minute interviews with psychiatric patients. In a subsequent conversation, one of the patients told him that she had lied to him. So, Ekman sat and looked at the film but saw nothing noteworthy. Then he slowed it down and looked again. Then he slowed it even further. And suddenly, there, across just two frames of the film, he saw it: an intense expression of extreme anguish. It lasted less than a 15th of a second, but once he had spotted the first expression, he soon found three more examples in that same interview. He termed his discovery \"micro-expression: very rapid intense demonstrations of emotion that the subject intended to be concealed.\n\nOver the course of the next four decades, Ekman successfully demonstrated a proposition first suggested by Charles Darwin: that the ways in which we express rage, disgust, contempt, fear, surprise, happiness and sadness are universal. The facial muscles triggered by those seven basic emotions are, he has shown, essentially standard, regardless of language and culture, from the US to Japan and Brazil to Papua New Guinea. What is more, expressions of emotion are impossible to suppress and, particularly when we are lying, micro-expressions of powerfully felt emotions will inevitably flit across our face before we get the chance to stop them.\n\nFortunately for liars, most people will fail to spot these fleeting signals of inner torment. Of the 15,000 Ekman has tested, only 50 people, whom he calls \"naturals\", have been able to do it. But given a little more training, Ekman says, almost anyone can develop the skill. He should know, since these tests were completed in the mid- 1980s and the first publication of his research, he has been called in by the FBI and CIA (among countless more law-enforcement and other agencies around the world), not just to solve cases, but to teach them how to use his technique for themselves. He has held workshops for defense and prosecution lawyers, health professionals, even jealous spouses, all of them wanting to know exactly when someone is not being 100 percent candid.\n\nMost recently, Ekman's research has resulted in a new television series about the exploits of the fictional Dr Cal Lightman, a scientist who studies involuntary body language to discover not only if you are lying. But why might you have been motivated to do so? According to the publicity blurb, Lightman is a human lie detector, even more accurate than a polygraph test. Ekman concedes he was skeptical when the producer first approached him with the idea of turning his life's work into a TV series, and initially would have stopped the project if he could. In particular, he was fearful that the show would exaggerate the effectiveness of his techniques and create the quite inaccurate impression among audiences that criminals could no longer hope to get away with lying. In the worst-case scenario, he was concerned about unfair convictions, that one day someone not properly trained in his techniques might be sitting on a jury and wrongly find someone guilty of a crime simply on the basis of a television programme.\n\nIn the end though, he was won over because the series is unusual in several respects. It is the first time, as far as Ekman is aware, that a commercial TV drama has been based on the work of just one scientist. That scientist is also deeply involved in the project, talking through plot ideas and checking five successive drafts of each script to ensure details are correct. He was also impressed with the producer's manifestly serious and well-intentioned reasons for making the programme. Now that the first series has been completed, he believes probably 80-90 per cent of the show is based on fact and that's good enough for what is. After all, a drama, not a documentary.\n\nEkman, incidentally, professes to have been a terrible liar ever since he was a small boy and observes that the ability to detect a lie and the ability to lie successfully are completely unrelated. He has been asked by people running for high office if he could teach them to become more credible with the public but has always refused to use his skills in that way on ethical grounds. He also insists that there are various kinds of lies. A \"true\" lie can be identified by having two essential characteristics: there must be a deliberate intent to mislead and there must be no notification that this is what is occurring. This means that an actor or a poker player isn't a true liar. They are supposed to deceive you, it's part of the game, and the same is true of flattery. He prefers to focus on the kinds of lies where the liar would be in grave trouble if they were found out, and where the target would feel properly aggrieved if they knew.",
+          "visual_structure": {
+            "question_groups": [
+              {
+                "type": "multiple_choice_block",
+                "title": "Questions 27-31",
+                "instructions": "Choose the correct letter A, B, C or D.\n\nWrite the correct letter in boxes 27-31 on your answer sheet",
+                "questions": [
+                  {
+                    "question_id": 27,
+                    "text": "According to the writer, Ekman became interested in lying after a question from his"
+                  },
+                  {
+                    "question_id": 28,
+                    "text": "The writer refers to the 12-minute interviews in order to"
+                  },
+                  {
+                    "question_id": 29,
+                    "text": "What is the writer's point in the third paragraph?"
+                  },
+                  {
+                    "question_id": 30,
+                    "text": "What are we told about Ekman's conclusions from his tests?"
+                  },
+                  {
+                    "question_id": 31,
+                    "text": "What point does the writer make about Ekman's techniques in the fourth paragraph?"
+                  }
+                ]
+              },
+              {
+                "type": "summary_completion",
+                "title": "Questions 32-36",
+                "instructions": "Complete the summary using the list of words, A-I, below.\n\nWrite the correct letter, A-I, in boxes 32-36 on your answer sheet",
+                "summary_text": "The television series based on Ekman's work\n\nA new TV series based on Ekman's work features a hero named Lightman, who detects lies. Initially, Ekman was unenthusiastic about the TV project because he feared the possibility of encouraging viewers' 32............ For example, he was worried that one day the programme could result in 33............ not being carried out. Ultimately though, he has given the show his blessing because he is not aware of any other comparable programme based on a single person's 34............ The 35............ of the show's producer have been another pleasant surprise considering the genre of the programme. Ekman is happy with the show's overall 36............",
+                "options": [
+                  "A consequences",
+                  "B crimes",
+                  "C false beliefs",
+                  "D motives",
+                  "E justice",
+                  "F accuracy",
+                  "G acting",
+                  "H research",
+                  "I ratings"
+                ],
+                "question_ids": [32, 33, 34, 35, 36]
+              },
+              {
+                "type": "yes_no_ng_block",
+                "title": "Questions 37-40",
+                "instructions": "Do the following statements agree with the claims of the writer in Reading Passage 3?\n\nIn boxes 37-40 on your answer sheet, write\n\nYES if the statement agrees with the claims of the writer\n\nNO if the statement contradicts the claims of the writer\n\nNOT GIVEN if it is impossible to say what the writer thinks about this",
+                "question_ids": [37, 38, 39, 40]
+              }
+            ]
+          },
+          "questions": [
+            {
+              "id": 27,
+              "type": "multiple_choice",
+              "question": "According to the writer, Ekman became interested in lying after a question from his",
+              "options": [
+                "A peers.",
+                "B patients.",
+                "C students.",
+                "D teachers."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 0
+              }
+            },
+            {
+              "id": 28,
+              "type": "multiple_choice",
+              "question": "The writer refers to the 12-minute interviews in order to",
+              "options": [
+                "A illustrate how frequently patients lie.",
+                "B describe the origins of Ekman's theories.",
+                "C compare Ekman's research to previous studies.",
+                "D show how patients behaviour is affected by filming."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 1
+              }
+            },
+            {
+              "id": 29,
+              "type": "multiple_choice",
+              "question": "What is the writer's point in the third paragraph?",
+              "options": [
+                "A Micro-expressions are common to all people.",
+                "B Recent research has refuted an old idea.",
+                "C With practice we can learn to control our micro-expression.",
+                "D Human society is too complex to allow for generalisations."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 2
+              }
+            },
+            {
+              "id": 30,
+              "type": "multiple_choice",
+              "question": "What are we told about Ekman's conclusions from his tests?",
+              "options": [
+                "A It's natural for people to lie.",
+                "B Few untrained people can detect lying.",
+                "C Most liars suffer from periods of depression.",
+                "D All of his subjects were trained to identify micro-expressions."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 3
+              }
+            },
+            {
+              "id": 31,
+              "type": "multiple_choice",
+              "question": "What point does the writer make about Ekman's techniques in the fourth paragraph?",
+              "options": [
+                "A They take a decade to teach.",
+                "B They have been in great demand.",
+                "C They have aroused the suspicions of some agencies.",
+                "D They can be used by a limited range of occupations."
+              ],
+              "visual_context": {
+                "type": "mc_standalone",
+                "block_index": 0,
+                "question_index": 4
+              }
+            },
+            {
+              "id": 32,
+              "type": "summary_completion",
+              "prompt": "Initially, Ekman was unenthusiastic about the TV project because he feared the possibility of encouraging viewers' 32............",
+              "word_limit": "ONE LETTER",
+              "options": [
+                "A consequences",
+                "B crimes",
+                "C false beliefs",
+                "D motives",
+                "E justice",
+                "F accuracy",
+                "G acting",
+                "H research",
+                "I ratings"
+              ],
+              "visual_context": {
+                "type": "summary_gap",
+                "index": 0
+              }
+            },
+            {
+              "id": 33,
+              "type": "summary_completion",
+              "prompt": "he was worried that one day the programme could result in 33............ not being carried out.",
+              "word_limit": "ONE LETTER",
+              "options": [
+                "A consequences",
+                "B crimes",
+                "C false beliefs",
+                "D motives",
+                "E justice",
+                "F accuracy",
+                "G acting",
+                "H research",
+                "I ratings"
+              ],
+              "visual_context": {
+                "type": "summary_gap",
+                "index": 1
+              }
+            },
+            {
+              "id": 34,
+              "type": "summary_completion",
+              "prompt": "he is not aware of any other comparable programme based on a single person's 34............",
+              "word_limit": "ONE LETTER",
+              "options": [
+                "A consequences",
+                "B crimes",
+                "C false beliefs",
+                "D motives",
+                "E justice",
+                "F accuracy",
+                "G acting",
+                "H research",
+                "I ratings"
+              ],
+              "visual_context": {
+                "type": "summary_gap",
+                "index": 2
+              }
+            },
+            {
+              "id": 35,
+              "type": "summary_completion",
+              "prompt": "The 35............ of the show's producer have been another pleasant surprise",
+              "word_limit": "ONE LETTER",
+              "options": [
+                "A consequences",
+                "B crimes",
+                "C false beliefs",
+                "D motives",
+                "E justice",
+                "F accuracy",
+                "G acting",
+                "H research",
+                "I ratings"
+              ],
+              "visual_context": {
+                "type": "summary_gap",
+                "index": 3
+              }
+            },
+            {
+              "id": 36,
+              "type": "summary_completion",
+              "prompt": "Ekman is happy with the show's overall 36............",
+              "word_limit": "ONE LETTER",
+              "options": [
+                "A consequences",
+                "B crimes",
+                "C false beliefs",
+                "D motives",
+                "E justice",
+                "F accuracy",
+                "G acting",
+                "H research",
+                "I ratings"
+              ],
+              "visual_context": {
+                "type": "summary_gap",
+                "index": 4
+              }
+            },
+            {
+              "id": 37,
+              "type": "yes_no_ng",
+              "statement": "Ekman regrets the lies he told as a child.",
+              "options": ["YES", "NO", "NOT GIVEN"],
+              "visual_context": {
+                "type": "ynng_block",
+                "index": 0
+              }
+            },
+            {
+              "id": 38,
+              "type": "yes_no_ng",
+              "statement": "People who are good at lying tend to be good at detecting lies.",
+              "options": ["YES", "NO", "NOT GIVEN"],
+              "visual_context": {
+                "type": "ynng_block",
+                "index": 1
+              }
+            },
+            {
+              "id": 39,
+              "type": "yes_no_ng",
+              "statement": "Ekman has worked with poker players to help them lie more convincingly.",
+              "options": ["YES", "NO", "NOT GIVEN"],
+              "visual_context": {
+                "type": "ynng_block",
+                "index": 2
+              }
+            },
+            {
+              "id": 40,
+              "type": "yes_no_ng",
+              "statement": "Ekman is more interested in the types of lies with serious consequences.",
+              "options": ["YES", "NO", "NOT GIVEN"],
+              "visual_context": {
+                "type": "ynng_block",
+                "index": 3
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "writing",
+      "section_number": 3,
+      "title": "Writing",
+      "tasks": [
+        {
+          "task_number": 1,
+          "type": "graph_description",
+          "title": "Task 1",
+          "instructions": "The graph below shows information about the total oil consumption of four major consumers from 2009 to 2030.",
+          "graph_data": {
+            "title": "Oil consumption from 2009 to 2030",
+            "x_axis": {
+              "type": "categorical",
+              "labels": ["2009", "2015", "2025", "2030"],
+              "spacing": "equal",
+              "title": "Year"
+            },
+            "y_axis": {
+              "min": 0,
+              "max": 12,
+              "step": 2,
+              "unit": "Million barrels per day",
+              "title": "Oil consumption"
+            },
+            "series": [
+              {
+                "name": "USA",
+                "connect": "linear",
+                "points": [4.5, 5.0, 5.5, 6.0],
+                "style": "solid",
+                "color_suggestion": "#1f77b4"
+              },
+              {
+                "name": "China",
+                "connect": "linear",
+                "points": [2.0, 3.0, 4.5, 6.0],
+                "style": "solid",
+                "color_suggestion": "#ff7f0e"
+              },
+              {
+                "name": "Middle East",
+                "connect": "linear",
+                "points": [1.5, 2.0, 3.0, 3.5],
+                "style": "solid",
+                "color_suggestion": "#2ca02c"
+              },
+              {
+                "name": "Western Europe & Japan",
+                "connect": "linear",
+                "points": [3.0, 2.8, 2.5, 2.3],
+                "style": "solid",
+                "color_suggestion": "#d62728"
+              }
+            ],
+            "visualization_requirements": {
+              "grid": {
+                "x_axis": true,
+                "y_axis": true,
+                "style": "dotted"
+              },
+              "legend": {
+                "position": "top",
+                "orientation": "horizontal"
+              },
+              "plot_area": {
+                "width": 600,
+                "height": 400,
+                "padding": {
+                  "top": 50,
+                  "right": 50,
+                  "bottom": 80,
+                  "left": 80
+                }
+              }
+            }
+          },
+          "requirements": "Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
+          "word_limit": 150,
+          "time_limit": 20
+        },
+        {
+          "task_number": 2,
+          "type": "essay",
+          "title": "Task 2",
+          "instructions": "Environmental damage is a problem in most countries.",
+          "questions": [
+            "What is the cause of this damage?",
+            "What should be done about this problem?"
+          ],
+          "requirements": "Write an essay discussing both questions. Give reasons for your answer and include any relevant examples from your own knowledge or experience.",
+          "word_limit": 250,
+          "time_limit": 40,
+          "essay_structure": "Two-part question: 1) Causes of environmental damage, 2) Solutions to the problem",
+          "expected_coverage": [
+            "Industrial pollution",
+            "Deforestation",
+            "Overconsumption of resources",
+            "Government regulations",
+            "International cooperation",
+            "Individual responsibility",
+            "Renewable energy transition"
+          ]
+        }
+      ]
+    }
+  ]
+}
