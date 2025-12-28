@@ -757,118 +757,7 @@ const FlowchartRenderer = ({
   answers,
   onAnswerChange,
 }) => {
-  const [draggedOption, setDraggedOption] = useState(null);
-  const scrollIntervalRef = useRef(null);
-  const isDraggingRef = useRef(false);
-  const scrollDirectionRef = useRef(null);
-  const SCROLL_THRESHOLD = 120;
-  const SCROLL_SPEED = 20;
-
   if (!flowchartData) return null;
-
-  // Set up drag auto-scroll listener
-  useEffect(() => {
-    const handleGlobalDragOver = (e) => {
-      if (!isDraggingRef.current) return;
-
-      const clientY = e.clientY;
-      const viewportHeight = window.innerHeight;
-
-      let newDirection = null;
-      if (clientY < SCROLL_THRESHOLD) {
-        newDirection = "up";
-      } else if (clientY > viewportHeight - SCROLL_THRESHOLD) {
-        newDirection = "down";
-      }
-
-      scrollDirectionRef.current = newDirection;
-
-      if (!scrollIntervalRef.current && newDirection) {
-        scrollIntervalRef.current = setInterval(() => {
-          const direction = scrollDirectionRef.current;
-          if (direction === "up") {
-            window.scrollBy(0, -SCROLL_SPEED);
-          } else if (direction === "down") {
-            window.scrollBy(0, SCROLL_SPEED);
-          }
-        }, 16);
-      }
-
-      if (!newDirection && scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-        scrollDirectionRef.current = null;
-      }
-    };
-
-    const handleDragEnd = () => {
-      isDraggingRef.current = false;
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-      scrollDirectionRef.current = null;
-    };
-
-    // Add listeners to both document and window with capture phase
-    document.addEventListener("dragover", handleGlobalDragOver, true);
-    document.addEventListener("dragend", handleDragEnd, true);
-    window.addEventListener("dragover", handleGlobalDragOver, true);
-    window.addEventListener("dragend", handleDragEnd, true);
-
-    return () => {
-      document.removeEventListener("dragover", handleGlobalDragOver, true);
-      document.removeEventListener("dragend", handleDragEnd, true);
-      window.removeEventListener("dragover", handleGlobalDragOver, true);
-      window.removeEventListener("dragend", handleDragEnd, true);
-      if (scrollIntervalRef && scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleDragStart = (e, option, isUsed) => {
-    if (isUsed) {
-      e.preventDefault();
-      return;
-    }
-    const letter = option.charAt(0);
-    setDraggedOption(letter);
-    isDraggingRef.current = true;
-    e.dataTransfer.effectAllowed = "copy";
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-  };
-
-  const handleDrop = (e, questionId) => {
-    e.preventDefault();
-    isDraggingRef.current = false;
-
-    if (scrollIntervalRef.current) {
-      clearInterval(scrollIntervalRef.current);
-      scrollIntervalRef.current = null;
-    }
-
-    if (draggedOption) {
-      onAnswerChange(questionId, draggedOption);
-    }
-    setDraggedOption(null);
-  };
-
-  const handleDragEnd = () => {
-    isDraggingRef.current = false;
-
-    if (scrollIntervalRef.current) {
-      clearInterval(scrollIntervalRef.current);
-      scrollIntervalRef.current = null;
-    }
-
-    setDraggedOption(null);
-  };
 
   const handleClearAnswer = (questionId) => {
     onAnswerChange(questionId, "");
@@ -878,92 +767,60 @@ const FlowchartRenderer = ({
     <div className="visual-flowchart">
       <h3 className="flowchart-title">{flowchartData.title}</h3>
 
-      {flowchartData.options_box && (
-        <div className="flowchart-options-box drag-enabled">
-          <h4>{flowchartData.options_box.title}</h4>
-          <div className="flowchart-options draggable-options">
-            {flowchartData.options_box.options.map((option, idx) => {
-              const letter = option.charAt(0);
-              const flowchartQuestionIds = flowchartData.question_ids || [];
-              const isUsed = flowchartQuestionIds.some(
-                (qId) => answers[qId] === letter
-              );
-              return (
-                <div
-                  key={idx}
-                  className={`option-tag draggable ${isUsed ? "used" : ""}`}
-                  draggable={!isUsed}
-                  onDragStart={(e) => handleDragStart(e, option, isUsed)}
-                  onDragEnd={handleDragEnd}
-                  title={
-                    isUsed
-                      ? "Already used for another question"
-                      : "Drag to match with a question"
-                  }
-                >
-                  {option}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       <div className="flowchart-steps">
         {flowchartData.steps.map((step, stepIndex) => {
-          const questionId = flowchartData.question_ids?.[stepIndex];
-          const question = questions.find((q) => q.id === questionId);
+          // Extract gap number from step text (e.g., "21............" → 21)
+          const gapMatch = step.match(/(\d+)\.{2,}/);
+          const gapNumber = gapMatch ? parseInt(gapMatch[1], 10) : null;
 
-          let matchedQuestion = question;
-          if (!matchedQuestion) {
-            const gapMatch = step.match(/(\d+)\.{2,}/);
-            if (gapMatch) {
-              const stepQuestionId = parseInt(gapMatch[1], 10);
-              matchedQuestion = questions.find((q) => q.id === stepQuestionId);
-            }
-          }
-
-          const selectedAnswer = answers[matchedQuestion?.id];
-          const selectedOption = flowchartData.options_box?.options.find(
-            (opt) => opt.charAt(0) === selectedAnswer
-          );
+          // Find the question with matching ID based on gap number
+          const matchedQuestion = questions.find((q) => q.id === gapNumber);
+          const selectedAnswer = answers[gapNumber];
 
           return (
             <div key={stepIndex} className="flowchart-step-item">
               <div className="step-content">
-                {matchedQuestion ? (
+                {gapNumber ? (
                   <div className="step-text-with-gap">
                     {step.split(/(\d+\.{2,})/g).map((part, partIdx) => {
                       if (part.match(/^(\d+)\.{2,}$/)) {
                         return (
-                          <div
-                            key={partIdx}
-                            className="drop-zone-flowchart"
-                            onDragOver={handleDragOver}
-                            onDrop={(e) => handleDrop(e, matchedQuestion.id)}
-                          >
+                          <span key={partIdx} className="gap-select-container">
                             {selectedAnswer ? (
-                              <div className="matched-answer">
+                              <span className="selected-answer">
                                 <span className="answer-letter">
                                   {selectedAnswer}
                                 </span>
-                                <span className="answer-text">
-                                  {selectedOption}
-                                </span>
                                 <button
                                   className="clear-btn"
-                                  onClick={() =>
-                                    handleClearAnswer(matchedQuestion.id)
-                                  }
-                                  title="Clear this match"
+                                  onClick={() => handleClearAnswer(gapNumber)}
+                                  title="Clear this answer"
                                 >
                                   ✕
                                 </button>
-                              </div>
+                              </span>
                             ) : (
-                              <span className="drop-hint">Drop here</span>
+                              <select
+                                className="flowchart-select"
+                                value=""
+                                onChange={(e) =>
+                                  onAnswerChange(gapNumber, e.target.value)
+                                }
+                              >
+                                <option value="">-- Choose --</option>
+                                {flowchartData.options_box?.options.map(
+                                  (option, idx) => {
+                                    const letter = option.charAt(0);
+                                    return (
+                                      <option key={idx} value={letter}>
+                                        {option}
+                                      </option>
+                                    );
+                                  }
+                                )}
+                              </select>
                             )}
-                          </div>
+                          </span>
                         );
                       }
                       return <span key={partIdx}>{part}</span>;
@@ -1295,6 +1152,43 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
       <div className="question-card matching-card standalone">
         <div className="question-body">
           <p className="matching-question-text">{question.question}</p>
+          {question.matching_instruction && (
+            <p className="matching-instruction">
+              {question.matching_instruction}
+            </p>
+          )}
+          <div className="select-container">
+            <select
+              className="matching-select"
+              value={answer || ""}
+              onChange={(e) => onAnswerChange(question.id, e.target.value)}
+            >
+              <option value="">-- Select an answer --</option>
+              {question.matching_options?.map((option, idx) => {
+                const letter = option.split(" ")[0];
+                return (
+                  <option key={idx} value={letter}>
+                    {option}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          {answer && (
+            <div className="answer-preview-box">
+              Your answer: <strong>{answer}</strong>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (question.type === "flowchart_completion") {
+    return (
+      <div className="question-card matching-card standalone">
+        <div className="question-body">
+          <p className="matching-question-text">{question.prompt}</p>
           {question.matching_instruction && (
             <p className="matching-instruction">
               {question.matching_instruction}

@@ -355,7 +355,63 @@
   color: #ff5252;
 }
 
+/* ==================== MULTIPLE CHOICE ==================== */
+.mc-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mc-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #1a1a1a;
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .mc-option {
+  background: #3a3a3a;
+  border-color: #373737;
+  color: #e0e0e0;
+}
+
+.mc-option:hover {
+  background: #f8f8f8;
+  border-color: #dc2626;
+}
+
+[data-theme="dark"] .mc-option:hover {
+  background: #4a4a4a;
+  border-color: #ff5252;
+}
+
+.mc-option input {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.mc-option input:checked + span {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .mc-option input:checked + span {
+  color: #ff5252;
+}
+
 /* ==================== GAP FILL INPUT ==================== */
+
 .gap-input-container {
   display: inline-block;
   vertical-align: middle;
@@ -891,7 +947,81 @@
 }
 
 /* ==================== SCROLLBAR STYLING ==================== */
-/* Webkit browsers (Chrome, Safari, Edge) */
+/* ==================== DIAGRAM LABELING ==================== */
+.diagram-labeling-section {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+[data-theme="dark"] .diagram-labeling-section {
+  background: #2a2a2a;
+  border-color: #373737;
+}
+
+.diagram-description {
+  font-size: 13px;
+  color: #1a1a1a;
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .diagram-description {
+  color: #e0e0e0;
+}
+
+.diagram-container {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.diagram-image {
+  flex: 0 0 auto;
+}
+
+.diagram-image img {
+  max-width: 400px;
+  height: auto;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: #f8f8f8;
+}
+
+[data-theme="dark"] .diagram-image img {
+  border-color: #505050;
+  background: #3a3a3a;
+}
+
+.diagram-labels {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.label-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label-prompt {
+  font-size: 13px;
+  color: #1a1a1a;
+  margin: 0;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .label-prompt {
+  color: #e0e0e0;
+}
+
+/* ==================== SCROLLBAR ==================== */
 .reading-test-dashboard::-webkit-scrollbar {
   width: 10px;
   height: 10px;

@@ -2568,6 +2568,115 @@
   color: #3b82f6;
 }
 
+.gap-select-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flowchart-select {
+  padding: 6px 10px;
+  border: 2px solid #dc2626;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #ffffff;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  min-width: 180px;
+}
+
+[data-theme="dark"] .flowchart-select {
+  background: #3a3a3a;
+  border-color: #ff5252;
+  color: #e8e8e8;
+}
+
+.flowchart-select:hover {
+  border-color: #b91c1c;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.2);
+}
+
+[data-theme="dark"] .flowchart-select:hover {
+  border-color: #ff8585;
+  box-shadow: 0 2px 6px rgba(255, 82, 82, 0.2);
+}
+
+.flowchart-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.3);
+}
+
+[data-theme="dark"] .flowchart-select:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 6px rgba(96, 165, 250, 0.3);
+}
+
+.selected-answer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0f9ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  padding: 6px 10px;
+  animation: slideIn 0.2s ease;
+}
+
+[data-theme="dark"] .selected-answer {
+  background: #1f3a3f;
+  border-color: #164e63;
+}
+
+.selected-answer .answer-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  background: #dc2626;
+  color: #ffffff;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .selected-answer .answer-letter {
+  background: #ff5252;
+}
+
+.clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .clear-btn {
+  color: #999;
+}
+
+.clear-btn:hover {
+  color: #dc2626;
+  transform: scale(1.2);
+}
+
+[data-theme="dark"] .clear-btn:hover {
+  color: #ff5252;
+}
+
 .step-text {
   color: inherit;
   line-height: 1.6;

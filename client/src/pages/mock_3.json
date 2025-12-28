@@ -1046,6 +1046,7 @@
                 "type": "diagram_labeling",
                 "title": "Questions 12 and 13",
                 "instructions": "Label the diagram below.\n\nWrite NO MORE THAN TWO WORDS AND/OR A NUMBER from the text for each answer.",
+                "question_ids": [12, 13],
                 "diagram_description": "Cavity Wall Insulation diagram showing insulating material in the center, an insulating air space on one side labeled (13), and the interior and exterior leaves of brick on the other side labeled (12).",
                 "labels": [
                   {
@@ -1219,6 +1220,7 @@
                 "type": "multiple_choice_block",
                 "title": "Questions 23-26",
                 "instructions": "Choose the correct letter, A, B, C or D.",
+                "question_ids": [23, 24, 25, 26],
                 "questions": [
                   {
                     "question_id": 23,
@@ -1407,6 +1409,7 @@
                 "type": "multiple_choice_block",
                 "title": "Questions 27-31",
                 "instructions": "Choose the correct letter A, B, C or D.\n\nWrite the correct letter in boxes 27-31 on your answer sheet",
+                "question_ids": [27, 28, 29, 30, 31],
                 "questions": [
                   {
                     "question_id": 27,

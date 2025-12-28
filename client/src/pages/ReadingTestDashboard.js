@@ -223,15 +223,15 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
               <div className="visual-flowchart">
                 <div className="flowchart-steps">
                   {group.steps.map((step, stepIndex) => {
-                    const questionId = group.questionIds?.[stepIndex];
-                    const answer = answers[questionId];
-
                     return (
                       <div key={stepIndex} className="flowchart-step-item">
                         <div className="step-content">
                           <div className="step-text-with-gap">
                             {step.split(/(\d+\.{2,})/g).map((part, partIdx) => {
-                              if (part.match(/^(\d+)\.{2,}$/)) {
+                              const gapMatch = part.match(/^(\d+)\.{2,}$/);
+                              if (gapMatch) {
+                                const gapNumber = parseInt(gapMatch[1], 10);
+                                const answer = answers[gapNumber];
                                 return (
                                   <span
                                     key={partIdx}
@@ -243,11 +243,11 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                                       value={answer || ""}
                                       onChange={(e) =>
                                         onAnswerChange(
-                                          questionId,
+                                          gapNumber,
                                           e.target.value
                                         )
                                       }
-                                      placeholder={`Q${questionId}`}
+                                      placeholder={`Q${gapNumber}`}
                                       maxLength={40}
                                       autoComplete="off"
                                     />
@@ -276,30 +276,36 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                     {group.diagram_description}
                   </p>
                 )}
-                <div className="diagram-labels">
-                  {group.labels.map((label, labelIdx) => {
-                    const questionId = group.questionIds?.[labelIdx];
-                    const answer = answers[questionId];
+                <div className="diagram-container">
+                  <div className="diagram-image">
+                    <img src={require("./image.png")} alt="Diagram" />
+                  </div>
+                  <div className="diagram-labels">
+                    {group.labels.map((label, labelIdx) => {
+                      const questionId = group.questionIds?.[labelIdx];
+                      const answer = answers[questionId];
 
-                    return (
-                      <div key={labelIdx} className="label-item">
-                        <p className="label-prompt">{label.prompt}</p>
-                        <span className="gap-input-container">
-                          <input
-                            type="text"
-                            className="gap-fill-input"
-                            value={answer || ""}
-                            onChange={(e) =>
-                              onAnswerChange(questionId, e.target.value)
-                            }
-                            placeholder={`Q${questionId}`}
-                            maxLength={40}
-                            autoComplete="off"
-                          />
-                        </span>
-                      </div>
-                    );
-                  })}
+                      return (
+                        <div key={labelIdx} className="label-item">
+                          <p className="label-prompt">{label.prompt}</p>
+                          <span className="gap-input-container">
+                            <input
+                              type="text"
+                              className="gap-fill-input"
+                              value={answer || ""}
+                              onChange={(e) =>
+                                onAnswerChange(questionId, e.target.value)
+                              }
+                              placeholder={`Q${questionId}`}
+                              maxLength={40}
+                              autoComplete="off"
+                              key={`input-${questionId}`}
+                            />
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -416,6 +422,36 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                       </div>
                     )}
 
+                    {question.type === "multiple_choice" &&
+                      question.question &&
+                      question.options && (
+                        <div className="question-content">
+                          <p className="question-prompt">{question.question}</p>
+                          <div className="mc-options">
+                            {question.options.map((option, idx) => {
+                              const letter = option.charAt(0);
+                              return (
+                                <label key={idx} className="mc-option">
+                                  <input
+                                    type="radio"
+                                    name={`question-${question.id}`}
+                                    value={letter}
+                                    checked={answer === letter}
+                                    onChange={(e) =>
+                                      onAnswerChange(
+                                        question.id,
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                  <span>{option}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                     {question.type === "paragraph_matching" &&
                       question.prompt && (
                         <div className="question-content">
@@ -429,13 +465,22 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                               }
                             >
                               <option value="">-- Select paragraph --</option>
-                              {["A", "B", "C", "D", "E", "F", "G", "H"].map(
-                                (letter) => (
-                                  <option key={letter} value={letter}>
-                                    {letter}
-                                  </option>
-                                )
-                              )}
+                              {[
+                                "A",
+                                "B",
+                                "C",
+                                "D",
+                                "E",
+                                "F",
+                                "G",
+                                "H",
+                                "I",
+                                "J",
+                              ].map((letter) => (
+                                <option key={letter} value={letter}>
+                                  {letter}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         </div>
