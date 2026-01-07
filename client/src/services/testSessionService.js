@@ -101,3 +101,5 @@ const testSessionService = {
     );
   },
 };
+
+export default testSessionService;
