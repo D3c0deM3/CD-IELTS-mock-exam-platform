@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import ThemeToggle from "../components/ThemeToggle";
 import testSessionService from "../services/testSessionService";
+import { getOrCreateDeviceId } from "../utils/deviceIdGenerator";
 import "./StartScreen.css";
 
 function StartScreen() {
@@ -43,10 +44,14 @@ function StartScreen() {
       const user = JSON.parse(userData);
       const fullName = user.full_name;
 
+      // Get or create unique device ID
+      const deviceId = getOrCreateDeviceId();
+
       // Call backend to validate participant ID matches this user's name
       const response = await testSessionService.checkInParticipant(
         idCode.trim(),
-        fullName
+        fullName,
+        deviceId
       );
 
       // Store participant data in localStorage for use throughout the test

@@ -73,10 +73,10 @@ const testSessionService = {
   /**
    * Participant: Check in with ID code at start screen
    */
-  checkInParticipant: async (participant_id_code, full_name) => {
+  checkInParticipant: async (participant_id_code, full_name, device_id) => {
     return await apiClient.post(
       `${API_CONFIG.BASE_URL}/api/test-sessions/check-in-participant`,
-      { participant_id_code, full_name }
+      { participant_id_code, full_name, device_id }
     );
   },
 
@@ -94,10 +94,10 @@ const testSessionService = {
    * Participant: Validate that current device IP matches locked IP
    * Used when entering pending screen to prevent multi-device access
    */
-  validateParticipantIP: async (participant_id_code, full_name) => {
+  validateParticipantIP: async (participant_id_code, full_name, device_id) => {
     return await apiClient.post(
       `${API_CONFIG.BASE_URL}/api/test-sessions/validate-participant-ip`,
-      { participant_id_code, full_name }
+      { participant_id_code, full_name, device_id }
     );
   },
 };

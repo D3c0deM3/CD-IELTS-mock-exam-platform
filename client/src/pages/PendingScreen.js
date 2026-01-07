@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import testSessionService from "../services/testSessionService";
+import { getOrCreateDeviceId } from "../utils/deviceIdGenerator";
 import "./PendingScreen.css";
 
 function PendingScreen() {
@@ -31,14 +32,18 @@ function PendingScreen() {
         const user = userData ? JSON.parse(userData) : null;
         const fullName = user?.full_name;
 
-        // Call validation endpoint - this checks if IP matches the locked IP
+        // Get device ID (unique identifier for this device)
+        const deviceId = getOrCreateDeviceId();
+
+        // Call validation endpoint - this checks if device_id and IP match the locked values
         const response = await testSessionService.validateParticipantIP(
           idCode,
-          fullName
+          fullName,
+          deviceId
         );
 
         if (!response.ip_match) {
-          // IP doesn't match - this is a different device trying to use same code
+          // Device doesn't match - this is a different device trying to use same code
           setIpValidationError(
             "Another device is already using this participant ID code. Each ID code can only be used on one device at a time."
           );
