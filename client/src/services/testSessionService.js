@@ -89,6 +89,15 @@ const testSessionService = {
       { params: { full_name } }
     );
   },
-};
 
-export default testSessionService;
+  /**
+   * Participant: Validate that current device IP matches locked IP
+   * Used when entering pending screen to prevent multi-device access
+   */
+  validateParticipantIP: async (participant_id_code, full_name) => {
+    return await apiClient.post(
+      `${API_CONFIG.BASE_URL}/api/test-sessions/validate-participant-ip`,
+      { participant_id_code, full_name }
+    );
+  },
+};

@@ -379,6 +379,80 @@ router.post("/check-in-participant", async (req, res) => {
 });
 
 /**
+ * POST /api/test-sessions/validate-participant-ip
+ * Validate that current device IP matches the locked IP for this participant code
+ * Called when entering the pending screen to prevent multi-device access
+ * Returns: { ip_match: true/false, message: "..." }
+ */
+router.post("/validate-participant-ip", async (req, res) => {
+  const { participant_id_code, full_name } = req.body;
+
+  if (!participant_id_code) {
+    return res.status(400).json({ error: "Participant ID code is required" });
+  }
+
+  try {
+    // Extract client IP address
+    const clientIP =
+      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.socket.remoteAddress ||
+      "unknown";
+
+    // Find participant by ID code
+    const [participantRows] = await db.execute(
+      `SELECT tp.id, tp.participant_id_code, tp.full_name, tp.participant_status, tp.ip_address
+       FROM test_participants tp
+       WHERE tp.participant_id_code = ?`,
+      [participant_id_code]
+    );
+
+    if (participantRows.length === 0) {
+      return res.status(404).json({ error: "Participant ID code not found" });
+    }
+
+    const participant = participantRows[0];
+
+    // Verify name matches
+    const registeredName = (participant.full_name || "").trim().toLowerCase();
+    const providedName = (full_name || "").trim().toLowerCase();
+
+    if (registeredName !== providedName) {
+      return res.status(403).json({
+        error:
+          "This ID code is not registered to your account. You are not authorized to use this ID.",
+      });
+    }
+
+    // Check if code has expired
+    if (participant.participant_status === "expired") {
+      return res.status(403).json({
+        error:
+          "This participant ID code has already been used and is no longer valid. Each ID code can only be used once.",
+      });
+    }
+
+    // Check if IP matches (if IP is locked)
+    if (participant.ip_address && participant.ip_address !== clientIP) {
+      // Different IP trying to access - BLOCK
+      return res.status(403).json({
+        error:
+          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
+        ip_match: false,
+      });
+    }
+
+    // IP matches (or no IP locked yet) - ALLOW
+    return res.json({
+      ip_match: true,
+      message: "IP validation successful",
+    });
+  } catch (err) {
+    console.error("IP validation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
  * GET /api/test-sessions/participant/:id_code/can-start
  * Check if participant can start the test
  * Verifies the ID belongs to the user logged in on this device
