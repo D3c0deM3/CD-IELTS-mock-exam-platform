@@ -219,9 +219,6 @@ const setupDatabase = async () => {
         type: "ENUM('unused', 'in_progress', 'expired') DEFAULT 'unused'",
       },
       { name: "status_updated_at", type: "DATETIME" },
-      { name: "ip_address", type: "VARCHAR(45)" },
-      { name: "device_locked_at", type: "DATETIME" },
-      { name: "device_id", type: "VARCHAR(100)" },
     ];
 
     for (const column of missingColumns) {

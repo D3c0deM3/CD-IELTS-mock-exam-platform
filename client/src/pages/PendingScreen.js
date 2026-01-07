@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
-import testSessionService from "../services/testSessionService";
-import { getOrCreateDeviceId } from "../utils/deviceIdGenerator";
 import "./PendingScreen.css";
 
 function PendingScreen() {
@@ -11,7 +9,6 @@ function PendingScreen() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [adminStarted, setAdminStarted] = useState(false);
-  const [ipValidationError, setIpValidationError] = useState("");
 
   const idCode =
     location.state?.idCode || localStorage.getItem("ielts_mock_user_id");
@@ -22,87 +19,6 @@ function PendingScreen() {
       navigate("/");
     }
   }, [idCode, navigate]);
-
-  // CRITICAL: Validate IP address when entering pending screen
-  // This prevents another device with same ID code from accessing the test
-  useEffect(() => {
-    const validateIPAddress = async () => {
-      try {
-        const userData = localStorage.getItem("user");
-        const user = userData ? JSON.parse(userData) : null;
-        const fullName = user?.full_name;
-
-        // Get device ID (unique identifier for this device)
-        const deviceId = getOrCreateDeviceId();
-
-        // Call validation endpoint - this checks if device_id and IP match the locked values
-        const response = await testSessionService.validateParticipantIP(
-          idCode,
-          fullName,
-          deviceId
-        );
-
-        if (!response.ip_match) {
-          // Device doesn't match - this is a different device trying to use same code
-          setIpValidationError(
-            "Another device is already using this participant ID code. Each ID code can only be used on one device at a time."
-          );
-          // Redirect after showing error
-          setTimeout(() => {
-            navigate("/");
-          }, 3000);
-        }
-      } catch (err) {
-        console.error("IP validation error:", err);
-        // Network error or other issue
-        if (err.response?.status === 403) {
-          setIpValidationError(
-            err.response?.data?.error ||
-              "Another device is already using this participant ID code."
-          );
-          setTimeout(() => {
-            navigate("/");
-          }, 3000);
-        }
-      }
-    };
-
-    if (idCode) {
-      validateIPAddress();
-    }
-  }, [idCode, navigate]);
-
-  // Show error screen if IP validation failed
-  if (ipValidationError) {
-    return (
-      <div className="pending-screen error-screen">
-        <ThemeToggle />
-        <div className="pending-container">
-          <div className="error-content">
-            <div className="error-icon">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-                <path
-                  d="M12 8V12"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <circle cx="12" cy="16" r="1" fill="currentColor" />
-              </svg>
-            </div>
-            <h2>Access Denied</h2>
-            <p>{ipValidationError}</p>
-            <p className="redirect-message">Redirecting...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Security: Prevent navigating away
   useEffect(() => {

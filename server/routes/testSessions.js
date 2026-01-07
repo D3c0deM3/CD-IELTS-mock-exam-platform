@@ -257,26 +257,16 @@ router.get("/:id", authMiddleware, async (req, res) => {
  * Verifies the ID belongs to the user logged in on this device
  */
 router.post("/check-in-participant", async (req, res) => {
-  const { participant_id_code, full_name, device_id } = req.body;
+  const { participant_id_code, full_name } = req.body;
 
   if (!participant_id_code) {
     return res.status(400).json({ error: "Participant ID code is required" });
   }
 
-  if (!device_id) {
-    return res.status(400).json({ error: "Device ID is required" });
-  }
-
   try {
-    // Extract client IP address (handles proxies and load balancers)
-    const clientIP =
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket.remoteAddress ||
-      "unknown";
-
     // Find participant by ID code
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.participant_status, tp.ip_address, tp.device_locked_at, tp.device_id, ts.test_id, t.name as test_name, ts.admin_notes
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.participant_status, ts.test_id, t.name as test_name, ts.admin_notes
        FROM test_participants tp
        JOIN test_sessions ts ON tp.session_id = ts.id
        JOIN tests t ON ts.test_id = t.id
@@ -313,53 +303,11 @@ router.post("/check-in-participant", async (req, res) => {
       });
     }
 
-    // Check device/IP locking: Only one device per participant code
-    // Validates both IP address AND device_id to prevent same-network access
-    if (participant.ip_address && participant.ip_address !== clientIP) {
-      // Different IP - likely different device or network
-      return res.status(403).json({
-        error:
-          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
-      });
-    }
-
-    if (participant.device_id && participant.device_id !== device_id) {
-      // Same IP but different device_id - someone on same network trying to use code
-      return res.status(403).json({
-        error:
-          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
-      });
-    }
-
-    // Update check-in status and mark as in_progress, storing both IP and device_id
-    // Using WHERE clause ensures atomicity for first-entry race condition protection
+    // Update check-in status and mark as in_progress
     await db.execute(
-      `UPDATE test_participants 
-       SET has_entered_startscreen = 1,
-           entered_at = COALESCE(entered_at, NOW()),
-           participant_status = 'in_progress', 
-           status_updated_at = NOW(), 
-           ip_address = ?,
-           device_id = ?,
-           device_locked_at = COALESCE(device_locked_at, NOW())
-       WHERE id = ? AND (ip_address IS NULL OR ip_address = ?) AND (device_id IS NULL OR device_id = ?)`,
-      [clientIP, device_id, participant.id, clientIP, device_id]
+      "UPDATE test_participants SET has_entered_startscreen = 1, entered_at = NOW(), participant_status = 'in_progress', status_updated_at = NOW() WHERE id = ?",
+      [participant.id]
     );
-
-    // Verify the update succeeded - if WHERE clause filtered us out, device/IP was different
-    const [updateCheck] = await db.execute(
-      "SELECT ip_address, device_id FROM test_participants WHERE id = ? AND ip_address = ? AND device_id = ?",
-      [participant.id, clientIP, device_id]
-      [participant.id, clientIP]
-    );
-
-    if (updateCheck.length === 0) {
-      // Update failed - means a different IP got there first
-      return res.status(403).json({
-        error:
-          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
-      });
-    }
 
     // Extract test_materials_id from admin_notes if available
     let test_materials_id = 2; // Default to mock 2
@@ -388,96 +336,6 @@ router.post("/check-in-participant", async (req, res) => {
     });
   } catch (err) {
     console.error("Check-in error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-/**
- * POST /api/test-sessions/validate-participant-ip
- * Validate that current device IP and device_id match the locked values
- * Called when entering the pending screen to prevent multi-device access
- * Protects against same-network credential sharing
- * Returns: { ip_match: true/false, message: "..." }
- */
-router.post("/validate-participant-ip", async (req, res) => {
-  const { participant_id_code, full_name, device_id } = req.body;
-
-  if (!participant_id_code) {
-    return res.status(400).json({ error: "Participant ID code is required" });
-  }
-
-  if (!device_id) {
-    return res.status(400).json({ error: "Device ID is required" });
-  }
-
-  try {
-    // Extract client IP address
-    const clientIP =
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket.remoteAddress ||
-      "unknown";
-
-    // Find participant by ID code
-    const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.participant_id_code, tp.full_name, tp.participant_status, tp.ip_address, tp.device_id
-       FROM test_participants tp
-       WHERE tp.participant_id_code = ?`,
-      [participant_id_code]
-    );
-
-    if (participantRows.length === 0) {
-      return res.status(404).json({ error: "Participant ID code not found" });
-    }
-
-    const participant = participantRows[0];
-
-    // Verify name matches
-    const registeredName = (participant.full_name || "").trim().toLowerCase();
-    const providedName = (full_name || "").trim().toLowerCase();
-
-    if (registeredName !== providedName) {
-      return res.status(403).json({
-        error:
-          "This ID code is not registered to your account. You are not authorized to use this ID.",
-      });
-    }
-
-    // Check if code has expired
-    if (participant.participant_status === "expired") {
-      return res.status(403).json({
-        error:
-          "This participant ID code has already been used and is no longer valid. Each ID code can only be used once.",
-      });
-    }
-
-    // Check if IP matches (if IP is locked)
-    if (participant.ip_address && participant.ip_address !== clientIP) {
-      // Different IP trying to access - BLOCK
-      return res.status(403).json({
-        error:
-          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
-        ip_match: false,
-      });
-    }
-
-    // Check if device_id matches (if device is locked) - Prevents same-network sharing
-    if (participant.device_id && participant.device_id !== device_id) {
-      // Different device_id trying to access - BLOCK
-      // This catches when someone on same network tries to use the code
-      return res.status(403).json({
-        error:
-          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
-        ip_match: false,
-      });
-    }
-
-    // Both IP and device_id match (or not locked yet) - ALLOW
-    return res.json({
-      ip_match: true,
-      message: "Device validation successful",
-    });
-  } catch (err) {
-    console.error("IP validation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
