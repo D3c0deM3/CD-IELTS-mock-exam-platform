@@ -214,6 +214,13 @@ const setupDatabase = async () => {
       { name: "test_completed_at", type: "DATETIME" },
       { name: "total_pause_duration", type: "INT DEFAULT 0" },
       { name: "paused_at", type: "DATETIME" },
+      {
+        name: "participant_status",
+        type: "ENUM('unused', 'in_progress', 'expired') DEFAULT 'unused'",
+      },
+      { name: "status_updated_at", type: "DATETIME" },
+      { name: "ip_address", type: "VARCHAR(45)" },
+      { name: "device_locked_at", type: "DATETIME" },
     ];
 
     for (const column of missingColumns) {
@@ -326,6 +333,29 @@ const setupDatabase = async () => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (question_id) REFERENCES test_questions(id) ON DELETE CASCADE,
         KEY idx_question (question_id)
+      )
+    `);
+
+    // Table for storing participant answers (listening and reading)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS participant_answers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        session_id INT NOT NULL,
+        participant_id INT NOT NULL,
+        participant_id_code VARCHAR(50) NOT NULL,
+        full_name VARCHAR(255) NOT NULL,
+        section_type ENUM('listening', 'reading') NOT NULL,
+        question_number INT NOT NULL,
+        user_answer LONGTEXT,
+        correct_answer LONGTEXT,
+        is_correct BOOLEAN,
+        submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES test_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (participant_id) REFERENCES test_participants(id) ON DELETE CASCADE,
+        KEY idx_session_participant (session_id, participant_id),
+        KEY idx_section_type (section_type),
+        UNIQUE KEY unique_answer (participant_id, section_type, question_number)
       )
     `);
 

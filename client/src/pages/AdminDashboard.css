@@ -334,10 +334,58 @@ html[data-theme="dark"] .form-select:-webkit-autofill:focus {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
+.modal-large {
+  max-width: 1000px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
 .modal-header {
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 16px;
+}
+
+.modal-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+  margin-left: -28px;
+  margin-right: -28px;
+  padding-left: 28px;
+}
+
+.modal-tab {
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.modal-tab:hover {
+  color: var(--text);
+}
+
+.modal-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.modal-answers-content {
+  margin-left: -28px;
+  margin-right: -28px;
+  padding-right: 0;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .modal-close {

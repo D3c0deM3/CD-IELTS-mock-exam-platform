@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
+import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
+import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import "./ReadingTestDashboard.css";
 import testDataJson2 from "./mock_2.json";
 import testDataJson3 from "./mock_3.json";
@@ -583,8 +585,11 @@ const ReadingTestDashboard = () => {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";
   });
-  const [answers, setAnswers] = useState({});
-  const [timeRemaining, setTimeRemaining] = useState(60 * 60); // 60 minutes
+  const [answers, setAnswers] = useAnswersWithStorage("reading_answers");
+  const [timeRemaining, setTimeRemaining] = useTimerWithStorage(
+    60 * 60,
+    "reading_timer"
+  ); // 60 minutes
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentPassageIndex, setCurrentPassageIndex] = useState(0);
@@ -1135,6 +1140,11 @@ const ReadingTestDashboard = () => {
 
       const result = await response.json();
       console.log("Reading submission response:", result);
+
+      // Clear reading test localStorage after successful submission
+      // (Keep listening keys in case user wants to review, they'll be cleared on final submission)
+      localStorage.removeItem("reading_answers");
+      localStorage.removeItem("reading_timer");
 
       navigate("/test/writing", {
         state: { startTime: new Date().toISOString() },

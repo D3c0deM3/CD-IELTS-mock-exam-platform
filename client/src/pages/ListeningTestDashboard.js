@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
 import audioService from "../services/audioService";
+import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
+import useAudioPlaybackWithStorage from "../hooks/useAudioPlaybackWithStorage";
+import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import "./ListeningTestDashboard.css";
 
 // Import all available test data files for dynamic loading
@@ -1232,8 +1235,11 @@ const ListeningTestDashboard = () => {
     return localStorage.getItem("ielts_mock_theme") || "light";
   });
   const [currentPartIndex, setCurrentPartIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [timeRemaining, setTimeRemaining] = useState(30 * 60);
+  const [answers, setAnswers] = useAnswersWithStorage("listening_answers");
+  const [timeRemaining, setTimeRemaining] = useTimerWithStorage(
+    30 * 60,
+    "listening_timer"
+  );
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [audioLoaded, setAudioLoaded] = useState(false);
@@ -1245,6 +1251,9 @@ const ListeningTestDashboard = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(75);
+  const audioStorageState = useAudioPlaybackWithStorage(
+    "listening_audio_state"
+  );
 
   // ==================== TEXT HIGHLIGHTING ====================
   const [highlightsByPart, setHighlightsByPart] = useState({});
@@ -1523,6 +1532,16 @@ const ListeningTestDashboard = () => {
       try {
         console.log("⏳ Attempting to start audio playback...");
 
+        // Get participant data to ensure we have the right test materials
+        const participant = JSON.parse(
+          localStorage.getItem("currentParticipant") || "{}"
+        );
+        const testMaterialsId = participant.test_materials_id || 2;
+        console.log(
+          `🎧 Using test materials ID: ${testMaterialsId}`,
+          participant
+        );
+
         // First, ensure audio is preloaded (in case it wasn't preloaded in starter)
         let duration = audioService.getAudioDuration();
         let audio = audioService.getAudioElement();
@@ -1530,7 +1549,7 @@ const ListeningTestDashboard = () => {
         if (!audio || !duration) {
           console.log("🔄 Audio not cached, preloading now...");
           try {
-            const result = await audioService.preloadAudio();
+            const result = await audioService.preloadAudio(testMaterialsId);
             duration = result.duration;
             audio = result.audio;
             console.log(
@@ -1574,6 +1593,16 @@ const ListeningTestDashboard = () => {
         // Store audio reference
         audioRef.current = audio;
 
+        // Restore audio playback position if it was saved before refresh
+        if (audioStorageState.audioCurrentTime > 0) {
+          console.log(
+            `⏸️ Restoring audio position to ${audioStorageState.audioCurrentTime.toFixed(
+              2
+            )}s`
+          );
+          audio.currentTime = audioStorageState.audioCurrentTime;
+        }
+
         // Play audio automatically
         console.log("▶ Starting audio playback...");
         try {
@@ -1597,6 +1626,34 @@ const ListeningTestDashboard = () => {
       clearTimeout(timer);
     };
   }, []);
+
+  // ==================== AUDIO CURRENT TIME TRACKING ====================
+  // Track audio playback position and save to localStorage
+  useEffect(() => {
+    const audio = audioRef.current || audioService.getAudioElement();
+    if (!audio) return;
+
+    const handleTimeUpdate = () => {
+      // Update stored audio current time
+      audioStorageState.setAudioCurrentTime(audio.currentTime);
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handlePlayPause = () => {
+      audioStorageState.setIsPlayingStored(audio.paused === false);
+    };
+
+    // Add event listeners for audio time tracking
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("play", handlePlayPause);
+    audio.addEventListener("pause", handlePlayPause);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("play", handlePlayPause);
+      audio.removeEventListener("pause", handlePlayPause);
+    };
+  }, [audioStorageState]);
 
   // ==================== SUBMIT TEST HANDLER ====================
   const handleSubmitTest = useCallback(() => {
@@ -1652,6 +1709,11 @@ const ListeningTestDashboard = () => {
 
       const result = await response.json();
       console.log("Listening submission response:", result);
+
+      // Clear all localStorage keys after successful submission
+      localStorage.removeItem("listening_answers");
+      localStorage.removeItem("listening_audio_state");
+      localStorage.removeItem("listening_timer");
 
       // Stop audio before leaving the test
       audioService.stopAudio();

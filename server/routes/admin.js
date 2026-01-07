@@ -1262,4 +1262,29 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
   }
 });
 
+// GET /api/admin/participants/:id/answers - Get all answers for a participant
+router.get("/participants/:id/answers", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [answers] = await db.execute(
+      `SELECT 
+        question_number,
+        section_type,
+        user_answer,
+        correct_answer,
+        is_correct
+       FROM participant_answers
+       WHERE participant_id = ?
+       ORDER BY section_type, question_number ASC`,
+      [id]
+    );
+
+    res.json({ answers });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;

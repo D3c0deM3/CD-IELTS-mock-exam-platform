@@ -1,0 +1,253 @@
+.answer-checker {
+  width: 100%;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.answer-checker-header {
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.answer-checker-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.participant-id {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.answer-checker-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-item label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.stat-score {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.answer-checker-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  background: var(--bg-secondary);
+}
+
+.filter-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.answer-checker-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.answers-table {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.answers-table-header {
+  display: grid;
+  grid-template-columns: 35px 60px 1fr 1fr 50px;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.answers-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.answers-table-row {
+  display: grid;
+  grid-template-columns: 35px 60px 1fr 1fr 50px;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.answers-table-row:hover {
+  background: var(--bg-secondary);
+}
+
+.answers-table-row.correct {
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.answers-table-row.incorrect {
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-q {
+  font-weight: 600;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.cell-type {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding: 2px 4px;
+  background: var(--bg);
+  border-radius: 2px;
+}
+
+.cell-your,
+.cell-correct {
+  font-size: 11px;
+  padding: 4px 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-height: 20px;
+}
+
+.cell-correct {
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.cell-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+}
+
+.status-correct {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.status-correct svg {
+  color: #10b981;
+}
+
+.status-incorrect {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.status-incorrect svg {
+  color: #ef4444;
+}
+
+.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.no-results {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.answer-checker-loading,
+.answer-checker-error,
+.answer-checker-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.answer-checker-error {
+  color: #ef4444;
+}
+
+/* Scrollbar styling */
+.answer-checker::-webkit-scrollbar {
+  width: 5px;
+}
+
+.answer-checker::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.answer-checker::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.answer-checker::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}

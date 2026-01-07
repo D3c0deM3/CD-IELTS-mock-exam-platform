@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import ThemeToggle from "../components/ThemeToggle";
 import MaterialUpload from "../components/MaterialUpload";
+import AnswerChecker from "../components/AnswerChecker";
 import adminService from "../services/adminService";
 import "./AdminDashboard.css";
 
@@ -55,6 +56,7 @@ const AdminDashboard = () => {
     writing_score: "",
     speaking_score: "",
   });
+  const [scoresModalTab, setScoresModalTab] = useState("scores"); // scores or answers
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -623,6 +625,7 @@ const AdminDashboard = () => {
           ? participant.speaking_score
           : "",
     });
+    setScoresModalTab("scores");
     setShowScoresModal(true);
   };
 
@@ -1694,9 +1697,12 @@ const AdminDashboard = () => {
           className="modal-overlay"
           onClick={() => setShowScoresModal(false)}
         >
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal modal-large"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
-              Set Scores for {selectedParticipant.full_name}
+              Participant Details - {selectedParticipant.full_name}
             </div>
             <p
               style={{
@@ -1708,60 +1714,109 @@ const AdminDashboard = () => {
               ID Code:{" "}
               <strong>{selectedParticipant.participant_id_code}</strong>
             </p>
-            <form onSubmit={handleUpdateScores}>
-              <div className="form-group">
-                <label className="form-label">Writing Score (0-9) *</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  min="0"
-                  max="9"
-                  step="0.5"
-                  value={scoresForm.writing_score}
-                  onChange={(e) =>
-                    setScoresForm({
-                      ...scoresForm,
-                      writing_score: e.target.value,
-                    })
-                  }
-                  required
-                />
+
+            {/* Tab Navigation */}
+            <div className="modal-tabs">
+              <button
+                className={`modal-tab ${
+                  scoresModalTab === "scores" ? "active" : ""
+                }`}
+                onClick={() => setScoresModalTab("scores")}
+              >
+                Scores
+              </button>
+              <button
+                className={`modal-tab ${
+                  scoresModalTab === "answers" ? "active" : ""
+                }`}
+                onClick={() => setScoresModalTab("answers")}
+              >
+                Answers
+              </button>
+            </div>
+
+            {/* Scores Tab */}
+            {scoresModalTab === "scores" && (
+              <form onSubmit={handleUpdateScores}>
+                <div className="form-group">
+                  <label className="form-label">Listening Score</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={selectedParticipant.listening_score || 0}
+                    disabled
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Reading Score</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={selectedParticipant.reading_score || 0}
+                    disabled
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Writing Score (0-9) *</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    min="0"
+                    max="9"
+                    step="0.5"
+                    value={scoresForm.writing_score}
+                    onChange={(e) =>
+                      setScoresForm({
+                        ...scoresForm,
+                        writing_score: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Speaking Score (0-9) *</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    min="0"
+                    max="9"
+                    step="0.5"
+                    value={scoresForm.speaking_score}
+                    onChange={(e) =>
+                      setScoresForm({
+                        ...scoresForm,
+                        speaking_score: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowScoresModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loading}
+                  >
+                    Save Scores
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Answers Tab */}
+            {scoresModalTab === "answers" && (
+              <div className="modal-answers-content">
+                <AnswerChecker participant={selectedParticipant} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Speaking Score (0-9) *</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  min="0"
-                  max="9"
-                  step="0.5"
-                  value={scoresForm.speaking_score}
-                  onChange={(e) =>
-                    setScoresForm({
-                      ...scoresForm,
-                      speaking_score: e.target.value,
-                    })
-                  }
-                  required
-                />
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowScoresModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading}
-                >
-                  Save Scores
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}

@@ -185,6 +185,10 @@ const reviewWritingSubmission = (
   );
 };
 
+const getParticipantAnswers = (participant_id) => {
+  return apiClient.get(`${API_URL}/participants/${participant_id}/answers`);
+};
+
 const adminService = {
   // User Management
   getUsers,
@@ -205,6 +209,7 @@ const adminService = {
   registerParticipants,
   getSessionParticipants,
   updateParticipantScores,
+  getParticipantAnswers,
   // Test Management
   createTest,
   getTests,

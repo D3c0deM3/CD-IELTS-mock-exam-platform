@@ -324,6 +324,7 @@ const calculateReadingScore = (userAnswers, testId = 2) => {
 module.exports = {
   loadAnswersKey,
   normalizeText,
+  normalizeAnswer,
   calculateWritingScore,
   calculateListeningScore,
   calculateReadingScore,

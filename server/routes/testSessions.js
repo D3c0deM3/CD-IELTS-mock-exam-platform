@@ -264,9 +264,15 @@ router.post("/check-in-participant", async (req, res) => {
   }
 
   try {
+    // Extract client IP address (handles proxies and load balancers)
+    const clientIP =
+      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.socket.remoteAddress ||
+      "unknown";
+
     // Find participant by ID code
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, ts.test_id, t.name as test_name, ts.admin_notes
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.participant_status, tp.ip_address, tp.device_locked_at, ts.test_id, t.name as test_name, ts.admin_notes
        FROM test_participants tp
        JOIN test_sessions ts ON tp.session_id = ts.id
        JOIN tests t ON ts.test_id = t.id
@@ -283,6 +289,26 @@ router.post("/check-in-participant", async (req, res) => {
 
     const participant = participantRows[0];
 
+    // Check if participant code has already been used (expired)
+    if (participant.participant_status === "expired") {
+      return res.status(403).json({
+        error:
+          "This participant ID code has already been used and is no longer valid. Each ID code can only be used once.",
+      });
+    }
+
+    // Check device/IP locking: Only one device (IP) per participant code
+    if (participant.participant_status === "in_progress") {
+      // Code is already being used
+      if (participant.ip_address && participant.ip_address !== clientIP) {
+        // Different IP trying to use the same code
+        return res.status(403).json({
+          error:
+            "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
+        });
+      }
+    }
+
     // Verify that the participant's name matches the logged-in user's name
     // Both must match exactly (after trimming whitespace and converting to lowercase)
     const registeredName = (participant.full_name || "").trim().toLowerCase();
@@ -295,10 +321,10 @@ router.post("/check-in-participant", async (req, res) => {
       });
     }
 
-    // Update check-in status
+    // Update check-in status and mark as in_progress, storing the IP address
     await db.execute(
-      "UPDATE test_participants SET has_entered_startscreen = 1, entered_at = NOW() WHERE id = ?",
-      [participant.id]
+      "UPDATE test_participants SET has_entered_startscreen = 1, entered_at = NOW(), participant_status = 'in_progress', status_updated_at = NOW(), ip_address = ?, device_locked_at = NOW() WHERE id = ?",
+      [clientIP, participant.id]
     );
 
     // Extract test_materials_id from admin_notes if available
@@ -491,6 +517,54 @@ router.post("/submit-listening", async (req, res) => {
     const { rawScore: listeningRawScore, bandScore: listeningBandScore } =
       calculateListeningScore(listening_answers, testMaterialsId);
 
+    // Load the answer key to get correct answers for each question
+    const answersKey = require("../utils/scoreCalculator").loadAnswersKey(
+      testMaterialsId
+    );
+    const correctAnswers = answersKey.answers.listening;
+
+    // Get session_id and participant_id_code
+    const [sessionData] = await db.execute(
+      "SELECT session_id, participant_id_code FROM test_participants WHERE id = ?",
+      [participant_id]
+    );
+    const sessionId = sessionData[0].session_id;
+    const participantIdCode = sessionData[0].participant_id_code;
+
+    // Save listening answers to database with correctness check
+    const { normalizeAnswer } = require("../utils/scoreCalculator");
+    for (const question of correctAnswers) {
+      const userAnswer = listening_answers[question.question] || "";
+      const isCorrect =
+        normalizeAnswer(userAnswer) === normalizeAnswer(question.answer);
+
+      try {
+        await db.execute(
+          `INSERT INTO participant_answers 
+           (session_id, participant_id, participant_id_code, full_name, section_type, question_number, user_answer, correct_answer, is_correct, submitted_at)
+           VALUES (?, ?, ?, ?, 'listening', ?, ?, ?, ?, NOW())
+           ON DUPLICATE KEY UPDATE
+           user_answer = ?, correct_answer = ?, is_correct = ?, submitted_at = NOW()`,
+          [
+            sessionId,
+            participant_id,
+            participantIdCode,
+            full_name,
+            question.question,
+            userAnswer,
+            question.answer,
+            isCorrect ? 1 : 0,
+            userAnswer,
+            question.answer,
+            isCorrect ? 1 : 0,
+          ]
+        );
+      } catch (err) {
+        console.error("Error saving answer:", err);
+        // Continue saving other answers even if one fails
+      }
+    }
+
     // Save raw listening score to database (for admin dashboard display)
     await db.execute(
       `UPDATE test_participants 
@@ -565,6 +639,54 @@ router.post("/submit-reading", async (req, res) => {
     // Calculate reading score using the correct test materials' answer key
     const { rawScore: readingRawScore, bandScore: readingBandScore } =
       calculateReadingScore(reading_answers, testMaterialsId);
+
+    // Load the answer key to get correct answers for each question
+    const answersKey = require("../utils/scoreCalculator").loadAnswersKey(
+      testMaterialsId
+    );
+    const correctAnswers = answersKey.answers.reading;
+
+    // Get session_id and participant_id_code
+    const [sessionData] = await db.execute(
+      "SELECT session_id, participant_id_code FROM test_participants WHERE id = ?",
+      [participant_id]
+    );
+    const sessionId = sessionData[0].session_id;
+    const participantIdCode = sessionData[0].participant_id_code;
+
+    // Save reading answers to database with correctness check
+    const { normalizeAnswer } = require("../utils/scoreCalculator");
+    for (const question of correctAnswers) {
+      const userAnswer = reading_answers[question.question] || "";
+      const isCorrect =
+        normalizeAnswer(userAnswer) === normalizeAnswer(question.answer);
+
+      try {
+        await db.execute(
+          `INSERT INTO participant_answers 
+           (session_id, participant_id, participant_id_code, full_name, section_type, question_number, user_answer, correct_answer, is_correct, submitted_at)
+           VALUES (?, ?, ?, ?, 'reading', ?, ?, ?, ?, NOW())
+           ON DUPLICATE KEY UPDATE
+           user_answer = ?, correct_answer = ?, is_correct = ?, submitted_at = NOW()`,
+          [
+            sessionId,
+            participant_id,
+            participantIdCode,
+            full_name,
+            question.question,
+            userAnswer,
+            question.answer,
+            isCorrect ? 1 : 0,
+            userAnswer,
+            question.answer,
+            isCorrect ? 1 : 0,
+          ]
+        );
+      } catch (err) {
+        console.error("Error saving answer:", err);
+        // Continue saving other answers even if one fails
+      }
+    }
 
     // Save raw reading score to database (for admin dashboard display)
     await db.execute(
@@ -672,9 +794,13 @@ router.post("/submit-writing", async (req, res) => {
     );
 
     // Update test_participants with writing score status (0 = pending review)
+    // Also mark participant_status as 'expired' since all tests are now complete
     await db.execute(
       `UPDATE test_participants 
        SET writing_score = 0,
+           participant_status = 'expired',
+           status_updated_at = NOW(),
+           test_completed_at = NOW(),
            updated_at = NOW()
        WHERE id = ?`,
       [participant.id]

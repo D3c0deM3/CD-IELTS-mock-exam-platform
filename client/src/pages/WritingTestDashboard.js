@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
+import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
+import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import "./WritingTestDashboard.css";
 import testDataJson2 from "./mock_2.json";
 import testDataJson3 from "./mock_3.json";
@@ -355,8 +357,11 @@ const WritingTestDashboard = () => {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";
   });
-  const [answers, setAnswers] = useState({});
-  const [timeRemaining, setTimeRemaining] = useState(60 * 60); // 60 minutes
+  const [answers, setAnswers] = useAnswersWithStorage("writing_answers");
+  const [timeRemaining, setTimeRemaining] = useTimerWithStorage(
+    60 * 60,
+    "writing_timer"
+  ); // 60 minutes
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
@@ -741,6 +746,22 @@ const WritingTestDashboard = () => {
 
       const result = await response.json();
       console.log("Writing submission response:", result);
+
+      // Clear ALL localStorage keys after successful submission of final test
+      // Listening test keys
+      localStorage.removeItem("listening_answers");
+      localStorage.removeItem("listening_audio_state");
+      localStorage.removeItem("listening_timer");
+
+      // Reading test keys
+      localStorage.removeItem("reading_answers");
+      localStorage.removeItem("reading_timer");
+
+      // Writing test keys
+      localStorage.removeItem("writing_answers");
+      localStorage.removeItem("writing_timer");
+
+      console.log("✓ All test data cleared from localStorage");
 
       setShowSubmitConfirm(false);
 
