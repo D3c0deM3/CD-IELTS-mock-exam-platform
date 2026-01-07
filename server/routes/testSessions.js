@@ -297,18 +297,6 @@ router.post("/check-in-participant", async (req, res) => {
       });
     }
 
-    // Check device/IP locking: Only one device (IP) per participant code
-    if (participant.participant_status === "in_progress") {
-      // Code is already being used
-      if (participant.ip_address && participant.ip_address !== clientIP) {
-        // Different IP trying to use the same code
-        return res.status(403).json({
-          error:
-            "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
-        });
-      }
-    }
-
     // Verify that the participant's name matches the logged-in user's name
     // Both must match exactly (after trimming whitespace and converting to lowercase)
     const registeredName = (participant.full_name || "").trim().toLowerCase();
@@ -321,11 +309,43 @@ router.post("/check-in-participant", async (req, res) => {
       });
     }
 
+    // Check device/IP locking: Only one device (IP) per participant code
+    // This applies to both first entry (unused→in_progress) and continued access (in_progress)
+    if (participant.ip_address && participant.ip_address !== clientIP) {
+      // Code already has a different IP locked - reject this request
+      return res.status(403).json({
+        error:
+          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
+      });
+    }
+
     // Update check-in status and mark as in_progress, storing the IP address
+    // Using ON DUPLICATE KEY UPDATE ensures atomicity for first-entry race condition protection
     await db.execute(
-      "UPDATE test_participants SET has_entered_startscreen = 1, entered_at = NOW(), participant_status = 'in_progress', status_updated_at = NOW(), ip_address = ?, device_locked_at = NOW() WHERE id = ?",
-      [clientIP, participant.id]
+      `UPDATE test_participants 
+       SET has_entered_startscreen = 1, 
+           entered_at = COALESCE(entered_at, NOW()),
+           participant_status = 'in_progress', 
+           status_updated_at = NOW(), 
+           ip_address = ?,
+           device_locked_at = COALESCE(device_locked_at, NOW())
+       WHERE id = ? AND (ip_address IS NULL OR ip_address = ?)`,
+      [clientIP, participant.id, clientIP]
     );
+
+    // Verify the update succeeded - if WHERE clause filtered us out, IP was different
+    const [updateCheck] = await db.execute(
+      "SELECT ip_address FROM test_participants WHERE id = ? AND ip_address = ?",
+      [participant.id, clientIP]
+    );
+
+    if (updateCheck.length === 0) {
+      // Update failed - means a different IP got there first
+      return res.status(403).json({
+        error:
+          "This participant ID code is currently in use on another device. Only one device can use a participant ID code at a time. If you believe this is an error, contact your test administrator.",
+      });
+    }
 
     // Extract test_materials_id from admin_notes if available
     let test_materials_id = 2; // Default to mock 2
