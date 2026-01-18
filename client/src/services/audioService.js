@@ -3,6 +3,9 @@
  * Supports multiple test audio files with dynamic loading based on test_id
  */
 
+import API_CONFIG from "../config/api";
+import { apiClient } from "./api";
+
 // Import all available audio files
 import listeningAudio from "../pages/listening_test.mp3";
 import listeningAudio3 from "../pages/listening_test3.mp3";
@@ -30,6 +33,29 @@ const getAudioFileForTest = (testMaterialsId) => {
       );
       return listeningAudio;
   }
+};
+
+const resolveAudioUrl = (audioUrl) => {
+  if (!audioUrl) return audioUrl;
+  if (audioUrl.startsWith("http")) return audioUrl;
+  if (audioUrl.startsWith("/uploads")) {
+    return `${API_CONFIG.BASE_URL}${audioUrl}`;
+  }
+  return audioUrl;
+};
+
+const getRemoteAudioUrl = async (testMaterialsId) => {
+  try {
+    const response = await apiClient.get(
+      `/api/materials/sets/${testMaterialsId}/audio`
+    );
+    if (response?.audio_file_url) {
+      return resolveAudioUrl(response.audio_file_url);
+    }
+  } catch (err) {
+    return null;
+  }
+  return null;
 };
 
 /**
@@ -74,6 +100,12 @@ export const preloadAudio = async (testMaterialsId) => {
   isPreloading = true;
   currentTestId = test;
 
+  let resolvedAudioUrl = getAudioFileForTest(test);
+  const remoteAudioUrl = await getRemoteAudioUrl(test);
+  if (remoteAudioUrl) {
+    resolvedAudioUrl = remoteAudioUrl;
+  }
+
   preloadPromise = new Promise((resolve, reject) => {
     try {
       const audio = new Audio();
@@ -82,8 +114,8 @@ export const preloadAudio = async (testMaterialsId) => {
       audio.controlsList = "nodownload";
       audio.crossOrigin = "anonymous";
 
-      // Get the correct audio file for this test
-      const audioUrl = getAudioFileForTest(test);
+      // Get the correct audio file for this test (DB first, local fallback)
+      const audioUrl = resolvedAudioUrl;
 
       // Load metadata to get duration
       const handleLoadedMetadata = () => {

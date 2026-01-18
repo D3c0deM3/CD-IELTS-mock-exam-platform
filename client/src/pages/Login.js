@@ -177,9 +177,12 @@ const Login = () => {
           <span>Don't have an account?</span>
         </div>
 
-        <Link to="/register" className="btn btn-secondary btn-block">
-          Create Account
-        </Link>
+        <div className="auth-footer">
+          Create one now
+          <Link to="/register" className="auth-link">
+            Create Account →
+          </Link>
+        </div>
       </form>
     </AuthLayout>
   );

@@ -88,21 +88,35 @@ router.delete("/users/:id", async (req, res) => {
 // GET /api/admin/test-materials - Get available test materials (mocks)
 router.get("/test-materials", async (req, res) => {
   try {
+    const [rows] = await db.execute(
+      `SELECT ms.id, ms.test_id, ms.name, t.name AS test_name
+       FROM test_material_sets ms
+       JOIN tests t ON ms.test_id = t.id
+       ORDER BY ms.updated_at DESC`
+    );
+
+    if (rows.length > 0) {
+      return res.json({
+        materials: rows.map((row) => ({
+          mock_id: row.id,
+          name: row.name,
+          test_id: row.test_id,
+          test_name: row.test_name,
+        })),
+      });
+    }
+
     const fs = require("fs");
     const path = require("path");
 
-    // Check what answer files exist in the routes directory
-    // This tells us what test materials are available
+    // Fallback to file-based materials if DB has none
     const routesDir = path.join(__dirname, "./");
     const files = fs.readdirSync(routesDir);
-
     const materials = [];
 
-    // Look for answers_*.json files to determine available materials
-    // answers.json = mock 2, answers_3.json = mock 3, etc.
     files.forEach((file) => {
       if (file.startsWith("answers") && file.endsWith(".json")) {
-        let mockId = 2; // default
+        let mockId = 2;
         let mockName = "Mock 2 - Authentic Test 1";
 
         if (file === "answers.json") {
@@ -112,7 +126,6 @@ router.get("/test-materials", async (req, res) => {
           mockId = 3;
           mockName = "Mock 3 - Authentic Test 2";
         } else {
-          // Parse other answer files like answers_4.json, answers_5.json, etc.
           const match = file.match(/answers_(\d+)\.json/);
           if (match) {
             mockId = parseInt(match[1]);
@@ -128,7 +141,6 @@ router.get("/test-materials", async (req, res) => {
       }
     });
 
-    // Sort by mock_id
     materials.sort((a, b) => a.mock_id - b.mock_id);
 
     res.json({

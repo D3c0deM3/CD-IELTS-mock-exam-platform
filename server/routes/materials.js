@@ -9,6 +9,24 @@ const authMiddleware = require("../middleware/auth");
 const { PythonShell } = require("python-shell");
 // Store last conversion result for debugging
 let lastConversionResult = null;
+
+const ensureAdmin = async (req, res, next) => {
+  try {
+    const [user] = await db.execute("SELECT role FROM users WHERE id = ?", [
+      req.user.id,
+    ]);
+
+    if (user.length === 0 || user[0].role !== "admin") {
+      return res.status(403).json({ error: "Only admins can perform this action" });
+    }
+
+    return next();
+  } catch (err) {
+    console.error("Admin check error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // Configure multer for material uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -35,6 +53,42 @@ const upload = multer({
   fileFilter,
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
 });
+
+const audioStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, "../uploads/audio");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}_${uuidv4()}_${file.originalname}`;
+    cb(null, uniqueName);
+  },
+});
+
+const audioUpload = multer({
+  storage: audioStorage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+});
+
+const normalizeJsonInput = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = JSON.parse(value);
+    return JSON.stringify(parsed);
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  throw new Error("Invalid JSON input");
+};
 
 // POST /api/materials/upload - Upload material file
 router.post(
@@ -274,6 +328,364 @@ router.post(
     }
   }
 );
+
+// GET /api/materials/sets - List material sets (admin)
+router.get("/sets", authMiddleware, ensureAdmin, async (req, res) => {
+  const { test_id } = req.query;
+
+  try {
+    let query = `
+      SELECT 
+        ms.id,
+        ms.test_id,
+        t.name AS test_name,
+        ms.name,
+        ms.audio_file_url,
+        ms.audio_file_size,
+        ms.updated_at,
+        (ms.content_json IS NOT NULL AND ms.content_json <> '') AS has_content,
+        (ms.answer_key_json IS NOT NULL AND ms.answer_key_json <> '') AS has_answers
+      FROM test_material_sets ms
+      JOIN tests t ON ms.test_id = t.id
+    `;
+    const params = [];
+
+    if (test_id) {
+      query += " WHERE ms.test_id = ?";
+      params.push(test_id);
+    }
+
+    query += " ORDER BY ms.updated_at DESC";
+
+    const [rows] = await db.execute(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching material sets:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/materials/sets/:setId - Get material set details (admin)
+router.get("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
+  const { setId } = req.params;
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT 
+        ms.id,
+        ms.test_id,
+        t.name AS test_name,
+        ms.name,
+        ms.content_json,
+        ms.answer_key_json,
+        ms.audio_file_name,
+        ms.audio_file_url,
+        ms.audio_file_size,
+        ms.updated_at
+       FROM test_material_sets ms
+       JOIN tests t ON ms.test_id = t.id
+       WHERE ms.id = ?`,
+      [setId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Material set not found" });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error fetching material set:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/materials/sets/:setId/content - Get content JSON (auth)
+router.get("/sets/:setId/content", authMiddleware, async (req, res) => {
+  const { setId } = req.params;
+
+  try {
+    const [rows] = await db.execute(
+      "SELECT content_json FROM test_material_sets WHERE id = ?",
+      [setId]
+    );
+
+    if (rows.length === 0 || !rows[0].content_json) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    const content = JSON.parse(rows[0].content_json);
+    res.json({ content });
+  } catch (err) {
+    console.error("Error fetching content JSON:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/materials/sets/:setId/answers - Get answer key JSON (auth)
+router.get("/sets/:setId/answers", authMiddleware, async (req, res) => {
+  const { setId } = req.params;
+
+  try {
+    const [rows] = await db.execute(
+      "SELECT answer_key_json FROM test_material_sets WHERE id = ?",
+      [setId]
+    );
+
+    if (rows.length === 0 || !rows[0].answer_key_json) {
+      return res.status(404).json({ error: "Answer key not found" });
+    }
+
+    const answers = JSON.parse(rows[0].answer_key_json);
+    res.json({ answers });
+  } catch (err) {
+    console.error("Error fetching answer key JSON:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/materials/sets/:setId/audio - Get audio metadata (auth)
+router.get("/sets/:setId/audio", authMiddleware, async (req, res) => {
+  const { setId } = req.params;
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT audio_file_name, audio_file_url, audio_file_size 
+       FROM test_material_sets 
+       WHERE id = ?`,
+      [setId]
+    );
+
+    if (rows.length === 0 || !rows[0].audio_file_url) {
+      return res.status(404).json({ error: "Audio not found" });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error fetching audio metadata:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/materials/sets - Create material set (admin)
+router.post("/sets", authMiddleware, ensureAdmin, async (req, res) => {
+  const { test_id, name, content_json, answer_key_json } = req.body;
+
+  if (!test_id || !name) {
+    return res.status(400).json({ error: "test_id and name are required" });
+  }
+
+  let contentJsonValue = null;
+  let answersJsonValue = null;
+
+  try {
+    contentJsonValue = normalizeJsonInput(content_json);
+    answersJsonValue = normalizeJsonInput(answer_key_json);
+  } catch (err) {
+    return res.status(400).json({ error: "Invalid JSON format" });
+  }
+
+  try {
+    const [testExists] = await db.execute(
+      "SELECT id FROM tests WHERE id = ?",
+      [test_id]
+    );
+
+    if (testExists.length === 0) {
+      return res.status(404).json({ error: "Test not found" });
+    }
+
+    const [result] = await db.execute(
+      `INSERT INTO test_material_sets
+       (test_id, name, content_json, answer_key_json, uploaded_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+      [test_id, name, contentJsonValue, answersJsonValue, req.user.id]
+    );
+
+    res.json({
+      id: result.insertId,
+      test_id,
+      name,
+      has_content: Boolean(contentJsonValue),
+      has_answers: Boolean(answersJsonValue),
+    });
+  } catch (err) {
+    console.error("Error creating material set:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/materials/sets/:setId - Update material set (admin)
+router.put("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
+  const { setId } = req.params;
+  const { name, content_json, answer_key_json } = req.body;
+
+  const updates = [];
+  const params = [];
+
+  try {
+    if (name !== undefined) {
+      updates.push("name = ?");
+      params.push(name);
+    }
+
+    if (content_json !== undefined) {
+      if (content_json === "" || content_json === null) {
+        updates.push("content_json = NULL");
+      } else {
+        updates.push("content_json = ?");
+        params.push(normalizeJsonInput(content_json));
+      }
+    }
+
+    if (answer_key_json !== undefined) {
+      if (answer_key_json === "" || answer_key_json === null) {
+        updates.push("answer_key_json = NULL");
+      } else {
+        updates.push("answer_key_json = ?");
+        params.push(normalizeJsonInput(answer_key_json));
+      }
+    }
+  } catch (err) {
+    return res.status(400).json({ error: "Invalid JSON format" });
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No updates provided" });
+  }
+
+  try {
+    const query = `UPDATE test_material_sets SET ${updates.join(
+      ", "
+    )}, updated_at = NOW() WHERE id = ?`;
+    params.push(setId);
+
+    const [result] = await db.execute(query, params);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Material set not found" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error updating material set:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/materials/sets/:setId/audio - Upload audio file (admin)
+router.post(
+  "/sets/:setId/audio",
+  authMiddleware,
+  ensureAdmin,
+  audioUpload.single("file"),
+  async (req, res) => {
+    const { setId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file provided" });
+    }
+
+    const audioTypes = [
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/x-m4a",
+      "audio/aac",
+    ];
+
+    if (!audioTypes.includes(req.file.mimetype)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        error: "Only audio files (MP3, WAV, OGG, M4A) are allowed",
+      });
+    }
+
+    try {
+      const [existing] = await db.execute(
+        "SELECT audio_file_path FROM test_material_sets WHERE id = ?",
+        [setId]
+      );
+
+      if (existing.length === 0) {
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ error: "Material set not found" });
+      }
+
+      if (existing[0].audio_file_path && fs.existsSync(existing[0].audio_file_path)) {
+        fs.unlinkSync(existing[0].audio_file_path);
+      }
+
+      const fileUrl = `/uploads/audio/${req.file.filename}`;
+
+      await db.execute(
+        `UPDATE test_material_sets
+         SET audio_file_name = ?, audio_file_path = ?, audio_file_url = ?, audio_file_size = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [req.file.originalname, req.file.path, fileUrl, req.file.size, setId]
+      );
+
+      res.json({
+        success: true,
+        audio_file_url: fileUrl,
+        audio_file_name: req.file.originalname,
+        audio_file_size: req.file.size,
+      });
+    } catch (err) {
+      console.error("Audio upload error:", err);
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// DELETE /api/materials/sets/:setId - Delete material set and audio (admin)
+router.delete("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
+  const { setId } = req.params;
+
+  try {
+    const [rows] = await db.execute(
+      "SELECT test_id, audio_file_path FROM test_material_sets WHERE id = ?",
+      [setId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Material set not found" });
+    }
+
+    const { test_id: testId, audio_file_path: audioPath } = rows[0];
+    if (audioPath && fs.existsSync(audioPath)) {
+      fs.unlinkSync(audioPath);
+    }
+
+    const [materials] = await db.execute(
+      "SELECT id, file_path FROM test_materials WHERE test_id = ?",
+      [testId]
+    );
+
+    for (const material of materials) {
+      if (material.file_path && fs.existsSync(material.file_path)) {
+        fs.unlinkSync(material.file_path);
+      }
+    }
+
+    if (materials.length > 0) {
+      await db.execute("DELETE FROM test_materials WHERE test_id = ?", [testId]);
+    }
+
+    await db.execute("DELETE FROM test_material_sets WHERE id = ?", [setId]);
+
+    res.json({
+      success: true,
+      deleted_material_files: materials.length,
+    });
+  } catch (err) {
+    console.error("Error deleting material set:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // GET /api/materials/test/:testId - Get materials for a test
 router.get("/test/:testId", authMiddleware, async (req, res) => {

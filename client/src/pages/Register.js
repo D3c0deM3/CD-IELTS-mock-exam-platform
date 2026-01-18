@@ -156,7 +156,7 @@ const Register = () => {
             <div className="success-checkmark">✓</div>
           </div>
           <h2 className="success-title">Account Created!</h2>
-          <p className="success-message">
+          <p className="auth-success-message">
             Your account has been successfully created. Redirecting you to
             dashboard...
           </p>

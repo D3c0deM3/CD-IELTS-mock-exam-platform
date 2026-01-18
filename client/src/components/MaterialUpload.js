@@ -1,271 +1,400 @@
-import React, { useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import API_CONFIG from "../config/api";
 import { apiClient } from "../services/api";
 import "./MaterialUpload.css";
 
+const contentSample = `{
+  "metadata": {
+    "source": "mock_2.pdf",
+    "test_type": "IELTS Academic"
+  },
+  "test_info": {
+    "title": "IELTS Academic Practice Test",
+    "total_questions": 82
+  },
+  "sections": [
+    {
+      "type": "listening",
+      "section_number": 1,
+      "parts": []
+    },
+    {
+      "type": "reading",
+      "section_number": 1,
+      "passages": []
+    },
+    {
+      "title": "Writing",
+      "tasks": []
+    }
+  ]
+}`;
+
+const answersSample = `{
+  "test": "Authentic test 1",
+  "answers": {
+    "listening": [
+      { "question": 1, "answer": "Freezer" }
+    ],
+    "reading": [
+      { "question": 1, "answer": "NG" }
+    ]
+  }
+}`;
+
 const MaterialUpload = () => {
-  const [activeTab, setActiveTab] = useState("passages"); // passages, answers, audio
-  const [selectedTest, setSelectedTest] = useState("");
+  const [activeTab, setActiveTab] = useState("content");
   const [tests, setTests] = useState([]);
   const [testsLoading, setTestsLoading] = useState(true);
-  const [file, setFile] = useState(null);
-  const [materialName, setMaterialName] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [uploadedMaterials, setUploadedMaterials] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [selectedTest, setSelectedTest] = useState("");
+  const [materialSets, setMaterialSets] = useState([]);
+  const [setsLoading, setSetsLoading] = useState(false);
+  const [selectedSetId, setSelectedSetId] = useState("");
+  const [setName, setSetName] = useState("");
+  const [contentJson, setContentJson] = useState("");
+  const [answerJson, setAnswerJson] = useState("");
+  const [audioFile, setAudioFile] = useState(null);
+  const [audioMeta, setAudioMeta] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [isDeletingSet, setIsDeletingSet] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  // Fetch tests on component mount
-  React.useEffect(() => {
+  const refreshSets = async (testId) => {
+    if (!testId) return;
+    setSetsLoading(true);
+    try {
+      const response = await apiClient.get(
+        `/api/materials/sets?test_id=${testId}`
+      );
+      setMaterialSets(response);
+    } catch (err) {
+      setMaterialSets([]);
+    } finally {
+      setSetsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchTests = async () => {
+      setTestsLoading(true);
+      try {
+        const response = await apiClient.get("/api/tests");
+        setTests(response);
+      } catch (err) {
+        setError("Failed to load tests.");
+        setTests([]);
+      } finally {
+        setTestsLoading(false);
+      }
+    };
+
     fetchTests();
   }, []);
 
-  const fetchTests = async () => {
-    setTestsLoading(true);
-    try {
-      const response = await apiClient.get("/api/tests");
-      console.log("Tests fetched:", response);
-      setTests(response);
-      setError(null);
-    } catch (err) {
-      console.error("Failed to fetch tests:", err);
-      setError("Failed to load tests. Please refresh the page.");
-      setTests([]);
-    } finally {
-      setTestsLoading(false);
+  useEffect(() => {
+    if (!selectedTest) {
+      setMaterialSets([]);
+      setSelectedSetId("");
+      setSetName("");
+      setContentJson("");
+      setAnswerJson("");
+      setAudioMeta(null);
+      setAudioFile(null);
+      return;
     }
-  };
 
-  const fetchMaterials = useCallback(
-    async (testId) => {
-      setLoading(true);
+    refreshSets(selectedTest);
+  }, [selectedTest]);
+
+  useEffect(() => {
+    const fetchSetDetails = async () => {
+    if (!selectedSetId) {
+      setSetName("");
+      setContentJson("");
+      setAnswerJson("");
+      setAudioMeta(null);
+      setAudioFile(null);
+      return;
+    }
+
       try {
         const response = await apiClient.get(
-          `/api/materials/test/${testId}?type=${activeTab}`
+          `/api/materials/sets/${selectedSetId}`
         );
-        setUploadedMaterials(response);
+
+        setSetName(response.name || "");
+
+        if (response.content_json) {
+          try {
+            const parsed = JSON.parse(response.content_json);
+            setContentJson(JSON.stringify(parsed, null, 2));
+          } catch {
+            setContentJson(response.content_json);
+          }
+        } else {
+          setContentJson("");
+        }
+
+        if (response.answer_key_json) {
+          try {
+            const parsed = JSON.parse(response.answer_key_json);
+            setAnswerJson(JSON.stringify(parsed, null, 2));
+          } catch {
+            setAnswerJson(response.answer_key_json);
+          }
+        } else {
+          setAnswerJson("");
+        }
+
+        if (response.audio_file_url) {
+          setAudioMeta({
+            name: response.audio_file_name,
+            url: response.audio_file_url,
+            size: response.audio_file_size,
+          });
+        } else {
+          setAudioMeta(null);
+        }
       } catch (err) {
-        console.error("Failed to fetch materials:", err);
-        setUploadedMaterials([]);
-      } finally {
-        setLoading(false);
+        setError("Failed to load material set details.");
       }
-    },
-    [activeTab]
+    };
+
+    fetchSetDetails();
+  }, [selectedSetId]);
+
+  const clearMessages = () => {
+    setError("");
+    setSuccess("");
+  };
+
+  const handleJsonFile = (file, setter) => {
+    if (!file) return;
+    clearMessages();
+
+    if (file.type !== "application/json") {
+      setError("Only JSON files are supported.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        setter(JSON.stringify(parsed, null, 2));
+      } catch (err) {
+        setError("Invalid JSON file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const validateContent = (jsonText) => {
+    const parsed = JSON.parse(jsonText);
+    const hasSections = Array.isArray(parsed.sections);
+    const hasTestInfo = parsed.test_info && parsed.test_info.title;
+    if (!hasSections || !hasTestInfo) {
+      throw new Error(
+        "Content JSON must include test_info and sections arrays."
+      );
+    }
+    return parsed;
+  };
+
+  const validateAnswers = (jsonText) => {
+    const parsed = JSON.parse(jsonText);
+    const hasListening = Array.isArray(parsed?.answers?.listening);
+    const hasReading = Array.isArray(parsed?.answers?.reading);
+    if (!hasListening || !hasReading) {
+      throw new Error("Answer JSON must include answers.listening/reading.");
+    }
+    return parsed;
+  };
+
+  const upsertSet = async (payload) => {
+    if (!selectedTest) {
+      throw new Error("Select a test before saving materials.");
+    }
+
+    if (!setName.trim()) {
+      throw new Error("Set name is required.");
+    }
+
+    if (!selectedSetId) {
+      const response = await apiClient.post("/api/materials/sets", {
+        test_id: selectedTest,
+        name: setName.trim(),
+        ...payload,
+      });
+      setSelectedSetId(String(response.id));
+      await refreshSets(selectedTest);
+      return response.id;
+    }
+
+    await apiClient.put(`/api/materials/sets/${selectedSetId}`, {
+      name: setName.trim(),
+      ...payload,
+    });
+    await refreshSets(selectedTest);
+    return selectedSetId;
+  };
+
+  const handleSaveContent = async () => {
+    clearMessages();
+    if (!contentJson.trim()) {
+      setError("Content JSON is required.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      validateContent(contentJson);
+      await upsertSet({ content_json: contentJson });
+      setSuccess("Content saved successfully.");
+    } catch (err) {
+      setError(err.message || "Failed to save content.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAnswers = async () => {
+    clearMessages();
+    if (!answerJson.trim()) {
+      setError("Answer key JSON is required.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      validateAnswers(answerJson);
+      await upsertSet({ answer_key_json: answerJson });
+      setSuccess("Answer keys saved successfully.");
+    } catch (err) {
+      setError(err.message || "Failed to save answer keys.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAudioUpload = async () => {
+    clearMessages();
+    if (!audioFile) {
+      setError("Select an audio file to upload.");
+      return;
+    }
+
+    setIsUploadingAudio(true);
+    try {
+      let targetSetId = selectedSetId;
+
+      if (!targetSetId) {
+        if (!canSave) {
+          setError("Select a test and provide a set name before uploading.");
+          setIsUploadingAudio(false);
+          return;
+        }
+        targetSetId = String(await upsertSet({}));
+      }
+
+      const formData = new FormData();
+      formData.append("file", audioFile);
+      const token = localStorage.getItem("accessToken");
+      const response = await axios.post(
+        `${API_CONFIG.BASE_URL}/api/materials/sets/${targetSetId}/audio`,
+        formData,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        }
+      );
+      setAudioMeta({
+        name: response.data.audio_file_name,
+        url: response.data.audio_file_url,
+        size: response.data.audio_file_size,
+      });
+      setAudioFile(null);
+      setSuccess("Audio uploaded successfully.");
+      await refreshSets(selectedTest);
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.error ||
+          err?.message ||
+          "Failed to upload audio."
+      );
+    } finally {
+      setIsUploadingAudio(false);
+    }
+  };
+
+  const handleDeleteSet = async () => {
+    if (!selectedSetId) return;
+    if (
+      !window.confirm(
+        "Delete this material set and all tied material files (including audio)?"
+      )
+    )
+      return;
+
+    clearMessages();
+    setIsDeletingSet(true);
+    try {
+      await apiClient.delete(`/api/materials/sets/${selectedSetId}`);
+      setSuccess("Material set and files deleted.");
+      setSelectedSetId("");
+      setSetName("");
+      setContentJson("");
+      setAnswerJson("");
+      setAudioMeta(null);
+      setAudioFile(null);
+      await refreshSets(selectedTest);
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.error ||
+          err?.message ||
+          "Failed to delete material set."
+      );
+    } finally {
+      setIsDeletingSet(false);
+    }
+  };
+
+  const canSave = useMemo(
+    () => selectedTest && setName.trim().length > 0,
+    [selectedTest, setName]
   );
 
-  // Fetch materials when selected test changes
-  React.useEffect(() => {
-    if (selectedTest) {
-      fetchMaterials(selectedTest);
-    }
-  }, [selectedTest, activeTab, fetchMaterials]);
-
-  const getAcceptedFileTypes = () => {
-    switch (activeTab) {
-      case "passages":
-        return ".pdf";
-      case "answers":
-        return ".pdf";
-      case "audio":
-        return "audio/*";
-      default:
-        return "";
-    }
-  };
-
-  const handleFileChange = (event) => {
-    const selectedFile = event.target.files[0];
-    if (selectedFile) {
-      // Validate file type
-      const isValidType = validateFileType(selectedFile);
-      if (!isValidType) {
-        setError(
-          `Invalid file type. Expected ${getAcceptedFileTypes().toUpperCase()}`
-        );
-        setFile(null);
-        return;
-      }
-
-      // Validate file size (100MB max)
-      if (selectedFile.size > 100 * 1024 * 1024) {
-        setError("File size exceeds 100MB limit");
-        setFile(null);
-        return;
-      }
-
-      setFile(selectedFile);
-      setError(null);
-    }
-  };
-
-  const validateFileType = (file) => {
-    if (activeTab === "passages" || activeTab === "answers") {
-      return file.type === "application/pdf";
-    } else if (activeTab === "audio") {
-      return file.type.startsWith("audio/");
-    }
-    return false;
-  };
-
-  const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a file");
-      return;
-    }
-
-    if (!selectedTest) {
-      setError("Please select a test");
-      return;
-    }
-
-    if (!materialName.trim()) {
-      setError("Please enter a material name");
-      return;
-    }
-
-    setIsUploading(true);
-    setError(null);
-    setSuccess(null);
-    setUploadProgress(0);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("test_id", selectedTest);
-    formData.append("name", materialName);
-    formData.append("type", activeTab);
-
-    try {
-      const response = await apiClient.post("/api/materials/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        timeout: 120000, // 2 minutes for PDF conversion
-        onUploadProgress: (progressEvent) => {
-          const progress = Math.round(
-            (progressEvent.loaded / progressEvent.total) * 100
-          );
-          setUploadProgress(progress);
-        },
-      });
-
-      let successMessage = `Material uploaded successfully!`;
-
-      // Show conversion info if PDF was converted
-      if (response.conversion && response.conversion.success) {
-        successMessage += ` PDF converted with ${(
-          response.conversion.confidence * 100
-        ).toFixed(0)}% confidence.`;
-      }
-
-      setSuccess(successMessage);
-      setFile(null);
-      setMaterialName("");
-      setUploadProgress(0);
-
-      // Refresh materials list
-      fetchMaterials(selectedTest);
-
-      // Clear success message after 5 seconds (longer for conversion info)
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (err) {
-      console.error("Upload error details:", err);
-      const errorMsg =
-        err?.error || err?.message || "Upload failed. Please try again.";
-      setError(errorMsg);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDeleteMaterial = async (materialId) => {
-    if (window.confirm("Are you sure you want to delete this material?")) {
-      try {
-        await apiClient.delete(`/api/materials/${materialId}`);
-        setSuccess("Material deleted successfully");
-        fetchMaterials(selectedTest);
-        setTimeout(() => setSuccess(null), 3000);
-      } catch (err) {
-        setError(err.response?.data?.error || "Delete failed");
-      }
-    }
-  };
-
-  const getTabIcon = (tab) => {
-    switch (tab) {
-      case "passages":
-        return "📄";
-      case "answers":
-        return "✅";
-      case "audio":
-        return "🎵";
-      default:
-        return "📦";
-    }
-  };
-
-  const getTabTitle = (tab) => {
-    switch (tab) {
-      case "passages":
-        return "Reading/Listening Passages";
-      case "answers":
-        return "Answer Keys";
-      case "audio":
-        return "Audio Files";
-      default:
-        return "Materials";
-    }
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-  };
-
   return (
-    <div className="material-upload-container">
-      <div className="material-upload-card">
-        <h2>📦 Test Material Upload</h2>
-        <p className="subtitle">
-          Upload passages, answer keys, and audio files for tests
-        </p>
-
-        {/* Tab Navigation */}
-        <div className="material-tabs">
-          {["passages", "answers", "audio"].map((tab) => (
-            <button
-              key={tab}
-              className={`tab-button ${activeTab === tab ? "active" : ""}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {getTabIcon(tab)} {getTabTitle(tab)}
-            </button>
-          ))}
+    <div className="material-upload">
+      <div className="material-upload__card">
+        <div className="material-upload__header">
+          <div>
+            <h2>Material Upload</h2>
+            <p>
+              Store test content and answer keys in the database. Audio files are
+              saved on disk.
+            </p>
+          </div>
         </div>
 
-        <div className="material-content">
-          {/* Test Selection */}
-          <div className="form-group">
-            <label htmlFor="test-select">
-              Select Test <span className="required">*</span>
-            </label>
+        <div className="material-upload__setup">
+          <div className="material-field">
+            <label htmlFor="test-select">Test</label>
             {testsLoading ? (
-              <div className="loading-spinner">Loading tests...</div>
-            ) : tests.length === 0 ? (
-              <div className="empty-state">
-                <p>No tests available. Create a test first.</p>
-              </div>
+              <div className="material-placeholder">Loading tests...</div>
             ) : (
               <select
                 id="test-select"
                 value={selectedTest}
                 onChange={(e) => setSelectedTest(e.target.value)}
-                disabled={isUploading}
-                className="form-select"
               >
-                <option value="">-- Choose a test --</option>
+                <option value="">Select a test</option>
                 {tests.map((test) => (
                   <option key={test.id} value={test.id}>
                     {test.name}
@@ -275,193 +404,201 @@ const MaterialUpload = () => {
             )}
           </div>
 
-          {selectedTest && (
-            <>
-              {/* Material Name */}
-              <div className="form-group">
-                <label>Material Name *</label>
-                <input
-                  type="text"
-                  value={materialName}
-                  onChange={(e) => setMaterialName(e.target.value)}
-                  placeholder={`e.g., ${
-                    activeTab === "passages"
-                      ? "Passage 1 - The Future of AI"
-                      : activeTab === "answers"
-                      ? "Reading Answers"
-                      : "Section 1 Audio"
-                  }`}
-                  disabled={isUploading}
-                  className="form-input"
-                />
-              </div>
+          <div className="material-field">
+            <label htmlFor="set-select">Material Set</label>
+            <div className="material-set-row">
+              {setsLoading ? (
+                <div className="material-placeholder">Loading sets...</div>
+              ) : (
+                <select
+                  id="set-select"
+                  value={selectedSetId}
+                  onChange={(e) => setSelectedSetId(e.target.value)}
+                  disabled={!selectedTest}
+                >
+                  <option value="">Create new set</option>
+                  {materialSets.map((set) => (
+                    <option key={set.id} value={set.id}>
+                      {set.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                type="button"
+                className="material-delete"
+                onClick={handleDeleteSet}
+                disabled={!selectedSetId || isDeletingSet}
+              >
+                {isDeletingSet ? "Deleting..." : "Delete Set & Files"}
+              </button>
+            </div>
+          </div>
 
-              {/* File Upload */}
-              <div className="file-upload-section">
-                <div className="file-input-wrapper">
+          <div className="material-field">
+            <label htmlFor="set-name">Set Name</label>
+            <input
+              id="set-name"
+              type="text"
+              value={setName}
+              onChange={(e) => setSetName(e.target.value)}
+              placeholder="e.g., Mock 4 - IELTS Academic"
+              disabled={!selectedTest}
+            />
+          </div>
+        </div>
+
+        <div className="material-tabs">
+          <button
+            type="button"
+            className={activeTab === "content" ? "active" : ""}
+            onClick={() => setActiveTab("content")}
+          >
+            Content JSON
+          </button>
+          <button
+            type="button"
+            className={activeTab === "answers" ? "active" : ""}
+            onClick={() => setActiveTab("answers")}
+          >
+            Answer Keys JSON
+          </button>
+          <button
+            type="button"
+            className={activeTab === "audio" ? "active" : ""}
+            onClick={() => setActiveTab("audio")}
+          >
+            Audio
+          </button>
+        </div>
+
+        <div className="material-panel">
+          {activeTab === "content" && (
+            <div className="material-panel__section">
+              <div className="material-panel__row">
+                <div>
+                  <h3>Content JSON</h3>
+                  <p>
+                    Use the same structure as the existing mock JSON files in
+                    `client/src/pages`.
+                  </p>
+                </div>
+                <label className="material-file">
+                  Load JSON file
                   <input
                     type="file"
-                    id="material-input"
-                    accept={getAcceptedFileTypes()}
-                    onChange={handleFileChange}
-                    disabled={isUploading}
-                    className="file-input"
+                    accept="application/json"
+                    onChange={(e) =>
+                      handleJsonFile(e.target.files[0], setContentJson)
+                    }
                   />
-                  <label htmlFor="material-input" className="file-label">
-                    {file
-                      ? file.name
-                      : `Choose ${
-                          activeTab === "audio" ? "Audio" : "PDF"
-                        } File`}
-                  </label>
+                </label>
+              </div>
+
+              <textarea
+                value={contentJson}
+                onChange={(e) => setContentJson(e.target.value)}
+                placeholder={contentSample}
+                rows={14}
+                disabled={!selectedTest}
+              />
+
+              <button
+                type="button"
+                onClick={handleSaveContent}
+                disabled={!canSave || isSaving}
+              >
+                {isSaving ? "Saving..." : "Save Content"}
+              </button>
+            </div>
+          )}
+
+          {activeTab === "answers" && (
+            <div className="material-panel__section">
+              <div className="material-panel__row">
+                <div>
+                  <h3>Answer Keys JSON</h3>
+                  <p>
+                    Matches the current `answers.json` format used for scoring.
+                  </p>
                 </div>
+                <label className="material-file">
+                  Load JSON file
+                  <input
+                    type="file"
+                    accept="application/json"
+                    onChange={(e) =>
+                      handleJsonFile(e.target.files[0], setAnswerJson)
+                    }
+                  />
+                </label>
+              </div>
 
-                {file && (
-                  <div className="file-info">
-                    <p>
-                      <strong>File:</strong> {file.name}
-                    </p>
-                    <p>
-                      <strong>Size:</strong> {formatFileSize(file.size)}
-                    </p>
-                    <p>
-                      <strong>Type:</strong> {file.type}
-                    </p>
-                  </div>
-                )}
+              <textarea
+                value={answerJson}
+                onChange={(e) => setAnswerJson(e.target.value)}
+                placeholder={answersSample}
+                rows={12}
+                disabled={!selectedTest}
+              />
 
-                <button
-                  onClick={handleUpload}
-                  disabled={
-                    !file || !selectedTest || !materialName || isUploading
-                  }
-                  className="upload-btn"
-                >
-                  {isUploading ? (
-                    <>
-                      <span>Uploading... {uploadProgress}%</span>
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                    </>
-                  ) : (
-                    `Upload ${activeTab === "audio" ? "Audio" : "PDF"} File`
+              <button
+                type="button"
+                onClick={handleSaveAnswers}
+                disabled={!canSave || isSaving}
+              >
+                {isSaving ? "Saving..." : "Save Answer Keys"}
+              </button>
+            </div>
+          )}
+
+          {activeTab === "audio" && (
+            <div className="material-panel__section">
+              <div>
+                <h3>Listening Audio</h3>
+                <p>Upload MP3, WAV, OGG, or M4A files.</p>
+              </div>
+
+              {audioMeta && (
+                <div className="material-audio-meta">
+                  <span>{audioMeta.name}</span>
+                  <span>
+                    {audioMeta.size
+                      ? `${Math.round(audioMeta.size / 1024)} KB`
+                      : ""}
+                  </span>
+                  {audioMeta.url && (
+                    <a href={audioMeta.url} target="_blank" rel="noreferrer">
+                      Open
+                    </a>
                   )}
+                </div>
+              )}
+
+              <div className="material-audio-input">
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => setAudioFile(e.target.files[0])}
+                  disabled={!selectedTest}
+                />
+                <button
+                  type="button"
+                  onClick={handleAudioUpload}
+                  disabled={!audioFile || isUploadingAudio || !selectedSetId}
+                >
+                  {isUploadingAudio ? "Uploading..." : "Upload Audio"}
                 </button>
               </div>
-
-              {/* Messages */}
-              {error && <div className="error-message">{error}</div>}
-              {success && <div className="success-message">{success}</div>}
-
-              {/* Materials List */}
-              <div className="materials-list-section">
-                <h3>Uploaded {getTabTitle(activeTab)}</h3>
-
-                {loading ? (
-                  <p className="loading-message">Loading materials...</p>
-                ) : uploadedMaterials.length > 0 ? (
-                  <div className="materials-list">
-                    {uploadedMaterials.map((material) => (
-                      <div key={material.id} className="material-item">
-                        <div className="material-info">
-                          <p className="material-name">
-                            {getTabIcon(activeTab)} {material.name}
-                          </p>
-                          <p className="material-meta">
-                            Uploaded:{" "}
-                            {new Date(
-                              material.uploaded_at
-                            ).toLocaleDateString()}
-                            {material.file_size &&
-                              ` • Size: ${formatFileSize(material.file_size)}`}
-                          </p>
-                        </div>
-                        <div className="material-actions">
-                          {material.file_url && (
-                            <a
-                              href={material.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn-view"
-                              title="Download/View file"
-                            >
-                              📥 Download
-                            </a>
-                          )}
-                          <button
-                            onClick={() => handleDeleteMaterial(material.id)}
-                            className="btn-delete"
-                            title="Delete this material"
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="no-materials">
-                    No {getTabTitle(activeTab).toLowerCase()} uploaded yet
-                  </p>
-                )}
-              </div>
-            </>
+            </div>
           )}
         </div>
 
-        {/* Info Boxes */}
-        <div className="info-section">
-          <div className="info-box">
-            <h4>📋 File Requirements</h4>
-            <ul>
-              <li>
-                <strong>Passages & Answers:</strong> PDF format only
-              </li>
-              <li>
-                <strong>Audio Files:</strong> MP3, WAV, OGG, or M4A format
-              </li>
-              <li>
-                <strong>Max Size:</strong> 100MB per file
-              </li>
-              <li>
-                <strong>Naming:</strong> Clear, descriptive names recommended
-              </li>
-            </ul>
+        {(error || success) && (
+          <div className={`material-message ${error ? "error" : "success"}`}>
+            {error || success}
           </div>
-
-          <div className="info-box">
-            <h4>🤖 Automatic PDF Conversion</h4>
-            <ul>
-              <li>
-                <strong>Passages:</strong> Automatically converted to test
-                format
-              </li>
-              <li>
-                <strong>Answers:</strong> Stored for reference and grading
-              </li>
-              <li>
-                <strong>Confidence Score:</strong> Shows accuracy of conversion
-              </li>
-              <li>
-                <strong>Background Processing:</strong> No manual work needed
-              </li>
-            </ul>
-          </div>
-
-          <div className="info-box">
-            <h4>💡 Best Practices</h4>
-            <ul>
-              <li>Upload all materials for a test before publishing</li>
-              <li>Use consistent naming conventions</li>
-              <li>Test audio files for quality before uploading</li>
-              <li>Keep PDFs under 50MB for faster loading and conversion</li>
-            </ul>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

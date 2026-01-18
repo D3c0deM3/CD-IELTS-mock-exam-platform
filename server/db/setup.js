@@ -269,6 +269,27 @@ const setupDatabase = async () => {
       )
     `);
 
+    // Table for material sets (content + answer keys + audio metadata)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_material_sets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        test_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        content_json LONGTEXT,
+        answer_key_json LONGTEXT,
+        audio_file_name VARCHAR(255),
+        audio_file_path VARCHAR(500),
+        audio_file_url VARCHAR(500),
+        audio_file_size BIGINT,
+        uploaded_by INT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE RESTRICT,
+        KEY idx_test_material_set (test_id)
+      )
+    `);
+
     // Table for test passages (Reading/Listening content)
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS test_passages (

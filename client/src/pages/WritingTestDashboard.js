@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import API_CONFIG from "../config/api";
+import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import "./WritingTestDashboard.css";
@@ -611,46 +612,63 @@ const WritingTestDashboard = () => {
 
   // ==================== LOAD TEST DATA ====================
   useEffect(() => {
-    try {
-      // Get test_materials_id from participant data stored in localStorage
-      const participant = JSON.parse(
-        localStorage.getItem("currentParticipant") || "{}"
-      );
-      const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
+    const loadTestData = async () => {
+      try {
+        // Get test_materials_id from participant data stored in localStorage
+        const participant = JSON.parse(
+          localStorage.getItem("currentParticipant") || "{}"
+        );
+        const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
 
-      // Select the correct test data based on test_materials_id
-      let selectedTestData;
-      switch (testMaterialsId) {
-        case 2:
-          selectedTestData = testDataJson2;
-          break;
-        case 3:
-          selectedTestData = testDataJson3;
-          break;
-        default:
-          console.warn(
-            `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
+        let selectedTestData = null;
+
+        try {
+          const response = await apiClient.get(
+            `/api/materials/sets/${testMaterialsId}/content`
           );
-          selectedTestData = testDataJson2;
-      }
+          if (response?.content?.sections) {
+            selectedTestData = response.content;
+          }
+        } catch (err) {
+          selectedTestData = null;
+        }
 
-      const writingSection = selectedTestData.sections.find(
-        (s) => s.type === "writing"
-      );
+        if (!selectedTestData) {
+          switch (testMaterialsId) {
+            case 2:
+              selectedTestData = testDataJson2;
+              break;
+            case 3:
+              selectedTestData = testDataJson3;
+              break;
+            default:
+              console.warn(
+                `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
+              );
+              selectedTestData = testDataJson2;
+          }
+        }
 
-      if (writingSection) {
-        setTestData({
-          type: "writing",
-          tasks: writingSection.tasks,
-        });
-      } else {
-        console.error("No writing section found in test data");
+        const writingSection = selectedTestData.sections.find(
+          (s) => s.type === "writing"
+        );
+
+        if (writingSection) {
+          setTestData({
+            type: "writing",
+            tasks: writingSection.tasks,
+          });
+        } else {
+          console.error("No writing section found in test data");
+        }
+      } catch (error) {
+        console.error("Error loading test data:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error loading test data:", error);
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadTestData();
   }, []);
 
   // ==================== TIMER COUNTDOWN ====================

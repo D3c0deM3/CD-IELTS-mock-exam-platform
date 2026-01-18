@@ -5,13 +5,27 @@
 
 const fs = require("fs");
 const path = require("path");
+const db = require("../db");
 
 /**
  * Load the correct answers from the appropriate answers file based on test_materials_id
  * @param {number} testMaterialsId - The test materials ID (2 or 3 for now)
  * @returns {Object} The answers data
  */
-const loadAnswersKey = (testMaterialsId = 2) => {
+const loadAnswersKey = async (testMaterialsId = 2) => {
+  try {
+    const [rows] = await db.execute(
+      "SELECT answer_key_json FROM test_material_sets WHERE id = ?",
+      [testMaterialsId]
+    );
+
+    if (rows.length > 0 && rows[0].answer_key_json) {
+      return JSON.parse(rows[0].answer_key_json);
+    }
+  } catch (error) {
+    console.warn("DB answer key lookup failed, falling back to file:", error);
+  }
+
   try {
     // Map test_materials_id to answer file
     let answersFileName;
@@ -251,9 +265,9 @@ const normalizeAnswer = (answer) => {
  * @param {Object} userAnswers - User's listening answers { question_number: answer }
  * @returns {Object} { rawScore, bandScore }
  */
-const calculateListeningScore = (userAnswers, testId = 2) => {
+const calculateListeningScore = async (userAnswers, testId = 2) => {
   try {
-    const answersKey = loadAnswersKey(testId);
+    const answersKey = await loadAnswersKey(testId);
     const correctAnswers = answersKey.answers.listening;
 
     let correctCount = 0;
@@ -289,9 +303,9 @@ const calculateListeningScore = (userAnswers, testId = 2) => {
  * @param {number} testId - The test ID (2 or 3 for now)
  * @returns {Object} { rawScore, bandScore }
  */
-const calculateReadingScore = (userAnswers, testId = 2) => {
+const calculateReadingScore = async (userAnswers, testId = 2) => {
   try {
-    const answersKey = loadAnswersKey(testId);
+    const answersKey = await loadAnswersKey(testId);
     const correctAnswers = answersKey.answers.reading;
 
     let correctCount = 0;

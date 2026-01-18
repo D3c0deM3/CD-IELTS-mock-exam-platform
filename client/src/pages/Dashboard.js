@@ -115,8 +115,8 @@ const Donut = ({ band }) => {
       >
         <defs>
           <linearGradient id="donutGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#2563eb" />
-            <stop offset="100%" stopColor="#7c3aed" />
+            <stop offset="0%" stopColor="var(--accent)" />
+            <stop offset="100%" stopColor="var(--accent-2)" />
           </linearGradient>
         </defs>
 
@@ -124,7 +124,7 @@ const Donut = ({ band }) => {
           <circle
             r={radius}
             fill="none"
-            stroke="#eef6ff"
+            stroke="var(--border)"
             strokeWidth={stroke}
             strokeLinecap="round"
           />

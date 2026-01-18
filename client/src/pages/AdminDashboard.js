@@ -42,7 +42,7 @@ const AdminDashboard = () => {
   const [testForm, setTestForm] = useState({ name: "", description: "" });
   const [sessionForm, setSessionForm] = useState({
     test_id: "",
-    test_materials_id: 2,
+    test_materials_id: "",
     session_date: "",
     location: "",
     max_capacity: "",
@@ -258,7 +258,7 @@ const AdminDashboard = () => {
         location: "",
         max_capacity: "",
         admin_notes: "",
-        test_materials_id: 2,
+        test_materials_id: "",
       });
       setShowCreateSessionModal(false);
       fetchSessions();
@@ -679,20 +679,7 @@ const AdminDashboard = () => {
             <p>Manage tests, sessions, and participants</p>
           </div>
 
-          {error && (
-            <div
-              style={{
-                background: "#fee2e2",
-                color: "#991b1b",
-                padding: "12px 16px",
-                borderRadius: "8px",
-                marginBottom: "16px",
-                fontSize: "14px",
-              }}
-            >
-              {error}
-            </div>
-          )}
+          {error && <div className="admin-alert admin-alert-error">{error}</div>}
 
           {/* Tab Navigation */}
           <div className="tab-navigation">
@@ -1490,27 +1477,38 @@ const AdminDashboard = () => {
                   ))}
                 </select>
               </div>
-              <div className="form-group">
-                <label className="form-label">Test Materials *</label>
-                <select
-                  className="form-select"
-                  value={sessionForm.test_materials_id}
-                  onChange={(e) =>
-                    setSessionForm({
-                      ...sessionForm,
-                      test_materials_id: parseInt(e.target.value) || "",
-                    })
-                  }
-                  required
-                >
-                  <option value="">Select test materials</option>
-                  {testMaterials.map((material) => (
-                    <option key={material.mock_id} value={material.mock_id}>
-                      {material.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div className="form-group">
+                  <label className="form-label">Test Materials *</label>
+                  <select
+                    className="form-select"
+                    value={sessionForm.test_materials_id}
+                    onChange={(e) =>
+                      setSessionForm({
+                        ...sessionForm,
+                        test_materials_id: parseInt(e.target.value) || "",
+                      })
+                    }
+                    required
+                  >
+                    <option value="">Select test materials</option>
+                    {testMaterials
+                      .filter((material) => {
+                        if (!sessionForm.test_id) return true;
+                        if (!material.test_id) return true;
+                        return (
+                          parseInt(material.test_id, 10) ===
+                          parseInt(sessionForm.test_id, 10)
+                        );
+                      })
+                      .map((material) => (
+                        <option key={material.mock_id} value={material.mock_id}>
+                          {material.test_name
+                            ? `${material.name} (${material.test_name})`
+                            : material.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
               <div className="form-group">
                 <label className="form-label">Session Date & Time *</label>
                 <input

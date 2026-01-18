@@ -497,10 +497,10 @@ router.post("/submit-listening", async (req, res) => {
 
     // Calculate listening score using the correct test materials' answer key
     const { rawScore: listeningRawScore, bandScore: listeningBandScore } =
-      calculateListeningScore(listening_answers, testMaterialsId);
+      await calculateListeningScore(listening_answers, testMaterialsId);
 
     // Load the answer key to get correct answers for each question
-    const answersKey = require("../utils/scoreCalculator").loadAnswersKey(
+    const answersKey = await require("../utils/scoreCalculator").loadAnswersKey(
       testMaterialsId
     );
     const correctAnswers = answersKey.answers.listening;
@@ -620,10 +620,10 @@ router.post("/submit-reading", async (req, res) => {
 
     // Calculate reading score using the correct test materials' answer key
     const { rawScore: readingRawScore, bandScore: readingBandScore } =
-      calculateReadingScore(reading_answers, testMaterialsId);
+      await calculateReadingScore(reading_answers, testMaterialsId);
 
     // Load the answer key to get correct answers for each question
-    const answersKey = require("../utils/scoreCalculator").loadAnswersKey(
+    const answersKey = await require("../utils/scoreCalculator").loadAnswersKey(
       testMaterialsId
     );
     const correctAnswers = answersKey.answers.reading;

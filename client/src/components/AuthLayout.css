@@ -1,13 +1,64 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+
 .auth-page {
+  --auth-bg: #f8fafc;
+  --auth-card: #ffffff;
+  --auth-border: #e2e8f0;
+  --auth-text: #0f172a;
+  --auth-muted: #64748b;
+  --auth-accent: #2563eb;
+  --auth-accent-strong: #1d4ed8;
+  --auth-accent-soft: rgba(37, 99, 235, 0.14);
+  --auth-input-bg: #f8fafc;
+  --auth-input-border: #d7dde6;
+  --auth-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  --auth-font-body: "Manrope", "Segoe UI", sans-serif;
+  --auth-font-display: "Space Grotesk", "Manrope", sans-serif;
+
   min-height: 100vh;
-  background: #f9fafb;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+  background: radial-gradient(
+      circle at 12% 10%,
+      rgba(37, 99, 235, 0.12),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 88% 12%,
+      rgba(16, 185, 129, 0.08),
+      transparent 38%
+    ),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  font-family: var(--auth-font-body);
+  color: var(--auth-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   position: relative;
+  overflow: hidden;
 }
 
 [data-theme="dark"] .auth-page {
-  background: #0f172a;
+  --auth-bg: #0b1220;
+  --auth-card: #111827;
+  --auth-border: #1f2937;
+  --auth-text: #f8fafc;
+  --auth-muted: #9ca3af;
+  --auth-accent: #60a5fa;
+  --auth-accent-strong: #3b82f6;
+  --auth-accent-soft: rgba(96, 165, 250, 0.2);
+  --auth-input-bg: #0f172a;
+  --auth-input-border: #223046;
+  --auth-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+
+  background: radial-gradient(
+      circle at 12% 10%,
+      rgba(96, 165, 250, 0.18),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 88% 12%,
+      rgba(16, 185, 129, 0.12),
+      transparent 38%
+    ),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
 }
 
 .auth-container {
@@ -15,55 +66,62 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 24px;
+  padding-top: 56px;
   overflow-y: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .auth-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 32px 40px;
+  background: var(--auth-card);
+  border: 1px solid var(--auth-border);
+  border-radius: 16px;
+  padding: 36px 40px;
   width: 100%;
-  max-width: 400px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  margin-top: 7%; /* Center horizontally */
+  max-width: 440px;
+  box-shadow: var(--auth-shadow);
+  animation: authCardIn 0.5s ease-out 0.05s both;
 }
 
-[data-theme="dark"] .auth-card {
-  background: #1f2937;
-  border-color: #374151;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+@keyframes authCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Auth Title Section */
 .auth-header {
-  margin-bottom: 28px;
-  text-align: center;
+  margin-bottom: 26px;
+  text-align: left;
+}
+
+.auth-title-section {
+  display: grid;
+  gap: 6px;
 }
 
 .auth-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 8px 0;
-  line-height: 1.3;
-}
-
-[data-theme="dark"] .auth-title {
-  color: #f9fafb;
+  font-size: 26px;
+  font-weight: 700;
+  font-family: var(--auth-font-display);
+  color: var(--auth-text);
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--auth-muted);
   margin: 0;
   line-height: 1.4;
-  font-weight: 400;
-}
-
-[data-theme="dark"] .auth-subtitle {
-  color: #9ca3af;
+  font-weight: 500;
 }
 
 /* Auth Content */
@@ -75,11 +133,12 @@
 @media (max-width: 480px) {
   .auth-container {
     padding: 16px;
+    padding-top: 48px;
     min-height: calc(100vh - 64px);
   }
 
   .auth-card {
-    padding: 28px 24px;
+    padding: 28px 22px;
     max-width: 100%;
   }
 
@@ -91,10 +150,11 @@
 @media (max-height: 700px) {
   .auth-container {
     padding: 16px;
+    padding-top: 36px;
   }
 
   .auth-card {
-    padding: 24px 28px;
+    padding: 24px 26px;
   }
 
   .auth-header {
@@ -108,7 +168,7 @@
 
 @media (max-height: 600px) {
   .auth-card {
-    padding: 20px 24px;
+    padding: 20px 22px;
   }
 
   .auth-header {
