@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import adminService from "../services/adminService";
 import "./AnswerChecker.css";
 
-const AnswerChecker = ({ participant }) => {
+const AnswerChecker = ({ participant, fetchAnswersFn }) => {
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -15,7 +15,10 @@ const AnswerChecker = ({ participant }) => {
   const fetchAnswers = async () => {
     try {
       setLoading(true);
-      const response = await adminService.getParticipantAnswers(participant.id);
+      // Use provided fetch function or default to adminService
+      const response = fetchAnswersFn
+        ? await fetchAnswersFn(participant.id)
+        : await adminService.getParticipantAnswers(participant.id);
       setAnswers(response.answers || []);
       setError("");
     } catch (err) {

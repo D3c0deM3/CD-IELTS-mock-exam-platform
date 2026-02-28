@@ -33,7 +33,7 @@ const corsOrigins =
         "https://cd-ielts-mock-exam-platform.vercel.app",
         process.env.RAILWAY_PUBLIC_DOMAIN,
       ].filter(Boolean)
-    : ["http://localhost:3000", "http://localhost:3001"];
+    : true; // Allow all origins in development
 
 app.use(
   cors({
@@ -49,6 +49,7 @@ app.use("/uploads", express.static("uploads"));
 // -------------------- ROUTES --------------------
 app.use("/api/users", require("./routes/users"));
 app.use("/api/admin", require("./routes/admin"));
+app.use("/api/center", require("./routes/center"));
 app.use("/api/tests", require("./routes/tests"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/test-sessions", require("./routes/testSessions"));

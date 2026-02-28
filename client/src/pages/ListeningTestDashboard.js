@@ -8,6 +8,7 @@ import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useAudioPlaybackWithStorage from "../hooks/useAudioPlaybackWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import "./ListeningTestDashboard.css";
+import useActivityMonitor from "../hooks/useActivityMonitor";
 
 // Import all available test data files for dynamic loading
 import testData2 from "./mock_2.json";
@@ -1231,6 +1232,7 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
 // ==================== MAIN DASHBOARD COMPONENT ====================
 const ListeningTestDashboard = () => {
   const navigate = useNavigate();
+  useActivityMonitor("listening_dashboard");
   const visualStructureRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";

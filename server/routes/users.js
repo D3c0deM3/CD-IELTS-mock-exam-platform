@@ -144,6 +144,107 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// POST /api/users/make-center - Make a user a center account (by phone number)
+router.post("/make-center", async (req, res) => {
+  const { phone_number, center_name } = req.body;
+
+  if (!phone_number) {
+    return res.status(400).json({ error: "phone_number is required" });
+  }
+
+  try {
+    const [rows] = await db.execute(
+      "SELECT id FROM users WHERE phone_number = ?",
+      [phone_number]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userId = rows[0].id;
+    await db.execute("UPDATE users SET role = 'center' WHERE id = ?", [userId]);
+
+    // Ensure course_centers record exists
+    const [existing] = await db.execute(
+      "SELECT id FROM course_centers WHERE user_id = ?",
+      [userId]
+    );
+    if (existing.length === 0) {
+      await db.execute(
+        "INSERT INTO course_centers (user_id, center_name) VALUES (?, ?)",
+        [userId, center_name || "My Center"]
+      );
+    }
+
+    res.json({
+      message: `User with phone number ${phone_number} is now a center account`,
+      phone_number,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/users/create-center - Create a new center user
+router.post("/create-center", async (req, res) => {
+  const { full_name, phone_number, password, center_name } = req.body;
+
+  if (!full_name || !phone_number || !password) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    const [existingUser] = await db.execute(
+      "SELECT id FROM users WHERE phone_number = ?",
+      [phone_number]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({
+        error:
+          "An account with this phone number already exists. Use /make-center to promote it.",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const [result] = await db.execute(
+      "INSERT INTO users (full_name, phone_number, password, role) VALUES (?, ?, ?, 'center')",
+      [full_name, phone_number, hashedPassword]
+    );
+
+    const userId = result.insertId;
+
+    // Create course_centers record
+    await db.execute(
+      "INSERT INTO course_centers (user_id, center_name) VALUES (?, ?)",
+      [userId, center_name || full_name]
+    );
+
+    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+      expiresIn: "24h",
+    });
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.execute(
+      "INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+      [userId, token, expiresAt]
+    );
+
+    res.status(201).json({
+      message: "Center user created successfully",
+      userId,
+      token,
+      user: { role: "center", full_name, phone_number },
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/users/make-admin - Make a user an admin (by phone number)
 router.post("/make-admin", async (req, res) => {
   const { phone_number } = req.body;

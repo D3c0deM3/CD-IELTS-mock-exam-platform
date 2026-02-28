@@ -189,6 +189,38 @@ const getParticipantAnswers = (participant_id) => {
   return apiClient.get(`${API_URL}/participants/${participant_id}/answers`);
 };
 
+// ==================== COURSE CENTER MANAGEMENT ====================
+
+const getCenters = () => {
+  return apiClient.get(`${API_URL}/centers`);
+};
+
+const createCenter = (full_name, phone_number, password, center_name, max_session_users) => {
+  return apiClient.post(`${API_URL}/centers`, {
+    full_name,
+    phone_number,
+    password,
+    center_name,
+    max_session_users,
+  });
+};
+
+const promoteToCenter = (user_id, center_name, max_session_users) => {
+  return apiClient.post(`${API_URL}/centers/promote`, {
+    user_id,
+    center_name,
+    max_session_users,
+  });
+};
+
+const updateCenter = (center_id, data) => {
+  return apiClient.patch(`${API_URL}/centers/${center_id}`, data);
+};
+
+const deleteCenter = (center_id) => {
+  return apiClient.delete(`${API_URL}/centers/${center_id}`);
+};
+
 const adminService = {
   // User Management
   getUsers,
@@ -233,6 +265,12 @@ const adminService = {
   // Writing Submissions
   getWritingSubmissions,
   reviewWritingSubmission,
+  // Course Center Management
+  getCenters,
+  createCenter,
+  promoteToCenter,
+  updateCenter,
+  deleteCenter,
 };
 
 export default adminService;

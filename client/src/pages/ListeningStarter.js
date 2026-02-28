@@ -4,9 +4,11 @@ import ThemeToggle from "../components/ThemeToggle";
 import audioService from "../services/audioService";
 import listeningVideo from "../starter_videos/listening_starter.mp4";
 import "./ListeningStarter.css";
+import useActivityMonitor from "../hooks/useActivityMonitor";
 
 function ListeningStarter() {
   const navigate = useNavigate();
+  useActivityMonitor("listening_starter");
   const videoRef = useRef(null);
   const videoContainerRef = useRef(null);
   const [volume, setVolume] = useState(75);

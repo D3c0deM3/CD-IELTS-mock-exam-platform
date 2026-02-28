@@ -965,4 +965,70 @@ router.get("/participant/:id/scores", async (req, res) => {
   }
 });
 
+// ==================== MONITORING ====================
+
+// POST /api/test-sessions/participant-activity - Report participant activity (heartbeat + monitoring)
+router.post("/participant-activity", async (req, res) => {
+  const { participant_id_code, current_screen, event_type, event_data } = req.body;
+
+  if (!participant_id_code) {
+    return res.status(400).json({ error: "participant_id_code required" });
+  }
+
+  try {
+    // Update last_activity_at and current_screen
+    const updateFields = ["last_activity_at = NOW()"];
+    const updateValues = [];
+
+    if (current_screen) {
+      updateFields.push("current_screen = ?");
+      updateValues.push(current_screen);
+    }
+
+    updateValues.push(participant_id_code);
+
+    await db.execute(
+      `UPDATE test_participants SET ${updateFields.join(", ")} WHERE participant_id_code = ?`,
+      updateValues
+    );
+
+    // If event_type is provided, log monitoring event and increment counters
+    if (event_type) {
+      // Get participant info for logging
+      const [participantRows] = await db.execute(
+        "SELECT id, session_id FROM test_participants WHERE participant_id_code = ?",
+        [participant_id_code]
+      );
+
+      if (participantRows.length > 0) {
+        const { id: pid, session_id } = participantRows[0];
+
+        // Log the event
+        await db.execute(
+          "INSERT INTO participant_monitoring (participant_id, session_id, event_type, event_data) VALUES (?, ?, ?, ?)",
+          [pid, session_id, event_type, event_data || null]
+        );
+
+        // Increment counters
+        if (event_type === "tab_switch") {
+          await db.execute(
+            "UPDATE test_participants SET tab_switch_count = COALESCE(tab_switch_count, 0) + 1 WHERE id = ?",
+            [pid]
+          );
+        } else if (event_type === "focus_lost") {
+          await db.execute(
+            "UPDATE test_participants SET focus_lost_count = COALESCE(focus_lost_count, 0) + 1 WHERE id = ?",
+            [pid]
+          );
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error updating participant activity:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;

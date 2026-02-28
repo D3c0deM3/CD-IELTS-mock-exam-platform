@@ -10,6 +10,7 @@ const Navbar = () => {
   const isLoggedIn = localStorage.getItem("accessToken");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = user?.role === "admin";
+  const isCenter = user?.role === "center";
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -17,7 +18,9 @@ const Navbar = () => {
 
   const handleDashboard = () => {
     if (isLoggedIn) {
-      const route = isAdmin ? "/admin/dashboard" : "/dashboard";
+      let route = "/dashboard";
+      if (isAdmin) route = "/admin/dashboard";
+      else if (isCenter) route = "/center/dashboard";
       navigate(route);
     } else {
       navigate("/login");
@@ -28,6 +31,9 @@ const Navbar = () => {
   const getDashboardClass = () => {
     if (isAdmin) {
       return location.pathname === "/admin/dashboard" ? "active" : "";
+    }
+    if (isCenter) {
+      return location.pathname === "/center/dashboard" ? "active" : "";
     }
     return location.pathname === "/dashboard" ? "active" : "";
   };

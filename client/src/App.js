@@ -14,6 +14,7 @@ import ReadingTestDashboard from "./pages/ReadingTestDashboard";
 import WritingStarter from "./pages/WritingStarter";
 import WritingTestDashboard from "./pages/WritingTestDashboard";
 import EndTestScreen from "./pages/EndTestScreen";
+import CenterDashboard from "./pages/CenterDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -41,7 +42,7 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="student">
                 <Dashboard />
               </ProtectedRoute>
             }
@@ -78,6 +79,14 @@ function App() {
             element={<WritingTestDashboard />}
           />
           <Route path="/test/end" element={<EndTestScreen />} />
+          <Route
+            path="/center/dashboard"
+            element={
+              <ProtectedRoute requiredRole="center">
+                <CenterDashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>

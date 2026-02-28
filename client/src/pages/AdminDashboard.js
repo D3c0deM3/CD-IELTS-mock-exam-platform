@@ -29,13 +29,29 @@ const AdminDashboard = () => {
   const [sessionToDelete, setSessionToDelete] = useState(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [timeRemaining, setTimeRemaining] = useState(null);
-  const [timerActive, setTimerActive] = useState(false);
   const [writingSubmissions, setWritingSubmissions] = useState([]);
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [showWritingReviewModal, setShowWritingReviewModal] = useState(false);
   const [writingReviewForm, setWritingReviewForm] = useState({
     writing_score: "",
     admin_notes: "",
+  });
+
+  // Course Center states
+  const [centers, setCenters] = useState([]);
+  const [showCreateCenterModal, setShowCreateCenterModal] = useState(false);
+  const [showEditCenterModal, setShowEditCenterModal] = useState(false);
+  const [editingCenter, setEditingCenter] = useState(null);
+  const [centerForm, setCenterForm] = useState({
+    full_name: "",
+    phone_number: "",
+    password: "",
+    center_name: "",
+    max_session_users: 30,
+  });
+  const [editCenterForm, setEditCenterForm] = useState({
+    center_name: "",
+    max_session_users: 30,
   });
 
   // Form states
@@ -63,6 +79,7 @@ const AdminDashboard = () => {
     fetchSessions();
     fetchTests();
     fetchTestMaterials();
+    fetchCenters();
   }, []);
 
   // Fetch participants when session is selected
@@ -83,64 +100,48 @@ const AdminDashboard = () => {
     }
   }, [selectedSession, activeTab]);
 
-  // Smooth timer countdown
+  // Timer countdown - derived entirely from server data, no separate timerActive state
   useEffect(() => {
-    if (!dashboardStats?.session.test_started_at || !timerActive) {
+    const startedAt = dashboardStats?.session?.test_started_at;
+    const endAt = dashboardStats?.session?.test_end_at;
+    const allCompleted =
+      dashboardStats?.stats?.total > 0 &&
+      dashboardStats?.stats?.test_completed === dashboardStats?.stats?.total;
+
+    // No timer if test hasn't started, has no end time, or all completed
+    if (!startedAt || !endAt || allCompleted) {
       setTimeRemaining(null);
       return;
     }
 
-    // Check if test has ended
-    if (dashboardStats.session.test_end_at) {
-      const endTime = new Date(dashboardStats.session.test_end_at).getTime();
-      const now = Date.now();
+    const endTime = new Date(endAt).getTime();
 
-      if (now >= endTime) {
-        setTimeRemaining(0);
-        setTimerActive(false);
-        return;
-      }
+    // Check if already expired
+    if (Date.now() >= endTime) {
+      setTimeRemaining(0);
+      return;
     }
 
-    // Update timer every 100ms for smooth animation
-    const timer = setInterval(() => {
-      const endTime = new Date(dashboardStats.session.test_end_at).getTime();
-      const now = Date.now();
-      const msRemaining = endTime - now;
-
+    // Update timer every second
+    const tick = () => {
+      const msRemaining = endTime - Date.now();
       if (msRemaining <= 0) {
         setTimeRemaining(0);
-        setTimerActive(false);
+        clearInterval(timer);
       } else {
         setTimeRemaining(Math.ceil(msRemaining / 1000));
       }
-    }, 100);
+    };
+    tick(); // immediate first tick
+    const timer = setInterval(tick, 1000);
 
     return () => clearInterval(timer);
   }, [
-    dashboardStats?.session.test_started_at,
-    dashboardStats?.session.test_end_at,
-    timerActive,
+    dashboardStats?.session?.test_started_at,
+    dashboardStats?.session?.test_end_at,
+    dashboardStats?.stats?.test_completed,
+    dashboardStats?.stats?.total,
   ]);
-
-  // Start timer when test begins
-  useEffect(() => {
-    if (dashboardStats?.session.test_started_at && !timerActive) {
-      setTimerActive(true);
-    }
-  }, [dashboardStats?.session.test_started_at, timerActive]);
-
-  // Stop timer when test ends (end all tests)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (
-      dashboardStats?.stats.test_completed === dashboardStats?.stats.total &&
-      dashboardStats?.stats.total > 0
-    ) {
-      setTimerActive(false);
-      setTimeRemaining(null);
-    }
-  }, [dashboardStats?.stats]);
 
   const fetchSessions = async () => {
     try {
@@ -182,6 +183,74 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error("Failed to fetch writing submissions:", err);
       setError("Failed to fetch writing submissions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== COURSE CENTER FUNCTIONS ====================
+
+  const fetchCenters = async () => {
+    try {
+      const response = await adminService.getCenters();
+      setCenters(response);
+    } catch (err) {
+      console.error("Failed to fetch centers:", err);
+    }
+  };
+
+  const handleCreateCenter = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      await adminService.createCenter(
+        centerForm.full_name,
+        centerForm.phone_number,
+        centerForm.password,
+        centerForm.center_name,
+        centerForm.max_session_users
+      );
+      setShowCreateCenterModal(false);
+      setCenterForm({ full_name: "", phone_number: "", password: "", center_name: "", max_session_users: 30 });
+      fetchCenters();
+      setError("");
+    } catch (err) {
+      const msg = err.response?.data?.error || "Failed to create center";
+      setError(msg);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCenter = async (e) => {
+    e.preventDefault();
+    if (!editingCenter) return;
+    try {
+      setLoading(true);
+      await adminService.updateCenter(editingCenter.id, editCenterForm);
+      setShowEditCenterModal(false);
+      setEditingCenter(null);
+      fetchCenters();
+      setError("");
+    } catch (err) {
+      setError("Failed to update center");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCenter = async (centerId, centerName) => {
+    if (!window.confirm(`Delete center "${centerName}"? The user will be reverted to a student account.`)) return;
+    try {
+      setLoading(true);
+      await adminService.deleteCenter(centerId);
+      fetchCenters();
+      setError("");
+    } catch (err) {
+      setError("Failed to delete center");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -529,8 +598,6 @@ const AdminDashboard = () => {
 
     try {
       setLoading(true);
-      setTimerActive(false);
-      setTimeRemaining(null);
       const response = await adminService.endAllTests(selectedSession.id);
       fetchSessionDashboard(selectedSession.id);
       alert(`${response.ended_count} tests ended successfully!`);
@@ -728,6 +795,17 @@ const AdminDashboard = () => {
             >
               📦 Upload Materials
             </button>
+            <button
+              className={`tab-button ${
+                activeTab === "centers" ? "active" : ""
+              }`}
+              onClick={() => {
+                setActiveTab("centers");
+                fetchCenters();
+              }}
+            >
+              🏫 Centers
+            </button>
           </div>
 
           {/* Sessions Tab */}
@@ -863,8 +941,8 @@ const AdminDashboard = () => {
 
                 {/* Test Timer Info */}
                 {dashboardStats.session.test_started_at &&
-                  timerActive &&
-                  timeRemaining !== null && (
+                  timeRemaining !== null &&
+                  timeRemaining > 0 && (
                     <div
                       className="card"
                       style={{
@@ -960,8 +1038,7 @@ const AdminDashboard = () => {
                     </div>
                   )}
                 {dashboardStats.session.test_started_at &&
-                  !timerActive &&
-                  timeRemaining === null && (
+                  (timeRemaining === 0 || timeRemaining === null) && (
                     <div
                       className="card"
                       style={{
@@ -1070,6 +1147,8 @@ const AdminDashboard = () => {
                           <th>Writing</th>
                           <th>Speaking</th>
                           <th>Current Screen</th>
+                          <th>Tab Switches</th>
+                          <th>Focus Lost</th>
                           <th>Test Status</th>
                           <th>Last Activity</th>
                           <th>Actions</th>
@@ -1121,6 +1200,30 @@ const AdminDashboard = () => {
                                 }}
                               >
                                 {participant.current_screen || "not_started"}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{
+                                fontSize: "12px",
+                                padding: "2px 8px",
+                                borderRadius: "6px",
+                                fontWeight: "600",
+                                background: participant.tab_switch_count > 3 ? "rgba(239,68,68,0.12)" : "var(--bg-secondary)",
+                                color: participant.tab_switch_count > 3 ? "var(--error)" : "var(--muted)",
+                              }}>
+                                {participant.tab_switch_count || 0}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{
+                                fontSize: "12px",
+                                padding: "2px 8px",
+                                borderRadius: "6px",
+                                fontWeight: "600",
+                                background: participant.focus_lost_count > 5 ? "rgba(239,68,68,0.12)" : "var(--bg-secondary)",
+                                color: participant.focus_lost_count > 5 ? "var(--error)" : "var(--muted)",
+                              }}>
+                                {participant.focus_lost_count || 0}
                               </span>
                             </td>
                             <td>
@@ -1392,8 +1495,198 @@ const AdminDashboard = () => {
               <MaterialUpload />
             </div>
           )}
+
+          {/* Centers Tab */}
+          {activeTab === "centers" && (
+            <div>
+              <div className="card">
+                <div className="card-header">
+                  <h2>🏫 Course Centers</h2>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setCenterForm({ full_name: "", phone_number: "", password: "", center_name: "", max_session_users: 30 });
+                      setShowCreateCenterModal(true);
+                    }}
+                  >
+                    + New Center
+                  </button>
+                </div>
+                {centers.length === 0 ? (
+                  <p style={{ color: "var(--muted)", textAlign: "center", padding: "24px" }}>No course centers yet. Create one to get started.</p>
+                ) : (
+                  <div className="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Center Name</th>
+                          <th>Admin Name</th>
+                          <th>Phone</th>
+                          <th>Max Users</th>
+                          <th>Students</th>
+                          <th>Sessions</th>
+                          <th>Status</th>
+                          <th>Created</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {centers.map((center) => (
+                          <tr key={center.id}>
+                            <td><strong>{center.center_name}</strong></td>
+                            <td>{center.full_name}</td>
+                            <td>{center.phone_number}</td>
+                            <td>{center.max_session_users}</td>
+                            <td>{center.student_count}</td>
+                            <td>{center.session_count}</td>
+                            <td>
+                              <span className="status-indicator">
+                                <span className={`status-dot ${center.status === "active" ? "active" : "inactive"}`}></span>
+                                {center.status}
+                              </span>
+                            </td>
+                            <td>{new Date(center.created_at).toLocaleDateString()}</td>
+                            <td>
+                              <div style={{ display: "flex", gap: "4px" }}>
+                                <button
+                                  className="btn btn-secondary btn-small"
+                                  onClick={() => {
+                                    setEditingCenter(center);
+                                    setEditCenterForm({
+                                      center_name: center.center_name,
+                                      max_session_users: center.max_session_users,
+                                    });
+                                    setShowEditCenterModal(true);
+                                  }}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  className="btn btn-danger btn-small"
+                                  onClick={() => handleDeleteCenter(center.id, center.center_name)}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Create Center Modal */}
+      {showCreateCenterModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateCenterModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">Create Course Center</div>
+            <form onSubmit={handleCreateCenter}>
+              <div className="form-group">
+                <label className="form-label">Center Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={centerForm.center_name}
+                  onChange={(e) => setCenterForm({ ...centerForm, center_name: e.target.value })}
+                  placeholder="e.g., Oxford IELTS Center"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Admin Full Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={centerForm.full_name}
+                  onChange={(e) => setCenterForm({ ...centerForm, full_name: e.target.value })}
+                  placeholder="Center admin's name"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Phone Number *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={centerForm.phone_number}
+                  onChange={(e) => setCenterForm({ ...centerForm, phone_number: e.target.value })}
+                  placeholder="e.g., 09123456789"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Password *</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={centerForm.password}
+                  onChange={(e) => setCenterForm({ ...centerForm, password: e.target.value })}
+                  placeholder="Set a password for this center admin"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Max Session Users</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={centerForm.max_session_users}
+                  onChange={(e) => setCenterForm({ ...centerForm, max_session_users: parseInt(e.target.value) || 30 })}
+                  min="1"
+                  max="500"
+                />
+                <small style={{ color: "var(--muted)", fontSize: "12px" }}>Maximum participants allowed per session for this center</small>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateCenterModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Creating..." : "Create Center"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Center Modal */}
+      {showEditCenterModal && editingCenter && (
+        <div className="modal-overlay" onClick={() => setShowEditCenterModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">Edit Center: {editingCenter.center_name}</div>
+            <form onSubmit={handleEditCenter}>
+              <div className="form-group">
+                <label className="form-label">Center Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editCenterForm.center_name}
+                  onChange={(e) => setEditCenterForm({ ...editCenterForm, center_name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Max Session Users</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={editCenterForm.max_session_users}
+                  onChange={(e) => setEditCenterForm({ ...editCenterForm, max_session_users: parseInt(e.target.value) || 30 })}
+                  min="1"
+                  max="500"
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditCenterModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Saving..." : "Save Changes"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create Test Modal */}
       {showCreateTestModal && (

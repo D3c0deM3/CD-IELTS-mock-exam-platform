@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import writingVideo from "../starter_videos/writing_starter.mp4";
 import "./WritingStarter.css";
+import useActivityMonitor from "../hooks/useActivityMonitor";
 
 function WritingStarter() {
   const navigate = useNavigate();
+  useActivityMonitor("writing_starter");
   const videoRef = useRef(null);
   const videoContainerRef = useRef(null);
   const [volume, setVolume] = useState(75);

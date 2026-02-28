@@ -2774,7 +2774,7 @@
   color: #d8d8d8;
 }
 
-.form-input {
+.listening-test-dashboard .form-input {
   padding: 8px 12px;
   border: 2px solid #dc2626;
   border-radius: 6px;
@@ -2793,14 +2793,14 @@
   vertical-align: baseline;
 }
 
-[data-theme="dark"] .form-input {
+[data-theme="dark"] .listening-test-dashboard .form-input {
   background: #3d3d3d;
   color: #ff6b6b;
   border-color: #ff5252;
   box-shadow: 0 1px 3px rgba(255, 82, 82, 0.2);
 }
 
-.form-input:focus {
+.listening-test-dashboard .form-input:focus {
   outline: none;
   border-color: #b91c1c;
   box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15),
@@ -2808,7 +2808,7 @@
   background: #fff8f8;
 }
 
-[data-theme="dark"] .form-input:focus {
+[data-theme="dark"] .listening-test-dashboard .form-input:focus {
   border-color: #ff8585;
   background: #4d2a2a;
   box-shadow: 0 0 0 4px rgba(255, 82, 82, 0.2), 0 1px 3px rgba(255, 82, 82, 0.3);

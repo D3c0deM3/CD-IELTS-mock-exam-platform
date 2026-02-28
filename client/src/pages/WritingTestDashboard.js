@@ -6,6 +6,7 @@ import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import "./WritingTestDashboard.css";
+import useActivityMonitor from "../hooks/useActivityMonitor";
 import testDataJson2 from "./mock_2.json";
 import testDataJson3 from "./mock_3.json";
 
@@ -355,6 +356,7 @@ const TaskRenderer = ({ task, answers, onAnswerChange }) => {
 // ==================== MAIN DASHBOARD COMPONENT ====================
 const WritingTestDashboard = () => {
   const navigate = useNavigate();
+  useActivityMonitor("writing_dashboard");
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";
   });

@@ -386,7 +386,9 @@ html[data-theme="dark"] .admin-dashboard .admin-alert-error {
 .admin-dashboard-wrapper .form-input,
 .admin-dashboard-wrapper .form-select,
 .admin-dashboard-wrapper .form-textarea {
+  display: block;
   width: 100%;
+  min-width: 0;
   padding: 11px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;

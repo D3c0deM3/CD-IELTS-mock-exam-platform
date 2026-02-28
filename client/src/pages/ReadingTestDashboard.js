@@ -6,6 +6,7 @@ import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import "./ReadingTestDashboard.css";
+import useActivityMonitor from "../hooks/useActivityMonitor";
 import testDataJson2 from "./mock_2.json";
 import testDataJson3 from "./mock_3.json";
 
@@ -582,6 +583,7 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
 // ==================== MAIN DASHBOARD COMPONENT ====================
 const ReadingTestDashboard = () => {
   const navigate = useNavigate();
+  useActivityMonitor("reading_dashboard");
   const passageContentRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";

@@ -83,6 +83,176 @@ router.delete("/users/:id", async (req, res) => {
   }
 });
 
+// ==================== COURSE CENTER MANAGEMENT ====================
+
+// GET /api/admin/centers - List all course centers
+router.get("/centers", async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      `SELECT cc.id, cc.user_id, cc.center_name, cc.max_session_users, cc.created_at,
+              u.full_name, u.phone_number, u.status,
+              (SELECT COUNT(*) FROM center_students cs WHERE cs.center_id = cc.id) AS student_count,
+              (SELECT COUNT(*) FROM test_sessions ts WHERE ts.center_id = cc.id) AS session_count
+       FROM course_centers cc
+       JOIN users u ON cc.user_id = u.id
+       ORDER BY cc.created_at DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/admin/centers - Create a new course center account
+router.post("/centers", async (req, res) => {
+  const { full_name, phone_number, password, center_name, max_session_users } = req.body;
+
+  if (!full_name || !phone_number || !password || !center_name) {
+    return res.status(400).json({ error: "full_name, phone_number, password, and center_name are required" });
+  }
+
+  try {
+    // Check if phone number already exists
+    const [existing] = await db.execute(
+      "SELECT id, role FROM users WHERE phone_number = ?",
+      [phone_number]
+    );
+
+    if (existing.length > 0) {
+      // If user exists but isn't a center, offer to promote
+      if (existing[0].role !== "center") {
+        return res.status(409).json({
+          error: `A user with this phone number already exists (role: ${existing[0].role}). Use the promote option instead.`,
+          existing_user_id: existing[0].id,
+        });
+      }
+      return res.status(409).json({ error: "A center account with this phone number already exists." });
+    }
+
+    const bcrypt = require("bcrypt");
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const [userResult] = await db.execute(
+      "INSERT INTO users (full_name, phone_number, password, role) VALUES (?, ?, ?, 'center')",
+      [full_name, phone_number, hashedPassword]
+    );
+
+    const userId = userResult.insertId;
+
+    await db.execute(
+      "INSERT INTO course_centers (user_id, center_name, max_session_users) VALUES (?, ?, ?)",
+      [userId, center_name, max_session_users || 30]
+    );
+
+    res.status(201).json({
+      message: "Course center created successfully",
+      userId,
+      center_name,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/admin/centers/promote - Promote an existing student to center role
+router.post("/centers/promote", async (req, res) => {
+  const { user_id, center_name, max_session_users } = req.body;
+
+  if (!user_id || !center_name) {
+    return res.status(400).json({ error: "user_id and center_name are required" });
+  }
+
+  try {
+    const [rows] = await db.execute("SELECT id, role, full_name FROM users WHERE id = ?", [user_id]);
+    if (rows.length === 0) return res.status(404).json({ error: "User not found" });
+
+    if (rows[0].role === "center") {
+      return res.status(409).json({ error: "User is already a center admin" });
+    }
+    if (rows[0].role === "admin") {
+      return res.status(400).json({ error: "Cannot demote an admin to center role" });
+    }
+
+    await db.execute("UPDATE users SET role = 'center' WHERE id = ?", [user_id]);
+
+    // Create course_centers record if not exists
+    const [existingCenter] = await db.execute(
+      "SELECT id FROM course_centers WHERE user_id = ?",
+      [user_id]
+    );
+    if (existingCenter.length === 0) {
+      await db.execute(
+        "INSERT INTO course_centers (user_id, center_name, max_session_users) VALUES (?, ?, ?)",
+        [user_id, center_name, max_session_users || 30]
+      );
+    }
+
+    res.json({ message: `User "${rows[0].full_name}" promoted to center admin`, user_id });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/centers/:id - Update center settings
+router.patch("/centers/:id", async (req, res) => {
+  const { id } = req.params;
+  const { center_name, max_session_users } = req.body;
+
+  try {
+    const updates = [];
+    const params = [];
+
+    if (center_name !== undefined) {
+      updates.push("center_name = ?");
+      params.push(center_name);
+    }
+    if (max_session_users !== undefined) {
+      updates.push("max_session_users = ?");
+      params.push(max_session_users);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
+
+    params.push(id);
+    await db.execute(`UPDATE course_centers SET ${updates.join(", ")} WHERE id = ?`, params);
+
+    res.json({ message: "Center updated successfully" });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/admin/centers/:id - Delete a center (reverts user to student role)
+router.delete("/centers/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [center] = await db.execute("SELECT user_id FROM course_centers WHERE id = ?", [id]);
+    if (center.length === 0) return res.status(404).json({ error: "Center not found" });
+
+    const userId = center[0].user_id;
+
+    // Remove center students association
+    await db.execute("DELETE FROM center_students WHERE center_id = ?", [id]);
+    // Remove course center record
+    await db.execute("DELETE FROM course_centers WHERE id = ?", [id]);
+    // Revert user to student
+    await db.execute("UPDATE users SET role = 'student' WHERE id = ?", [userId]);
+
+    res.json({ message: "Center deleted and user reverted to student role" });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ==================== TEST MANAGEMENT ====================
 
 // GET /api/admin/test-materials - Get available test materials (mocks)
@@ -1047,6 +1217,8 @@ router.get("/sessions/:id/dashboard", async (req, res) => {
         reading_score,
         writing_score,
         speaking_score,
+        tab_switch_count,
+        focus_lost_count,
         test_completed_at
       FROM test_participants
       WHERE session_id = ?
@@ -1089,6 +1261,14 @@ router.get("/sessions/:id/dashboard", async (req, res) => {
       paused: participants.filter((p) => p.test_status === "paused").length,
       left_test: participants.filter((p) => p.test_status === "abandoned")
         .length,
+      total_tab_switches: participants.reduce(
+        (sum, p) => sum + (p.tab_switch_count || 0),
+        0
+      ),
+      total_focus_lost: participants.reduce(
+        (sum, p) => sum + (p.focus_lost_count || 0),
+        0
+      ),
     };
 
     res.json({

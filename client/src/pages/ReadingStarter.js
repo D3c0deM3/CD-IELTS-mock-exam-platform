@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import readingVideo from "../starter_videos/reading_starter.mp4";
 import "./ListeningStarter.css";
+import useActivityMonitor from "../hooks/useActivityMonitor";
 
 function ReadingStarter() {
+  useActivityMonitor("reading_starter");
   const [volume, setVolume] = useState(100);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);

@@ -448,6 +448,78 @@ const setupDatabase = async () => {
       }
     }
 
+    // ==================== COURSE CENTER TABLES ====================
+
+    // Table for course centers (managed by users with role='center')
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS course_centers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL UNIQUE,
+        center_name VARCHAR(255) NOT NULL,
+        max_session_users INT DEFAULT 50,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Table for center students - links students to a course center
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS center_students (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        center_id INT NOT NULL,
+        student_id INT NOT NULL,
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (center_id) REFERENCES course_centers(id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_center_student (center_id, student_id)
+      )
+    `);
+
+    // Table for tracking participant tab switches / focus loss
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS participant_monitoring (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        participant_id INT NOT NULL,
+        session_id INT NOT NULL,
+        event_type ENUM('tab_switch', 'focus_lost', 'focus_gained', 'screen_change') NOT NULL,
+        event_data TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (participant_id) REFERENCES test_participants(id) ON DELETE CASCADE,
+        FOREIGN KEY (session_id) REFERENCES test_sessions(id) ON DELETE CASCADE,
+        KEY idx_participant_session (participant_id, session_id)
+      )
+    `);
+
+    // Add tab_switch_count and focus_lost_count to test_participants
+    const monitoringColumns = [
+      { name: "tab_switch_count", type: "INT DEFAULT 0" },
+      { name: "focus_lost_count", type: "INT DEFAULT 0" },
+    ];
+
+    for (const column of monitoringColumns) {
+      try {
+        await connection.execute(`
+          ALTER TABLE test_participants ADD COLUMN ${column.name} ${column.type}
+        `);
+      } catch (err) {
+        if (err.code !== "ER_DUP_FIELDNAME") {
+          throw err;
+        }
+      }
+    }
+
+    // Add center_id to test_sessions for center-owned sessions
+    try {
+      await connection.execute(`
+        ALTER TABLE test_sessions ADD COLUMN center_id INT DEFAULT NULL
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        throw err;
+      }
+    }
+
     console.log("Database tables created successfully.");
   } catch (err) {
     console.error("Error creating database tables:", err);
