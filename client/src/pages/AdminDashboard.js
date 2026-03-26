@@ -215,6 +215,23 @@ const AdminDashboard = () => {
       fetchCenters();
       setError("");
     } catch (err) {
+      if (err.response?.status === 409 && err.response?.data?.existing_user_id) {
+        try {
+          await adminService.promoteToCenter(
+            err.response.data.existing_user_id,
+            centerForm.center_name,
+            centerForm.max_session_users
+          );
+          setShowCreateCenterModal(false);
+          setCenterForm({ full_name: "", phone_number: "", password: "", center_name: "", max_session_users: 30 });
+          fetchCenters();
+          setError("");
+          return;
+        } catch (promoteErr) {
+          setError(promoteErr.response?.data?.error || "Failed to promote user to center");
+          return;
+        }
+      }
       const msg = err.response?.data?.error || "Failed to create center";
       setError(msg);
       console.error(err);
