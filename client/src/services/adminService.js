@@ -25,7 +25,9 @@ const createTest = (name, description) => {
 const getTests = () => {
   return apiClient.get(`${API_URL}/tests`);
 };
-
+const deleteTest = (id) => {
+  return apiClient.delete(`${API_URL}/tests/${id}`);
+};
 const getTestMaterials = () => {
   return apiClient.get(`${API_URL}/test-materials`);
 };
@@ -57,8 +59,7 @@ const createSession = (
   session_date,
   location,
   max_capacity,
-  admin_notes,
-  test_materials_id
+  admin_notes
 ) => {
   return apiClient.post(`${API_URL}/sessions`, {
     test_id,
@@ -66,7 +67,6 @@ const createSession = (
     location,
     max_capacity,
     admin_notes,
-    test_materials_id,
   });
 };
 
@@ -221,6 +221,14 @@ const deleteCenter = (center_id) => {
   return apiClient.delete(`${API_URL}/centers/${center_id}`);
 };
 
+const getCenterTests = (center_id) => {
+  return apiClient.get(`${API_URL}/centers/${center_id}/tests`);
+};
+
+const assignCenterTests = (center_id, test_ids) => {
+  return apiClient.post(`${API_URL}/centers/${center_id}/tests`, { test_ids });
+};
+
 const adminService = {
   // User Management
   getUsers,
@@ -245,6 +253,7 @@ const adminService = {
   // Test Management
   createTest,
   getTests,
+  deleteTest,
   getTestMaterials,
   setTestConfig,
   getTestConfig,
@@ -271,6 +280,8 @@ const adminService = {
   promoteToCenter,
   updateCenter,
   deleteCenter,
+  getCenterTests,
+  assignCenterTests,
 };
 
 export default adminService;

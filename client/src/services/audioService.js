@@ -21,17 +21,14 @@ let currentTestId = null;
  * @param {number} testId - The test ID (2, 3, etc.)
  * @returns {string} - The audio file URL
  */
-const getAudioFileForTest = (testMaterialsId) => {
+const getBundledAudioForTest = (testMaterialsId) => {
   switch (testMaterialsId) {
     case 2:
       return listeningAudio;
     case 3:
       return listeningAudio3;
     default:
-      console.warn(
-        `No audio file found for test materials ${testMaterialsId}, defaulting to listening_test.mp3`
-      );
-      return listeningAudio;
+      return null;
   }
 };
 
@@ -65,17 +62,20 @@ const getRemoteAudioUrl = async (testMaterialsId) => {
  * @returns {Promise<{duration: number, audio: HTMLAudioElement}>}
  */
 export const preloadAudio = async (testMaterialsId) => {
-  // Determine which test materials to load
-  let test = testMaterialsId;
+  let test = Number(testMaterialsId) || null;
   if (!test) {
     try {
       const participant = JSON.parse(
         localStorage.getItem("currentParticipant") || "{}"
       );
-      test = participant.test_materials_id || 2;
+      test = Number(participant.test_materials_id) || null;
     } catch {
-      test = 2;
+      test = null;
     }
+  }
+
+  if (!test) {
+    throw new Error("No test materials are attached to this session.");
   }
 
   // If already preloading the same test, wait for that to complete
@@ -100,10 +100,13 @@ export const preloadAudio = async (testMaterialsId) => {
   isPreloading = true;
   currentTestId = test;
 
-  let resolvedAudioUrl = getAudioFileForTest(test);
   const remoteAudioUrl = await getRemoteAudioUrl(test);
-  if (remoteAudioUrl) {
-    resolvedAudioUrl = remoteAudioUrl;
+  const resolvedAudioUrl = remoteAudioUrl || getBundledAudioForTest(test);
+
+  if (!resolvedAudioUrl) {
+    isPreloading = false;
+    currentTestId = null;
+    throw new Error(`No audio file configured for test materials ${test}`);
   }
 
   preloadPromise = new Promise((resolve, reject) => {

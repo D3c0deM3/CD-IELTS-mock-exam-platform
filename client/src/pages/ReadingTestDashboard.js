@@ -5,10 +5,25 @@ import API_CONFIG from "../config/api";
 import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
+import {
+  GAP_PLACEHOLDER_REGEX,
+  normalizeTestContent,
+} from "../utils/testContentNormalizer";
 import "./ReadingTestDashboard.css";
 import useActivityMonitor from "../hooks/useActivityMonitor";
 import testDataJson2 from "./mock_2.json";
 import testDataJson3 from "./mock_3.json";
+
+const getBundledTestData = (testMaterialsId) => {
+  switch (Number(testMaterialsId)) {
+    case 2:
+      return testDataJson2;
+    case 3:
+      return testDataJson3;
+    default:
+      return null;
+  }
+};
 
 // ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
 const reapplyHighlights = (
@@ -139,12 +154,14 @@ const extractInstructionsForRange = (fullInstructions, questionIds) => {
 const PassageRenderer = React.forwardRef(
   ({ passage, highlights, onContextMenu }, ref) => {
     if (!passage) return null;
+    const formattedContent =
+      passage.formatted_content || passage.content || passage.text || "";
 
     return (
       <div ref={ref} className="reading-passage" onContextMenu={onContextMenu}>
         <h2 className="passage-title">{passage.title}</h2>
         <div className="passage-content">
-          {passage.formatted_content.split("\n\n").map((paragraph, idx) => {
+          {formattedContent.split("\n\n").map((paragraph, idx) => {
             // Check if paragraph starts with a letter marker (A-Z) followed by space
             const markerMatch = paragraph.match(/^([A-Z])\s+(.*)$/s);
 
@@ -319,6 +336,17 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
               group.type !== "diagram_labeling" &&
               groupQuestions.map((question) => {
                 const answer = answers[question.id];
+                const matchingOptions =
+                  question.matching_options || question.options || [];
+                const isYesNoNotGiven =
+                  question.type === "yes_no_ng" ||
+                  question.type === "yes_no_notgiven" ||
+                  question.type === "yes_no_not_given";
+                const isMatchingQuestion =
+                  question.type === "matching" ||
+                  question.type === "word_bank_matching" ||
+                  question.type === "map_labeling" ||
+                  question.type === "map_labelling";
 
                 return (
                   <div key={question.id} className="question-card">
@@ -352,7 +380,7 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                         </div>
                       )}
 
-                    {question.type === "yes_no_ng" &&
+                    {isYesNoNotGiven &&
                       question.statement &&
                       question.options && (
                         <div className="question-content">
@@ -382,14 +410,14 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                       <div className="question-content">
                         <p className="question-prompt">
                           {question.prompt
-                            .split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/)
+                            .split(GAP_PLACEHOLDER_REGEX)
                             .map((part, i) => {
                               if (!part) return null;
                               // Filter out dot-only parts (no actual content)
                               if (part.match(/^[\.\u2026_\s]+$/)) return null;
                               // Match gap pattern: number followed by dots/ellipsis (at start and end of part)
                               const gapMatch = part.match(
-                                /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
+                                /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/
                               );
 
                               if (gapMatch) {
@@ -490,9 +518,9 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                         </div>
                       )}
 
-                    {question.type === "matching" &&
+                    {isMatchingQuestion &&
                       (question.question || question.prompt) &&
-                      question.matching_options && (
+                      matchingOptions.length > 0 && (
                         <div className="question-content">
                           <p className="question-prompt">
                             {question.question || question.prompt}
@@ -506,7 +534,7 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                               }
                             >
                               <option value="">-- Select an answer --</option>
-                              {question.matching_options.map((option, idx) => {
+                              {matchingOptions.map((option, idx) => {
                                 const letter = option.split(" ")[0];
                                 return (
                                   <option key={idx} value={letter}>
@@ -524,15 +552,15 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                       question.options && (
                         <div className="question-content">
                           <p className="question-prompt">
-                            {question.prompt
-                              .split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/)
+                          {question.prompt
+                              .split(GAP_PLACEHOLDER_REGEX)
                               .map((part, i) => {
                                 if (!part) return null;
                                 // Filter out dot-only parts (no actual content)
                                 if (part.match(/^[\.\u2026_\s]+$/)) return null;
                                 // Match gap pattern: number followed by dots/ellipsis
                                 const gapMatch = part.match(
-                                  /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
+                                  /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/
                                 );
 
                                 if (gapMatch) {
@@ -595,6 +623,7 @@ const ReadingTestDashboard = () => {
   ); // 60 minutes
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [currentPassageIndex, setCurrentPassageIndex] = useState(0);
   const [highlightsByPassage, setHighlightsByPassage] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
@@ -846,55 +875,58 @@ const ReadingTestDashboard = () => {
   useEffect(() => {
     const loadTestData = async () => {
       try {
-        // Get test_materials_id from participant data stored in localStorage
         const participant = JSON.parse(
           localStorage.getItem("currentParticipant") || "{}"
         );
-        const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
-
+        const testMaterialsId = Number(participant.test_materials_id) || 2;
         let selectedTestData = null;
+        let remoteError = null;
 
         try {
           const response = await apiClient.get(
             `/api/materials/sets/${testMaterialsId}/content`
           );
           if (response?.content?.sections) {
-            selectedTestData = response.content;
+            selectedTestData = normalizeTestContent(response.content);
+          } else {
+            throw new Error("The saved material set does not contain content.");
           }
         } catch (err) {
-          selectedTestData = null;
+          remoteError = err;
         }
 
         if (!selectedTestData) {
-          switch (testMaterialsId) {
-            case 2:
-              selectedTestData = testDataJson2;
-              break;
-            case 3:
-              selectedTestData = testDataJson3;
-              break;
-            default:
-              console.warn(
-                `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
-              );
-              selectedTestData = testDataJson2;
-          }
+          selectedTestData = normalizeTestContent(
+            getBundledTestData(testMaterialsId)
+          );
+        }
+
+        if (!selectedTestData) {
+          const apiErrorMessage =
+            remoteError?.response?.data?.error || remoteError?.message;
+          throw new Error(
+            apiErrorMessage ||
+              `No test content was found for material set ${testMaterialsId}.`
+          );
         }
 
         const readingSection = selectedTestData.sections.find(
           (s) => s.type === "reading"
         );
 
-        if (readingSection) {
-          setTestData({
-            type: "reading",
-            passages: readingSection.passages,
-          });
-        } else {
-          console.error("No reading section found in test data");
+        if (!readingSection) {
+          throw new Error("No reading section found in the selected test.");
         }
+
+        setLoadError("");
+        setTestData({
+          type: "reading",
+          passages: readingSection.passages,
+        });
       } catch (error) {
         console.error("Error loading test data:", error);
+        setLoadError(error.message || "Error loading test data");
+        setTestData(null);
       } finally {
         setLoading(false);
       }
@@ -1201,7 +1233,9 @@ const ReadingTestDashboard = () => {
   if (!testData || !testData.passages || testData.passages.length === 0) {
     return (
       <div className="reading-test-dashboard" data-theme={theme}>
-        <div className="error-screen">Error loading test data</div>
+        <div className="error-screen">
+          {loadError || "Error loading test data"}
+        </div>
       </div>
     );
   }

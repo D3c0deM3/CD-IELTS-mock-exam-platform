@@ -28,7 +28,6 @@ const CenterDashboard = () => {
   const [showCreateSessionModal, setShowCreateSessionModal] = useState(false);
   const [sessionForm, setSessionForm] = useState({
     test_id: "",
-    test_materials_id: "",
     session_date: "",
     location: "",
     max_capacity: "",
@@ -302,7 +301,7 @@ const CenterDashboard = () => {
 
   const handleCreateSession = async (e) => {
     e.preventDefault();
-    if (!sessionForm.test_id || !sessionForm.test_materials_id || !sessionForm.session_date || !sessionForm.location) {
+    if (!sessionForm.test_id || !sessionForm.session_date || !sessionForm.location) {
       setError("All fields are required");
       return;
     }
@@ -314,10 +313,9 @@ const CenterDashboard = () => {
         sessionForm.session_date,
         sessionForm.location,
         sessionForm.max_capacity,
-        sessionForm.admin_notes,
-        sessionForm.test_materials_id
+        sessionForm.admin_notes
       );
-      setSessionForm({ test_id: "", session_date: "", location: "", max_capacity: "", admin_notes: "", test_materials_id: "" });
+      setSessionForm({ test_id: "", session_date: "", location: "", max_capacity: "", admin_notes: "" });
       setShowCreateSessionModal(false);
       fetchSessions();
       setError("");
@@ -1202,28 +1200,6 @@ const CenterDashboard = () => {
                   {tests.map((test) => (
                     <option key={test.id} value={test.id}>{test.name}</option>
                   ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Test Materials *</label>
-                <select
-                  className="form-select"
-                  value={sessionForm.test_materials_id}
-                  onChange={(e) => setSessionForm({ ...sessionForm, test_materials_id: parseInt(e.target.value) || "" })}
-                  required
-                >
-                  <option value="">Select materials</option>
-                  {testMaterials
-                    .filter((m) => {
-                      if (!sessionForm.test_id) return true;
-                      if (!m.test_id) return true;
-                      return parseInt(m.test_id, 10) === parseInt(sessionForm.test_id, 10);
-                    })
-                    .map((m) => (
-                      <option key={m.mock_id} value={m.mock_id}>
-                        {m.test_name ? `${m.name} (${m.test_name})` : m.name}
-                      </option>
-                    ))}
                 </select>
               </div>
               <div className="form-group">

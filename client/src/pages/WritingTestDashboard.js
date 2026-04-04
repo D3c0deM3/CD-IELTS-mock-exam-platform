@@ -5,10 +5,22 @@ import API_CONFIG from "../config/api";
 import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
+import { normalizeTestContent } from "../utils/testContentNormalizer";
 import "./WritingTestDashboard.css";
 import useActivityMonitor from "../hooks/useActivityMonitor";
 import testDataJson2 from "./mock_2.json";
 import testDataJson3 from "./mock_3.json";
+
+const getBundledTestData = (testMaterialsId) => {
+  switch (Number(testMaterialsId)) {
+    case 2:
+      return testDataJson2;
+    case 3:
+      return testDataJson3;
+    default:
+      return null;
+  }
+};
 
 // ==================== CHART RENDERER ====================
 const ChartRenderer = ({ graphData }) => {
@@ -367,6 +379,7 @@ const WritingTestDashboard = () => {
   ); // 60 minutes
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -616,55 +629,58 @@ const WritingTestDashboard = () => {
   useEffect(() => {
     const loadTestData = async () => {
       try {
-        // Get test_materials_id from participant data stored in localStorage
         const participant = JSON.parse(
           localStorage.getItem("currentParticipant") || "{}"
         );
-        const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
-
+        const testMaterialsId = Number(participant.test_materials_id) || 2;
         let selectedTestData = null;
+        let remoteError = null;
 
         try {
           const response = await apiClient.get(
             `/api/materials/sets/${testMaterialsId}/content`
           );
           if (response?.content?.sections) {
-            selectedTestData = response.content;
+            selectedTestData = normalizeTestContent(response.content);
+          } else {
+            throw new Error("The saved material set does not contain content.");
           }
         } catch (err) {
-          selectedTestData = null;
+          remoteError = err;
         }
 
         if (!selectedTestData) {
-          switch (testMaterialsId) {
-            case 2:
-              selectedTestData = testDataJson2;
-              break;
-            case 3:
-              selectedTestData = testDataJson3;
-              break;
-            default:
-              console.warn(
-                `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
-              );
-              selectedTestData = testDataJson2;
-          }
+          selectedTestData = normalizeTestContent(
+            getBundledTestData(testMaterialsId)
+          );
+        }
+
+        if (!selectedTestData) {
+          const apiErrorMessage =
+            remoteError?.response?.data?.error || remoteError?.message;
+          throw new Error(
+            apiErrorMessage ||
+              `No test content was found for material set ${testMaterialsId}.`
+          );
         }
 
         const writingSection = selectedTestData.sections.find(
           (s) => s.type === "writing"
         );
 
-        if (writingSection) {
-          setTestData({
-            type: "writing",
-            tasks: writingSection.tasks,
-          });
-        } else {
-          console.error("No writing section found in test data");
+        if (!writingSection) {
+          throw new Error("No writing section found in the selected test.");
         }
+
+        setLoadError("");
+        setTestData({
+          type: "writing",
+          tasks: writingSection.tasks,
+        });
       } catch (error) {
         console.error("Error loading test data:", error);
+        setLoadError(error.message || "Error loading test data");
+        setTestData(null);
       } finally {
         setLoading(false);
       }
@@ -822,12 +838,20 @@ const WritingTestDashboard = () => {
   if (!testData || !testData.tasks || testData.tasks.length === 0) {
     return (
       <div className="writing-test-dashboard" data-theme={theme}>
-        <div className="error-screen">Error loading test data</div>
+        <div className="error-screen">
+          {loadError || "Error loading test data"}
+        </div>
       </div>
     );
   }
 
   const currentTask = testData.tasks[currentTaskIndex];
+  const taskWordCounts = testData.tasks.map((task) => ({
+    taskNumber: task.task_number,
+    words: (answers[task.task_number] || "")
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length,
+  }));
 
   // ==================== MAIN RENDER ====================
   return (
@@ -862,60 +886,115 @@ const WritingTestDashboard = () => {
       <div className="writing-content">
         {/* LEFT COLUMN - GRAPH/TOPIC */}
         <div className="graph-column">
-          {currentTask.type === "graph_description" &&
-            currentTask.graph_data && (
-              <div className="graph-wrapper">
-                <h2 className="graph-title">{currentTask.graph_data.title}</h2>
-                <p className="instruction-text">{currentTask.instructions}</p>
-                {currentTask.requirements && (
-                  <p className="requirement-text">
-                    <strong>Requirements:</strong> {currentTask.requirements}
-                  </p>
-                )}
-                <ChartRenderer key={theme} graphData={currentTask.graph_data} />
-                <div className="task-meta">
-                  <span className="word-limit">
-                    Minimum {currentTask.word_limit} words
-                  </span>
-                  <span className="time-limit">
-                    {currentTask.time_limit} minutes
-                  </span>
-                </div>
-              </div>
-            )}
-          {currentTask.type === "essay" && (
             <div className="essay-topic-wrapper">
               <h2 className="topic-title">
-                Topic: Task {currentTask.task_number}
+                {currentTask.title || `Task ${currentTask.task_number || ''}`}
               </h2>
-              <p className="topic-text">{currentTask.instructions}</p>
+              
+              {currentTask.instructions && (
+                <p className="instruction-text" style={{ whiteSpace: 'pre-wrap', marginBottom: '15px' }}>
+                  {currentTask.instructions}
+                </p>
+              )}
+
+              {currentTask.prompt && (
+                <div className="topic-text" style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '20px', padding: '15px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                  {currentTask.prompt}
+                </div>
+              )}
+
+              {currentTask.type === "graph_description" && currentTask.graph_data && (
+                <div className="graph-wrapper">
+                  <ChartRenderer key={theme} graphData={currentTask.graph_data} />
+                </div>
+              )}
+
+              {currentTask.visual_content && currentTask.visual_content.type === "dual_maps" && (
+                <div className="dual-maps-container" style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
+                  {currentTask.visual_content.maps.map((map, i) => (
+                    <div key={i} className="map-box" style={{ flex: 1, border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                      <h4 style={{textAlign: 'center', marginBottom: '10px'}}>{map.title}</h4>
+                      {map.compass && <p style={{textAlign: 'right', fontWeight: 'bold', margin: '0 0 10px 0'}}>{map.compass}</p>}
+                      <ul style={{ paddingLeft: '20px' }}>
+                        {map.layout && map.layout.map((item, j) => (
+                          <li key={j} style={{marginBottom: '5px'}}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {currentTask.visual_content && currentTask.visual_content.type !== "dual_maps" && (
+                <div className="generic-visual-content" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f5f5f5', border: '1px solid #ddd' }}>
+                   <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'inherit'}}>{JSON.stringify(currentTask.visual_content, null, 2)}</pre>
+                </div>
+              )}
+
+              {currentTask.map_data && currentTask.map_data.maps && (
+                <div className="dual-maps-container" style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
+                  {currentTask.map_data.maps.map((map, i) => (
+                    <div key={i} className="map-box" style={{ flex: 1, border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                      <h4 style={{textAlign: 'center', marginBottom: '10px'}}>{map.title}</h4>
+                      {map.compass && <p style={{textAlign: 'right', fontWeight: 'bold', margin: '0 0 10px 0'}}>N: {map.compass.N}, W: {map.compass.W}, E: {map.compass.E}, S: {map.compass.S}</p>}
+                      <ul style={{ paddingLeft: '20px' }}>
+                        {map.features && map.features.map((feature, j) => (
+                          <li key={j} style={{marginBottom: '5px'}}><strong>{feature.label}</strong>: {feature.position}</li>
+                        ))}
+                        {map.layout && map.layout.map((item, j) => (
+                          <li key={'l'+j} style={{marginBottom: '5px'}}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+
+
+              {currentTask.visual_content && currentTask.visual_content.type === "dual_maps" && (
+                <div className="maps-wrapper" style={{ display: 'flex', gap: '20px', marginTop: '20px', flexDirection: 'column' }}>
+                  {currentTask.visual_content.maps.map((mapData, idx) => (
+                    <div key={idx} className="map-container" style={{ border: '1px solid var(--border-color)', padding: '15px', borderRadius: '8px' }}>
+                       <h3 style={{ textAlign: 'center', marginBottom: '10px' }}>{mapData.title}</h3>
+                       <ul style={{ listStyleType: 'disc', paddingLeft: '20px' }}>
+                         {mapData.layout && mapData.layout.map((item, idxx) => (
+                           <li key={idxx} style={{ marginBottom: '5px' }}>{item}</li>
+                         ))}
+                       </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {currentTask.questions && currentTask.questions.length > 0 && (
-                <div className="topic-questions">
-                  {currentTask.questions.map((question, idx) => (
-                    <p key={idx} className="topic-question-item">
-                      {idx + 1}. {question}
+                <div className="topic-questions" style={{ marginTop: '20px' }}>
+                  {currentTask.questions.map((q, idx) => (
+                    <p key={idx} className="topic-question-item" style={{ marginBottom: '8px' }}>
+                      {idx + 1}.{" "}
+                      {typeof q === "string"
+                        ? q
+                        : q?.prompt || q?.question || q?.text || JSON.stringify(q)}
                     </p>
                   ))}
                 </div>
               )}
-              {currentTask.requirements && (
-                <p className="requirement-text">
-                  <strong>Requirements:</strong> {currentTask.requirements}
-                </p>
-              )}
-              <div className="task-meta">
-                <span className="word-limit">
-                  Minimum {currentTask.word_limit} words
-                </span>
-                <span className="time-limit">
-                  {currentTask.time_limit} minutes
-                </span>
+
+              <div className="task-meta" style={{ marginTop: '30px', display: 'flex', gap: '15px', color: 'var(--text-secondary)' }}>
+                {(currentTask.word_limit || currentTask.requirements) && (
+                  <span className="word-limit">
+                    {currentTask.word_limit || currentTask.requirements}
+                  </span>
+                )}
+                {(currentTask.time_limit || currentTask.time_recommended) && (
+                  <span className="time-limit">
+                    {currentTask.time_limit || currentTask.time_recommended}
+                  </span>
+                )}
               </div>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* RIGHT COLUMN - ESSAY WRITING BOX */}
+          {/* RIGHT COLUMN - ESSAY WRITING BOX */}
         <div className="essay-column">
           <TaskRenderer
             task={currentTask}
@@ -942,11 +1021,9 @@ const WritingTestDashboard = () => {
         </div>
 
         <div className="word-count-info">
-          Task 1:{" "}
-          {(answers[1] || "").split(/\s+/).filter((w) => w.length > 0).length}{" "}
-          words | Task 2:{" "}
-          {(answers[2] || "").split(/\s+/).filter((w) => w.length > 0).length}{" "}
-          words
+          {taskWordCounts
+            .map((task) => `Task ${task.taskNumber}: ${task.words} words`)
+            .join(" | ")}
         </div>
 
         <button
@@ -966,26 +1043,11 @@ const WritingTestDashboard = () => {
               <h2>Submit Writing Test?</h2>
             </div>
             <div className="modal-body">
-              <p className="word-summary">
-                Task 1:{" "}
-                <strong>
-                  {
-                    (answers[1] || "").split(/\s+/).filter((w) => w.length > 0)
-                      .length
-                  }
-                </strong>{" "}
-                words
-              </p>
-              <p className="word-summary">
-                Task 2:{" "}
-                <strong>
-                  {
-                    (answers[2] || "").split(/\s+/).filter((w) => w.length > 0)
-                      .length
-                  }
-                </strong>{" "}
-                words
-              </p>
+              {taskWordCounts.map((task) => (
+                <p key={task.taskNumber} className="word-summary">
+                  Task {task.taskNumber}: <strong>{task.words}</strong> words
+                </p>
+              ))}
               <p className="warning-message">
                 Once you submit, you cannot return to modify your answers.
               </p>

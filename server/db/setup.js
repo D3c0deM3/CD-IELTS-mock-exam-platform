@@ -118,6 +118,7 @@ const setupDatabase = async () => {
       CREATE TABLE IF NOT EXISTS test_sessions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         test_id INT NOT NULL,
+        test_materials_id INT DEFAULT NULL,
         session_date DATETIME NOT NULL,
         location VARCHAR(255) NOT NULL,
         max_capacity INT,
@@ -129,6 +130,36 @@ const setupDatabase = async () => {
         FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
       )
+    `);
+
+    try {
+      await connection.execute(`
+        ALTER TABLE test_sessions ADD COLUMN test_materials_id INT DEFAULT NULL AFTER test_id
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_FIELDNAME") {
+        throw err;
+      }
+    }
+
+    try {
+      await connection.execute(`
+        CREATE INDEX idx_test_sessions_materials ON test_sessions (test_materials_id)
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_KEYNAME") {
+        throw err;
+      }
+    }
+
+    await connection.execute(`
+      UPDATE test_sessions
+      SET test_materials_id = CAST(
+        SUBSTRING_INDEX(SUBSTRING_INDEX(admin_notes, ']', 1), ':', -1) AS UNSIGNED
+      )
+      WHERE test_materials_id IS NULL
+        AND admin_notes IS NOT NULL
+        AND admin_notes LIKE '[MOCK_ID:%]%'
     `);
 
     await connection.execute(`
@@ -146,6 +177,18 @@ const setupDatabase = async () => {
     `);
 
     // Table for test participants with assigned IDs and score tracking
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS center_tests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        center_id INT NOT NULL,
+        test_id INT NOT NULL,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (center_id) REFERENCES course_centers(id) ON DELETE CASCADE,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_center_test (center_id, test_id)
+      )
+    `);
+
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS test_participants (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -287,6 +330,29 @@ const setupDatabase = async () => {
         FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
         FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE RESTRICT,
         KEY idx_test_material_set (test_id)
+      )
+    `);
+
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS test_material_set_images (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        set_id INT NOT NULL,
+        placeholder_key VARCHAR(255) NOT NULL,
+        label VARCHAR(255),
+        context_type VARCHAR(100),
+        context_label VARCHAR(255),
+        file_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_url VARCHAR(500) NOT NULL,
+        file_size BIGINT,
+        mime_type VARCHAR(100),
+        uploaded_by INT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (set_id) REFERENCES test_material_sets(id) ON DELETE CASCADE,
+        FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE RESTRICT,
+        UNIQUE KEY unique_set_placeholder (set_id, placeholder_key),
+        KEY idx_material_set_images_set (set_id)
       )
     `);
 

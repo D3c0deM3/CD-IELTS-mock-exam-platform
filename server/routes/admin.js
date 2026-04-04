@@ -3,6 +3,10 @@ const router = express.Router();
 const db = require("../db");
 const authMiddleware = require("../middleware/auth");
 const { calculateBandScore } = require("../utils/scoreCalculator");
+const {
+  getValidatedMaterialSetIdForTest,
+  sanitizeSessionNotes,
+} = require("../utils/testMaterialSets");
 
 // Middleware to check for admin role
 const adminMiddleware = async (req, res, next) => {
@@ -369,9 +373,24 @@ router.post("/tests", async (req, res) => {
 router.get("/tests", async (req, res) => {
   try {
     const [rows] = await db.execute(
-      "SELECT id, name, description FROM tests ORDER BY id DESC"
+      `SELECT t.id, t.name, t.description, 
+        (SELECT m.name FROM test_material_sets m WHERE m.test_id = t.id ORDER BY m.created_at DESC LIMIT 1) as connected_material
+       FROM tests t 
+       ORDER BY t.id DESC`
     );
     res.json(rows);
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/admin/tests/:id - Delete a test
+router.delete("/tests/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.execute("DELETE FROM tests WHERE id = ?", [id]);
+    res.json({ message: "Test deleted successfully" });
   } catch (err) {
     console.error("DB error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -474,11 +493,11 @@ router.get("/tests/:id/config", async (req, res) => {
 router.post("/sessions", async (req, res) => {
   const {
     test_id,
+    test_materials_id,
     session_date,
     location,
     max_capacity,
     admin_notes,
-    test_materials_id,
   } = req.body;
 
   if (!test_id || !session_date || !location) {
@@ -488,19 +507,27 @@ router.post("/sessions", async (req, res) => {
   }
 
   try {
-    // Combine admin_notes with test_materials_id
-    const notesWithMaterials = admin_notes
-      ? `[MOCK_ID:${test_materials_id || 2}] ${admin_notes}`
-      : `[MOCK_ID:${test_materials_id || 2}]`;
+    const resolvedMaterialSetId = await getValidatedMaterialSetIdForTest(
+      test_id,
+      test_materials_id
+    );
+
+    if (!resolvedMaterialSetId) {
+      return res.status(400).json({
+        error:
+          "No uploaded material set was found for this test. Save the test content first, then create the session.",
+      });
+    }
 
     const [result] = await db.execute(
-      "INSERT INTO test_sessions (test_id, session_date, location, max_capacity, admin_notes, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO test_sessions (test_id, test_materials_id, session_date, location, max_capacity, admin_notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
         test_id,
+        resolvedMaterialSetId,
         session_date,
         location,
         max_capacity || null,
-        notesWithMaterials,
+        sanitizeSessionNotes(admin_notes),
         req.user.id,
       ]
     );
@@ -508,7 +535,7 @@ router.post("/sessions", async (req, res) => {
     res.status(201).json({
       message: "Test session created successfully",
       sessionId: result.insertId,
-      test_materials_id: test_materials_id || 2,
+      test_materials_id: resolvedMaterialSetId,
     });
   } catch (err) {
     console.error("DB error:", err);
@@ -523,6 +550,7 @@ router.get("/sessions", async (req, res) => {
       `SELECT 
         ts.id,
         ts.test_id,
+        ts.test_materials_id,
         t.name as test_name,
         ts.session_date,
         ts.location,
@@ -1476,6 +1504,66 @@ router.get("/participants/:id/answers", async (req, res) => {
   } catch (err) {
     console.error("DB error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+// ==================== ASSIGN TESTS TO CENTER ====================
+
+// GET /api/admin/centers/:id/tests - Get tests assigned to a center
+router.get("/centers/:id/tests", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await db.execute(
+      `SELECT t.id, t.name, t.description, ct.assigned_at
+       FROM tests t
+       JOIN center_tests ct ON t.id = ct.test_id
+       WHERE ct.center_id = ?
+       ORDER BY t.id DESC`,
+      [id]
+    );
+    res.json({ tests: rows });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/admin/centers/:id/tests - Assign tests to a center
+router.post("/centers/:id/tests", async (req, res) => {
+  const { id } = req.params;
+  const { test_ids } = req.body;
+
+  if (!test_ids || !Array.isArray(test_ids)) {
+    return res.status(400).json({ error: "test_ids must be an array" });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    await connection.execute("DELETE FROM center_tests WHERE center_id = ?", [id]);
+
+    if (test_ids.length > 0) {
+      const values = test_ids.map(testId => [id, testId]);
+      const placeholders = values.map(() => "(?, ?)").join(", ");
+      const flatValues = values.flat();
+
+      await connection.execute(
+        `INSERT INTO center_tests (center_id, test_id) VALUES ${placeholders}`,
+        flatValues
+      );
+    }
+
+    await connection.commit();
+    res.json({ message: "Tests assigned successfully" });
+  } catch (err) {
+    await connection.rollback();
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  } finally {
+    connection.release();
   }
 });
 

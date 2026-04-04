@@ -42,14 +42,13 @@ const getTestMaterials = () => {
 
 // ==================== SESSION MANAGEMENT ====================
 
-const createSession = (test_id, session_date, location, max_capacity, admin_notes, test_materials_id) => {
+const createSession = (test_id, session_date, location, max_capacity, admin_notes) => {
   return apiClient.post(`${API_URL}/sessions`, {
     test_id,
     session_date,
     location,
     max_capacity,
     admin_notes,
-    test_materials_id,
   });
 };
 

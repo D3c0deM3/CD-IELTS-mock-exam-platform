@@ -74,11 +74,14 @@ function ListeningStarter() {
   useEffect(() => {
     const preloadTestAudio = async () => {
       try {
-        // Get test_materials_id from participant data stored in localStorage
         const participant = JSON.parse(
           localStorage.getItem("currentParticipant") || "{}"
         );
-        const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
+        const testMaterialsId = Number(participant.test_materials_id) || null;
+
+        if (!testMaterialsId) {
+          throw new Error("No test materials are attached to this session.");
+        }
 
         await audioService.preloadAudio(testMaterialsId);
         console.log(

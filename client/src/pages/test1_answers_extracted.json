@@ -1,0 +1,349 @@
+{
+  "test": "Uploaded Test1 PDF (mixed source)",
+  "answers": {
+    "listening": [
+      {
+        "question": 1,
+        "answer": "Database"
+      },
+      {
+        "question": 2,
+        "answer": "Rock"
+      },
+      {
+        "question": 3,
+        "answer": "Month"
+      },
+      {
+        "question": 4,
+        "answer": "45"
+      },
+      {
+        "question": 5,
+        "answer": "750"
+      },
+      {
+        "question": 6,
+        "answer": "studio"
+      },
+      {
+        "question": 7,
+        "answer": "legal"
+      },
+      {
+        "question": 8,
+        "answer": "recording"
+      },
+      {
+        "question": 9,
+        "answer": "Kippax"
+      },
+      {
+        "question": 10,
+        "answer": "Talent"
+      },
+      {
+        "question": 11,
+        "answer": "A"
+      },
+      {
+        "question": 12,
+        "answer": "B"
+      },
+      {
+        "question": 13,
+        "answer": "C"
+      },
+      {
+        "question": 14,
+        "answer": "B"
+      },
+      {
+        "question": 15,
+        "answer": "G"
+      },
+      {
+        "question": 16,
+        "answer": "A"
+      },
+      {
+        "question": 17,
+        "answer": "C"
+      },
+      {
+        "question": 18,
+        "answer": "H"
+      },
+      {
+        "question": 19,
+        "answer": "D"
+      },
+      {
+        "question": 20,
+        "answer": "B"
+      },
+      {
+        "question": 21,
+        "answer": "A"
+      },
+      {
+        "question": 22,
+        "answer": "B"
+      },
+      {
+        "question": 23,
+        "answer": "A"
+      },
+      {
+        "question": 24,
+        "answer": "A"
+      },
+      {
+        "question": 25,
+        "answer": "B"
+      },
+      {
+        "question": 26,
+        "answer": "C"
+      },
+      {
+        "question": 27,
+        "answer": "D"
+      },
+      {
+        "question": 28,
+        "answer": "B"
+      },
+      {
+        "question": 29,
+        "answer": "C"
+      },
+      {
+        "question": 30,
+        "answer": "A"
+      },
+      {
+        "question": 31,
+        "answer": "Flooding"
+      },
+      {
+        "question": 32,
+        "answer": "Firewood"
+      },
+      {
+        "question": 33,
+        "answer": "Fertilizer"
+      },
+      {
+        "question": 34,
+        "answer": "Trash"
+      },
+      {
+        "question": 35,
+        "answer": "Sand"
+      },
+      {
+        "question": 36,
+        "answer": "Grey"
+      },
+      {
+        "question": 37,
+        "answer": "Hot house"
+      },
+      {
+        "question": 38,
+        "answer": "Salty"
+      },
+      {
+        "question": 39,
+        "answer": "Rabbit"
+      },
+      {
+        "question": 40,
+        "answer": "storm"
+      }
+    ],
+    "reading": [
+      {
+        "question": 1,
+        "answer": "False"
+      },
+      {
+        "question": 2,
+        "answer": "True"
+      },
+      {
+        "question": 3,
+        "answer": "Not Given"
+      },
+      {
+        "question": 4,
+        "answer": "True"
+      },
+      {
+        "question": 5,
+        "answer": "True"
+      },
+      {
+        "question": 6,
+        "answer": "Not Given"
+      },
+      {
+        "question": 7,
+        "answer": "pit"
+      },
+      {
+        "question": 8,
+        "answer": "thatch"
+      },
+      {
+        "question": 9,
+        "answer": "tiring house"
+      },
+      {
+        "question": 10,
+        "answer": "musicians"
+      },
+      {
+        "question": 11,
+        "answer": "sprinklers"
+      },
+      {
+        "question": 12,
+        "answer": "half"
+      },
+      {
+        "question": 13,
+        "answer": "Covered"
+      },
+      {
+        "question": 14,
+        "answer": "B"
+      },
+      {
+        "question": 15,
+        "answer": "D"
+      },
+      {
+        "question": 16,
+        "answer": "E"
+      },
+      {
+        "question": 17,
+        "answer": "C"
+      },
+      {
+        "question": 18,
+        "answer": "A"
+      },
+      {
+        "question": 19,
+        "answer": "C"
+      },
+      {
+        "question": 20,
+        "answer": "A"
+      },
+      {
+        "question": 21,
+        "answer": "C"
+      },
+      {
+        "question": 22,
+        "answer": "A"
+      },
+      {
+        "question": 23,
+        "answer": "B"
+      },
+      {
+        "question": 24,
+        "answer": "ageing"
+      },
+      {
+        "question": 25,
+        "answer": "lifespan"
+      },
+      {
+        "question": 26,
+        "answer": "conflict"
+      },
+      {
+        "question": 27,
+        "answer": "B"
+      },
+      {
+        "question": 28,
+        "answer": "A"
+      },
+      {
+        "question": 29,
+        "answer": "I"
+      },
+      {
+        "question": 30,
+        "answer": "G"
+      },
+      {
+        "question": 31,
+        "answer": "C"
+      },
+      {
+        "question": 32,
+        "answer": "No"
+      },
+      {
+        "question": 33,
+        "answer": "Not given"
+      },
+      {
+        "question": 34,
+        "answer": "Yes"
+      },
+      {
+        "question": 35,
+        "answer": "Not Given"
+      },
+      {
+        "question": 36,
+        "answer": "Yes"
+      },
+      {
+        "question": 37,
+        "answer": "C"
+      },
+      {
+        "question": 38,
+        "answer": "A"
+      },
+      {
+        "question": 39,
+        "answer": "D"
+      },
+      {
+        "question": 40,
+        "answer": "C"
+      }
+    ]
+  },
+  "answer_formats": {
+    "listening": {
+      "1-10": "Short answers/numbers",
+      "11-14": "Multiple choice (letters)",
+      "15-20": "Map labeling / matching (letters)",
+      "21-26": "Multiple choice (letters)",
+      "27-30": "Matching (letters)",
+      "31-40": "Short answers"
+    },
+    "reading": {
+      "1-6": "True/False/Not Given",
+      "7-13": "Short answers",
+      "14-19": "Paragraph matching (letters)",
+      "20-23": "Researcher matching (letters)",
+      "24-26": "Short answers",
+      "27-31": "Summary completion from word list (letters)",
+      "32-36": "Yes/No/Not Given",
+      "37-40": "Multiple choice (letters)"
+    }
+  }
+}

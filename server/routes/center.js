@@ -3,6 +3,10 @@ const router = express.Router();
 const db = require("../db");
 const authMiddleware = require("../middleware/auth");
 const { calculateBandScore } = require("../utils/scoreCalculator");
+const {
+  getValidatedMaterialSetIdForTest,
+  sanitizeSessionNotes,
+} = require("../utils/testMaterialSets");
 
 // Middleware to check for center role
 const centerMiddleware = async (req, res, next) => {
@@ -281,11 +285,12 @@ router.get("/students/:userId/stats", async (req, res) => {
 
 // ==================== TEST MANAGEMENT ====================
 
-// GET /api/center/tests - Get all tests
+// GET /api/center/tests - Get tests assigned to center
 router.get("/tests", async (req, res) => {
   try {
     const [rows] = await db.execute(
-      "SELECT id, name, description FROM tests ORDER BY id DESC"
+      "SELECT t.id, t.name, t.description FROM tests t JOIN center_tests ct ON t.id = ct.test_id WHERE ct.center_id = ? ORDER BY t.id DESC",
+      [req.center.id]
     );
     res.json(rows);
   } catch (err) {
@@ -301,7 +306,10 @@ router.get("/test-materials", async (req, res) => {
       `SELECT ms.id, ms.test_id, ms.name, t.name AS test_name
        FROM test_material_sets ms
        JOIN tests t ON ms.test_id = t.id
-       ORDER BY ms.updated_at DESC`
+       JOIN center_tests ct ON ms.test_id = ct.test_id
+       WHERE ct.center_id = ?
+       ORDER BY ms.updated_at DESC`,
+      [req.center.id]
     );
 
     if (rows.length > 0) {
@@ -355,8 +363,14 @@ router.get("/test-materials", async (req, res) => {
 
 // POST /api/center/sessions - Create a session (center-owned)
 router.post("/sessions", async (req, res) => {
-  const { test_id, session_date, location, max_capacity, admin_notes, test_materials_id } =
-    req.body;
+  const {
+    test_id,
+    test_materials_id,
+    session_date,
+    location,
+    max_capacity,
+    admin_notes,
+  } = req.body;
 
   if (!test_id || !session_date || !location) {
     return res.status(400).json({ error: "test_id, session_date, and location are required" });
@@ -368,18 +382,36 @@ router.post("/sessions", async (req, res) => {
     : req.center.max_session_users;
 
   try {
-    const notesWithMaterials = admin_notes
-      ? `[MOCK_ID:${test_materials_id || 2}] ${admin_notes}`
-      : `[MOCK_ID:${test_materials_id || 2}]`;
+    const resolvedMaterialSetId = await getValidatedMaterialSetIdForTest(
+      test_id,
+      test_materials_id
+    );
+
+    if (!resolvedMaterialSetId) {
+      return res.status(400).json({
+        error:
+          "No uploaded material set was found for this test. Save the test content first, then create the session.",
+      });
+    }
 
     const [result] = await db.execute(
-      "INSERT INTO test_sessions (test_id, session_date, location, max_capacity, admin_notes, created_by, center_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [test_id, session_date, location, capacity, notesWithMaterials, req.user.id, req.center.id]
+      "INSERT INTO test_sessions (test_id, test_materials_id, session_date, location, max_capacity, admin_notes, created_by, center_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        test_id,
+        resolvedMaterialSetId,
+        session_date,
+        location,
+        capacity,
+        sanitizeSessionNotes(admin_notes),
+        req.user.id,
+        req.center.id,
+      ]
     );
 
     res.status(201).json({
       message: "Session created successfully",
       sessionId: result.insertId,
+      test_materials_id: resolvedMaterialSetId,
       max_capacity: capacity,
       center_limit: req.center.max_session_users,
     });
@@ -396,6 +428,7 @@ router.get("/sessions", async (req, res) => {
       `SELECT 
         ts.id,
         ts.test_id,
+        ts.test_materials_id,
         t.name as test_name,
         ts.session_date,
         ts.location,

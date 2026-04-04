@@ -7,6 +7,11 @@ const {
   calculateListeningScore,
   calculateReadingScore,
 } = require("../utils/scoreCalculator");
+const {
+  getValidatedMaterialSetIdForTest,
+  resolveSessionMaterialSetId,
+  sanitizeSessionNotes,
+} = require("../utils/testMaterialSets");
 
 /**
  * POST /api/test-sessions/register-students
@@ -136,8 +141,14 @@ router.get("/my-registrations", authMiddleware, async (req, res) => {
  * Body: { test_id, session_date, location, max_capacity, admin_notes }
  */
 router.post("/create", authMiddleware, async (req, res) => {
-  const { test_id, session_date, location, max_capacity, admin_notes } =
-    req.body;
+  const {
+    test_id,
+    test_materials_id,
+    session_date,
+    location,
+    max_capacity,
+    admin_notes,
+  } = req.body;
 
   // Check if user is admin
   const [userRows] = await db.execute("SELECT role FROM users WHERE id = ?", [
@@ -154,14 +165,27 @@ router.post("/create", authMiddleware, async (req, res) => {
   }
 
   try {
+    const resolvedMaterialSetId = await getValidatedMaterialSetIdForTest(
+      test_id,
+      test_materials_id
+    );
+
+    if (!resolvedMaterialSetId) {
+      return res.status(400).json({
+        error:
+          "No uploaded material set was found for this test. Save the test content first, then create the session.",
+      });
+    }
+
     const [result] = await db.execute(
-      "INSERT INTO test_sessions (test_id, session_date, location, max_capacity, admin_notes, created_by, status) VALUES (?, ?, ?, ?, ?, ?, 'scheduled')",
+      "INSERT INTO test_sessions (test_id, test_materials_id, session_date, location, max_capacity, admin_notes, created_by, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')",
       [
         test_id,
+        resolvedMaterialSetId,
         session_date,
         location,
         max_capacity || null,
-        admin_notes || null,
+        sanitizeSessionNotes(admin_notes),
         req.user.id,
       ]
     );
@@ -169,6 +193,7 @@ router.post("/create", authMiddleware, async (req, res) => {
     res.status(201).json({
       message: "Test session created successfully",
       session_id: result.insertId,
+      test_materials_id: resolvedMaterialSetId,
     });
   } catch (err) {
     console.error("Error creating test session:", err);
@@ -225,6 +250,7 @@ router.get("/:id", authMiddleware, async (req, res) => {
       `SELECT 
         ts.id,
         ts.test_id,
+        ts.test_materials_id,
         t.name as test_name,
         t.description,
         ts.session_date,
@@ -266,7 +292,7 @@ router.post("/check-in-participant", async (req, res) => {
   try {
     // Find participant by ID code
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.participant_status, ts.test_id, t.name as test_name, ts.admin_notes
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.participant_status, ts.test_id, ts.test_materials_id, t.name as test_name, ts.admin_notes
        FROM test_participants tp
        JOIN test_sessions ts ON tp.session_id = ts.id
        JOIN tests t ON ts.test_id = t.id
@@ -309,13 +335,17 @@ router.post("/check-in-participant", async (req, res) => {
       [participant.id]
     );
 
-    // Extract test_materials_id from admin_notes if available
-    let test_materials_id = 2; // Default to mock 2
-    if (participant.admin_notes) {
-      const mockIdMatch = participant.admin_notes.match(/\[MOCK_ID:(\d+)\]/);
-      if (mockIdMatch) {
-        test_materials_id = parseInt(mockIdMatch[1]);
-      }
+    const test_materials_id = await resolveSessionMaterialSetId({
+      testId: participant.test_id,
+      testMaterialsId: participant.test_materials_id,
+      adminNotes: participant.admin_notes,
+    });
+
+    if (!test_materials_id) {
+      return res.status(409).json({
+        error:
+          "This session does not have test content attached yet. Please contact the administrator.",
+      });
     }
 
     res.json({
@@ -465,7 +495,7 @@ router.post("/submit-listening", async (req, res) => {
   try {
     // Verify participant exists and get test_id and admin_notes for test_materials_id
     const [participantRows] = await db.execute(
-      "SELECT tp.id, tp.full_name, ts.test_id, ts.admin_notes FROM test_participants tp JOIN test_sessions ts ON tp.session_id = ts.id WHERE tp.id = ?",
+      "SELECT tp.id, tp.full_name, ts.test_id, ts.test_materials_id, ts.admin_notes FROM test_participants tp JOIN test_sessions ts ON tp.session_id = ts.id WHERE tp.id = ?",
       [participant_id]
     );
 
@@ -474,15 +504,17 @@ router.post("/submit-listening", async (req, res) => {
     }
 
     const participant = participantRows[0];
-    const testId = participant.test_id || 2; // Default to test 2 if not found
+    const testMaterialsId = await resolveSessionMaterialSetId({
+      testId: participant.test_id,
+      testMaterialsId: participant.test_materials_id,
+      adminNotes: participant.admin_notes,
+    });
 
-    // Extract test_materials_id from admin_notes if available
-    let testMaterialsId = 2; // Default to mock 2
-    if (participant.admin_notes) {
-      const mockIdMatch = participant.admin_notes.match(/\[MOCK_ID:(\d+)\]/);
-      if (mockIdMatch) {
-        testMaterialsId = parseInt(mockIdMatch[1]);
-      }
+    if (!testMaterialsId) {
+      return res.status(409).json({
+        error:
+          "This session does not have test content attached yet. Please contact the administrator.",
+      });
     }
 
     // Verify name matches
@@ -588,7 +620,7 @@ router.post("/submit-reading", async (req, res) => {
   try {
     // Verify participant exists and get test_id and admin_notes for test_materials_id
     const [participantRows] = await db.execute(
-      "SELECT tp.id, tp.full_name, ts.test_id, ts.admin_notes FROM test_participants tp JOIN test_sessions ts ON tp.session_id = ts.id WHERE tp.id = ?",
+      "SELECT tp.id, tp.full_name, ts.test_id, ts.test_materials_id, ts.admin_notes FROM test_participants tp JOIN test_sessions ts ON tp.session_id = ts.id WHERE tp.id = ?",
       [participant_id]
     );
 
@@ -597,15 +629,17 @@ router.post("/submit-reading", async (req, res) => {
     }
 
     const participant = participantRows[0];
-    const testId = participant.test_id || 2; // Default to test 2 if not found
+    const testMaterialsId = await resolveSessionMaterialSetId({
+      testId: participant.test_id,
+      testMaterialsId: participant.test_materials_id,
+      adminNotes: participant.admin_notes,
+    });
 
-    // Extract test_materials_id from admin_notes if available
-    let testMaterialsId = 2; // Default to mock 2
-    if (participant.admin_notes) {
-      const mockIdMatch = participant.admin_notes.match(/\[MOCK_ID:(\d+)\]/);
-      if (mockIdMatch) {
-        testMaterialsId = parseInt(mockIdMatch[1]);
-      }
+    if (!testMaterialsId) {
+      return res.status(409).json({
+        error:
+          "This session does not have test content attached yet. Please contact the administrator.",
+      });
     }
 
     // Verify name matches

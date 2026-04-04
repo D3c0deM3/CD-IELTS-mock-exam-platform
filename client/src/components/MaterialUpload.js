@@ -43,11 +43,11 @@ const answersSample = `{
   }
 }`;
 
-const MaterialUpload = () => {
+const MaterialUpload = ({ initialTestId }) => {
   const [activeTab, setActiveTab] = useState("content");
   const [tests, setTests] = useState([]);
   const [testsLoading, setTestsLoading] = useState(true);
-  const [selectedTest, setSelectedTest] = useState("");
+  const [selectedTest, setSelectedTest] = useState(initialTestId || "");
   const [materialSets, setMaterialSets] = useState([]);
   const [setsLoading, setSetsLoading] = useState(false);
   const [selectedSetId, setSelectedSetId] = useState("");

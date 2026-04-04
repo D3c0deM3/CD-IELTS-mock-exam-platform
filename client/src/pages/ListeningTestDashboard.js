@@ -7,12 +7,28 @@ import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useAudioPlaybackWithStorage from "../hooks/useAudioPlaybackWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
+import {
+  extractQuestionIdFromText,
+  GAP_PLACEHOLDER_REGEX,
+  normalizeTestContent,
+} from "../utils/testContentNormalizer";
 import "./ListeningTestDashboard.css";
 import useActivityMonitor from "../hooks/useActivityMonitor";
 
 // Import all available test data files for dynamic loading
 import testData2 from "./mock_2.json";
 import testData3 from "./mock_3.json";
+
+const getBundledTestData = (testMaterialsId) => {
+  switch (Number(testMaterialsId)) {
+    case 2:
+      return testData2;
+    case 3:
+      return testData3;
+    default:
+      return null;
+  }
+};
 
 // ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
 const reapplyHighlights = (
@@ -128,13 +144,18 @@ const extractGapContent = (text) => {
 const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
   if (!tableData) return null;
 
-  const columns = [
-    { header: "House or flat", key: "house_or_flat" },
-    { header: "Details", key: "details" },
-    { header: "Rent per month", key: "rent" },
-    { header: "Address", key: "address" },
-    { header: "Location", key: "location" },
-  ];
+  const rows = Array.isArray(tableData.rows) ? tableData.rows : [];
+  const inferredKeys = rows[0] ? Object.keys(rows[0]) : [];
+  const columns =
+    Array.isArray(tableData.headers) && tableData.headers.length > 0
+      ? tableData.headers.map((header, index) => ({
+          header,
+          key: tableData.column_keys?.[index] || inferredKeys[index] || header,
+        }))
+      : inferredKeys.map((key) => ({
+          header: key.replace(/_/g, " "),
+          key,
+        }));
 
   return (
     <div className="visual-table">
@@ -156,12 +177,12 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
         </thead>
 
         <tbody>
-          {tableData.rows.map((row, rowIndex) => (
+          {rows.map((row, rowIndex) => (
             <tr key={rowIndex}>
               {columns.map((col, colIndex) => {
-                const cellContent = row[col.key] ?? "";
+                const cellContent = row[col.key] ?? row[col.header] ?? "";
                 // More robust regex to handle various dot patterns (., ……, …, ___)
-                const parts = cellContent.split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/);
+                const parts = cellContent.split(GAP_PLACEHOLDER_REGEX);
 
                 return (
                   <td key={`${rowIndex}-${colIndex}`}>
@@ -171,7 +192,7 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
                       if (part.match(/^[\.\u2026_\s]+$/)) return null;
                       // Match gap pattern: number followed by dots/ellipsis
                       const gapMatch = part.match(
-                        /^(\d+)\s*(?:\.{2,}|…+|_{2,})$/
+                        /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/
                       );
 
                       if (gapMatch) {
@@ -234,13 +255,23 @@ const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
 const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
   if (!notesData) return null;
 
+  const explicitQuestionIds =
+    Array.isArray(notesData.question_ids) && notesData.question_ids.length > 0
+      ? notesData.question_ids
+      : [];
+
   return (
     <div className="visual-notes">
       {notesData.title && <h3 className="notes-title">{notesData.title}</h3>}
 
       <ul className="ielts-notes">
         {notesData.items.map((item, index) => {
-          const questionId = notesData.question_ids?.[index];
+          const inlineQuestionId = extractQuestionIdFromText(item);
+          const questionId =
+            inlineQuestionId ||
+            (explicitQuestionIds.length === notesData.items.length
+              ? explicitQuestionIds[index]
+              : null);
           const question = questions.find((q) => q.id === questionId);
 
           if (!question) {
@@ -252,7 +283,7 @@ const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
           }
 
           // More robust regex to handle various dot patterns
-          const parts = item.split(/(\d+\s*(?:\.{2,}|…+|_{2,}))/);
+          const parts = item.split(GAP_PLACEHOLDER_REGEX);
 
           return (
             <li key={index} className="note-item-with-gap">
@@ -261,7 +292,11 @@ const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
                 // Filter out parts that are only dots, ellipsis, underscores, or whitespace
                 if (part.match(/^[\.\u2026_\s]+$/)) return null;
                 // Match gap pattern: number followed by dots/ellipsis
-                if (part.match(/^(\d+)\s*(?:\.{2,}|…+|_{2,})$/)) {
+                if (
+                  part.match(
+                    /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/
+                  )
+                ) {
                   return (
                     <input
                       key={partIndex}
@@ -318,14 +353,25 @@ const StructuredNotesRenderer = ({
           {section.title && <h3 className="section-title">{section.title}</h3>}
           <ul className="section-items">
             {section.items.map((item, itemIndex) => {
-              if (item.type === "question") {
+              const normalizedItem =
+                typeof item === "string"
+                  ? {
+                      type: extractQuestionIdFromText(item)
+                        ? "question"
+                        : "text",
+                      question_id: extractQuestionIdFromText(item),
+                      content: item,
+                    }
+                  : item;
+
+              if (normalizedItem.type === "question") {
                 const question = questions.find(
-                  (q) => q.id === item.question_id
+                  (q) => q.id === normalizedItem.question_id
                 );
                 if (question) {
                   // More robust regex to handle various dot patterns
-                  const parts = item.content.split(
-                    /(\d+\s*(?:\.{2,}|…+|_{2,}))/g
+                  const parts = normalizedItem.content.split(
+                    GAP_PLACEHOLDER_REGEX
                   );
                   return (
                     <li key={itemIndex} className="structured-item-with-gap">
@@ -334,7 +380,11 @@ const StructuredNotesRenderer = ({
                         // Filter out parts that are only dots, ellipsis, underscores, or whitespace
                         if (part.match(/^[\.\u2026_\s]+$/)) return null;
                         // Match gap pattern: number followed by dots/ellipsis
-                        if (part.match(/^(\d+)\s*(?:\.{2,}|…+|_{2,})$/)) {
+                        if (
+                          part.match(
+                            /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/
+                          )
+                        ) {
                           return (
                             <input
                               key={partIndex}
@@ -371,7 +421,7 @@ const StructuredNotesRenderer = ({
               }
               return (
                 <li key={itemIndex} className="structured-item">
-                  {item.content}
+                  {normalizedItem.content}
                 </li>
               );
             })}
@@ -609,10 +659,9 @@ const MatchingListRenderer = ({
       <div className="matching-items-list">
         {matchingData.items.map((item, idx) => {
           const question = questions.find((q) => q.id === item.question_id);
-          const selectedAnswer = answers[question?.id];
-          const selectedOption = matchingData.options_box?.options.find(
-            (opt) => opt.charAt(0) === selectedAnswer
-          );
+          if (!question) return null;
+
+          const selectedAnswer = answers[question.id];
 
           return (
             <div key={idx} className="matching-list-item-row">
@@ -621,11 +670,16 @@ const MatchingListRenderer = ({
                 className="matching-select"
                 value={selectedAnswer || ""}
                 onChange={(e) =>
-                  handleSelectChange(question?.id, e.target.value)
+                  handleSelectChange(question.id, e.target.value)
                 }
               >
                 <option value="">-- Select an option --</option>
-                {matchingData.options_box?.options.map((option, optIdx) => {
+                {(
+                  matchingData.options_box?.options ||
+                  question.matching_options ||
+                  question.options ||
+                  []
+                ).map((option, optIdx) => {
                   const letter = option.charAt(0);
                   return (
                     <option key={optIdx} value={letter}>
@@ -928,6 +982,10 @@ const VisualStructureRenderer = ({
               componentQuestionIds = component.items.map(
                 (item) => item.question_id
               );
+            } else if (component.type === "map_labeling" && component.locations) {
+              componentQuestionIds = component.locations.map(
+                (location) => location.question_id
+              );
             } else if (component.type === "multiple_choice_block") {
               // For multiple_choice_block, extract IDs from multiple_choice questions
               componentQuestionIds = questions
@@ -978,6 +1036,22 @@ const VisualStructureRenderer = ({
                 {component.type === "notes" && (
                   <NotesRenderer
                     notesData={component}
+                    questions={componentQuestions}
+                    answers={answers}
+                    onAnswerChange={onAnswerChange}
+                  />
+                )}
+                {component.type === "map_labeling" && (
+                  <MatchingListRenderer
+                    matchingData={{
+                      title: component.title,
+                      instructions: component.instructions,
+                      options_box: {
+                        title: "Map Labels",
+                        options: component.map_letters || [],
+                      },
+                      items: component.locations || [],
+                    }}
                     questions={componentQuestions}
                     answers={answers}
                     onAnswerChange={onAnswerChange}
@@ -1036,6 +1110,29 @@ const VisualStructureRenderer = ({
           )}
           <StructuredNotesRenderer
             structuredData={visualStructure}
+            questions={questions}
+            answers={answers}
+            onAnswerChange={onAnswerChange}
+          />
+        </>
+      );
+
+    case "notes":
+      return (
+        <>
+          {partInstructions && (
+            <div className="test-instructions">
+              <h2>Instructions</h2>
+              <p>{partInstructions}</p>
+              {partContext && (
+                <p className="context-text">
+                  <strong>Context:</strong> {partContext}
+                </p>
+              )}
+            </div>
+          )}
+          <NotesRenderer
+            notesData={visualStructure}
             questions={questions}
             answers={answers}
             onAnswerChange={onAnswerChange}
@@ -1152,11 +1249,19 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
     );
   }
 
-  if (question.type === "matching") {
+  if (
+    question.type === "matching" ||
+    question.type === "map_labeling" ||
+    question.type === "map_labelling"
+  ) {
+    const matchingOptions =
+      question.matching_options || question.options || [];
     return (
       <div className="question-card matching-card standalone">
         <div className="question-body">
-          <p className="matching-question-text">{question.question}</p>
+          <p className="matching-question-text">
+            {question.question || question.prompt}
+          </p>
           {question.matching_instruction && (
             <p className="matching-instruction">
               {question.matching_instruction}
@@ -1169,7 +1274,7 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
               onChange={(e) => onAnswerChange(question.id, e.target.value)}
             >
               <option value="">-- Select an answer --</option>
-              {question.matching_options?.map((option, idx) => {
+              {matchingOptions.map((option, idx) => {
                 const letter = option.split(" ")[0];
                 return (
                   <option key={idx} value={letter}>
@@ -1245,6 +1350,7 @@ const ListeningTestDashboard = () => {
   );
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [audioLoaded, setAudioLoaded] = useState(false);
   const [audioDuration, setAudioDuration] = useState(0);
   const audioRef = useRef(null);
@@ -1539,7 +1645,11 @@ const ListeningTestDashboard = () => {
         const participant = JSON.parse(
           localStorage.getItem("currentParticipant") || "{}"
         );
-        const testMaterialsId = participant.test_materials_id || 2;
+        const testMaterialsId = Number(participant.test_materials_id) || null;
+
+        if (!testMaterialsId) {
+          throw new Error("No test materials are attached to this session.");
+        }
         console.log(
           `🎧 Using test materials ID: ${testMaterialsId}`,
           participant
@@ -1777,55 +1887,58 @@ const ListeningTestDashboard = () => {
   useEffect(() => {
     const loadTestData = async () => {
       try {
-        // Get test_materials_id from participant data stored in localStorage
         const participant = JSON.parse(
           localStorage.getItem("currentParticipant") || "{}"
         );
-        const testMaterialsId = participant.test_materials_id || 2; // Default to mock 2
-
+        const testMaterialsId = Number(participant.test_materials_id) || 2;
         let selectedTestData = null;
+        let remoteError = null;
 
         try {
           const response = await apiClient.get(
             `/api/materials/sets/${testMaterialsId}/content`
           );
           if (response?.content?.sections) {
-            selectedTestData = response.content;
+            selectedTestData = normalizeTestContent(response.content);
+          } else {
+            throw new Error("The saved material set does not contain content.");
           }
         } catch (err) {
-          selectedTestData = null;
+          remoteError = err;
         }
 
         if (!selectedTestData) {
-          switch (testMaterialsId) {
-            case 2:
-              selectedTestData = testData2;
-              break;
-            case 3:
-              selectedTestData = testData3;
-              break;
-            default:
-              console.warn(
-                `No test data found for test materials ${testMaterialsId}, defaulting to mock 2`
-              );
-              selectedTestData = testData2;
-          }
+          selectedTestData = normalizeTestContent(
+            getBundledTestData(testMaterialsId)
+          );
+        }
+
+        if (!selectedTestData) {
+          const apiErrorMessage =
+            remoteError?.response?.data?.error || remoteError?.message;
+          throw new Error(
+            apiErrorMessage ||
+              `No test content was found for material set ${testMaterialsId}.`
+          );
         }
 
         const listeningSection = selectedTestData.sections.find(
           (s) => s.type === "listening"
         );
 
-        if (listeningSection) {
-          setTestData({
-            type: "listening",
-            parts: listeningSection.parts,
-          });
-        } else {
-          console.error("No listening section found in test data");
+        if (!listeningSection) {
+          throw new Error("No listening section found in the selected test.");
         }
+
+        setLoadError("");
+        setTestData({
+          type: "listening",
+          parts: listeningSection.parts,
+        });
       } catch (error) {
         console.error("Error loading test data:", error);
+        setLoadError(error.message || "Error loading test data");
+        setTestData(null);
       } finally {
         setLoading(false);
       }
@@ -2046,7 +2159,9 @@ const ListeningTestDashboard = () => {
   if (!testData || !testData.parts || testData.parts.length === 0) {
     return (
       <div className="listening-test-dashboard" data-theme={theme}>
-        <div className="error-screen">Error loading test data</div>
+        <div className="error-screen">
+          {loadError || "Error loading test data"}
+        </div>
       </div>
     );
   }

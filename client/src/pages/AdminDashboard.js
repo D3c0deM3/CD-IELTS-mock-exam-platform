@@ -10,7 +10,6 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("sessions");
   const [sessions, setSessions] = useState([]);
   const [tests, setTests] = useState([]);
-  const [testMaterials, setTestMaterials] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -53,12 +52,14 @@ const AdminDashboard = () => {
     center_name: "",
     max_session_users: 30,
   });
+  const [showAssignTestsModal, setShowAssignTestsModal] = useState(false);
+  const [selectedCenterForTests, setSelectedCenterForTests] = useState(null);
+  const [selectedTestsForCenter, setSelectedTestsForCenter] = useState([]);
 
   // Form states
   const [testForm, setTestForm] = useState({ name: "", description: "" });
   const [sessionForm, setSessionForm] = useState({
     test_id: "",
-    test_materials_id: "",
     session_date: "",
     location: "",
     max_capacity: "",
@@ -78,7 +79,6 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchSessions();
     fetchTests();
-    fetchTestMaterials();
     fetchCenters();
   }, []);
 
@@ -165,15 +165,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const fetchTestMaterials = async () => {
-    try {
-      const response = await adminService.getTestMaterials();
-      setTestMaterials(response.materials || response);
-    } catch (err) {
-      console.error("Failed to fetch test materials:", err);
-      setError("Failed to fetch test materials");
-    }
-  };
 
   const fetchWritingSubmissions = async (sessionId) => {
     try {
@@ -196,6 +187,45 @@ const AdminDashboard = () => {
       setCenters(response);
     } catch (err) {
       console.error("Failed to fetch centers:", err);
+    }
+  };
+
+  const openAssignTestsModal = async (center) => {
+    try {
+      setLoading(true);
+      setSelectedCenterForTests(center);
+      // Ensure we have tests loaded
+      if (tests.length === 0) {
+        await fetchTests();
+      }
+      const response = await adminService.getCenterTests(center.id);
+      // Assuming response is an array of test objects or test IDs
+      // Map to array of test IDs if needed. Let's assume response gives {tests: [{id: 1, ...}]} or array [{id: 1}]
+      const assignedIds = (response.tests || response).map(t => t.id || t.test_id);
+      setSelectedTestsForCenter(assignedIds);
+      setShowAssignTestsModal(true);
+    } catch (err) {
+      console.error("Failed to fetch center tests:", err);
+      setError("Failed to fetch assigned tests for the center");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignTestsSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      await adminService.assignCenterTests(selectedCenterForTests.id, selectedTestsForCenter);
+      setShowAssignTestsModal(false);
+      setSelectedCenterForTests(null);
+      setSelectedTestsForCenter([]);
+      setError("");
+    } catch (err) {
+      console.error("Failed to assign tests to center:", err);
+      setError("Failed to assign tests to center");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -292,6 +322,23 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteTest = async (testId) => {
+    if (!window.confirm("Are you sure you want to delete this test? This will also delete any related materials and sessions.")) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await adminService.deleteTest(testId);
+      await fetchTests();
+      setError("");
+    } catch (err) {
+      console.error("Failed to delete test:", err);
+      setError("Failed to delete test. It may be linked to active sessions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Create Test
   const handleCreateTest = async (e) => {
     e.preventDefault();
@@ -320,7 +367,6 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (
       !sessionForm.test_id ||
-      !sessionForm.test_materials_id ||
       !sessionForm.session_date ||
       !sessionForm.location
     ) {
@@ -335,8 +381,7 @@ const AdminDashboard = () => {
         sessionForm.session_date,
         sessionForm.location,
         sessionForm.max_capacity,
-        sessionForm.admin_notes,
-        sessionForm.test_materials_id
+        sessionForm.admin_notes
       );
       setSessionForm({
         test_id: "",
@@ -344,7 +389,6 @@ const AdminDashboard = () => {
         location: "",
         max_capacity: "",
         admin_notes: "",
-        test_materials_id: "",
       });
       setShowCreateSessionModal(false);
       fetchSessions();
@@ -1488,6 +1532,8 @@ const AdminDashboard = () => {
                           <th>ID</th>
                           <th>Name</th>
                           <th>Description</th>
+                          <th>Connected Material</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1496,6 +1542,17 @@ const AdminDashboard = () => {
                             <td>{test.id}</td>
                             <td>{test.name}</td>
                             <td>{test.description || "—"}</td>
+                            <td>{test.connected_material ? <span style={{ color: 'var(--success)', fontWeight: '500' }}>{test.connected_material}</span> : <span style={{ color: 'var(--muted)' }}>Not connected</span>}</td>
+                            <td>
+                              <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                  className="btn btn-danger btn-small"
+                                  onClick={() => handleDeleteTest(test.id)}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1565,6 +1622,12 @@ const AdminDashboard = () => {
                             <td>{new Date(center.created_at).toLocaleDateString()}</td>
                             <td>
                               <div style={{ display: "flex", gap: "4px" }}>
+                                <button
+                                  className="btn btn-info btn-small"
+                                  onClick={() => openAssignTestsModal(center)}
+                                >
+                                  Assign Tests
+                                </button>
                                 <button
                                   className="btn btn-secondary btn-small"
                                   onClick={() => {
@@ -1787,38 +1850,6 @@ const AdminDashboard = () => {
                   ))}
                 </select>
               </div>
-                <div className="form-group">
-                  <label className="form-label">Test Materials *</label>
-                  <select
-                    className="form-select"
-                    value={sessionForm.test_materials_id}
-                    onChange={(e) =>
-                      setSessionForm({
-                        ...sessionForm,
-                        test_materials_id: parseInt(e.target.value) || "",
-                      })
-                    }
-                    required
-                  >
-                    <option value="">Select test materials</option>
-                    {testMaterials
-                      .filter((material) => {
-                        if (!sessionForm.test_id) return true;
-                        if (!material.test_id) return true;
-                        return (
-                          parseInt(material.test_id, 10) ===
-                          parseInt(sessionForm.test_id, 10)
-                        );
-                      })
-                      .map((material) => (
-                        <option key={material.mock_id} value={material.mock_id}>
-                          {material.test_name
-                            ? `${material.name} (${material.test_name})`
-                            : material.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
               <div className="form-group">
                 <label className="form-label">Session Date & Time *</label>
                 <input
@@ -2487,6 +2518,53 @@ const AdminDashboard = () => {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Tests Modal */}
+      {showAssignTestsModal && selectedCenterForTests && (
+        <div className="modal-overlay" onClick={() => setShowAssignTestsModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">Assign Tests to {selectedCenterForTests.center_name}</div>
+            <form onSubmit={handleAssignTestsSubmit}>
+              <div className="form-group" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {tests.length === 0 ? (
+                  <p className="text-muted">No tests available.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {tests.map((test) => (
+                      <label key={test.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTestsForCenter.includes(test.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTestsForCenter([...selectedTestsForCenter, test.id]);
+                            } else {
+                              setSelectedTestsForCenter(selectedTestsForCenter.filter((id) => id !== test.id));
+                            }
+                          }}
+                        />
+                        <span>{test.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAssignTestsModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  Save
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
