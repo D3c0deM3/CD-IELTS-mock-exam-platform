@@ -25,14 +25,18 @@ app.get("/api/health", (req, res) => {
 });
 
 // -------------------- MIDDLEWARE --------------------
+const configuredCorsOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const corsOrigins =
   process.env.NODE_ENV === "production"
     ? [
         "https://cd-ielts.netlify.app",
-        "https://cd-ielts-mock-exam-platform-production.up.railway.app",
         "https://cd-ielts-mock-exam-platform.vercel.app",
-        process.env.RAILWAY_PUBLIC_DOMAIN,
-      ].filter(Boolean)
+        ...configuredCorsOrigins,
+      ]
     : true; // Allow all origins in development
 
 app.use(
