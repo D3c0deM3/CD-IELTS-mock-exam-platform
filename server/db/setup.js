@@ -176,19 +176,6 @@ const setupDatabase = async () => {
       )
     `);
 
-    // Table for test participants with assigned IDs and score tracking
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS center_tests (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        center_id INT NOT NULL,
-        test_id INT NOT NULL,
-        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (center_id) REFERENCES course_centers(id) ON DELETE CASCADE,
-        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_center_test (center_id, test_id)
-      )
-    `);
-
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS test_participants (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -526,6 +513,19 @@ const setupDatabase = async () => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Table for tests assigned to course centers
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS center_tests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        center_id INT NOT NULL,
+        test_id INT NOT NULL,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (center_id) REFERENCES course_centers(id) ON DELETE CASCADE,
+        FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_center_test (center_id, test_id)
       )
     `);
 

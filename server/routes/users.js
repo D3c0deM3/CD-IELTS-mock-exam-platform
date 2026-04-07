@@ -4,6 +4,22 @@ const db = require("../db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
+const requireSetupToken = (req, res, next) => {
+  const setupToken = process.env.ADMIN_SETUP_TOKEN;
+  const providedToken =
+    req.headers["x-admin-setup-token"] || req.body?.setup_token;
+
+  if (!setupToken) {
+    return res.status(403).json({ error: "Setup endpoints are disabled" });
+  }
+
+  if (providedToken !== setupToken) {
+    return res.status(403).json({ error: "Invalid setup token" });
+  }
+
+  next();
+};
+
 // GET /api/users/:id - lookup user by id (ID code)
 router.get("/:id", async (req, res) => {
   const id = req.params.id;
@@ -145,7 +161,7 @@ router.post("/login", async (req, res) => {
 });
 
 // POST /api/users/make-center - Make a user a center account (by phone number)
-router.post("/make-center", async (req, res) => {
+router.post("/make-center", requireSetupToken, async (req, res) => {
   const { phone_number, center_name } = req.body;
 
   if (!phone_number) {
@@ -187,7 +203,7 @@ router.post("/make-center", async (req, res) => {
 });
 
 // POST /api/users/create-center - Create a new center user
-router.post("/create-center", async (req, res) => {
+router.post("/create-center", requireSetupToken, async (req, res) => {
   const { full_name, phone_number, password, center_name } = req.body;
 
   if (!full_name || !phone_number || !password) {
@@ -246,7 +262,7 @@ router.post("/create-center", async (req, res) => {
 });
 
 // POST /api/users/make-admin - Make a user an admin (by phone number)
-router.post("/make-admin", async (req, res) => {
+router.post("/make-admin", requireSetupToken, async (req, res) => {
   const { phone_number } = req.body;
 
   if (!phone_number) {
@@ -274,7 +290,7 @@ router.post("/make-admin", async (req, res) => {
 });
 
 // POST /api/users/create-admin - Create a new admin user
-router.post("/create-admin", async (req, res) => {
+router.post("/create-admin", requireSetupToken, async (req, res) => {
   const { full_name, phone_number, password } = req.body;
 
   if (!full_name || !phone_number || !password) {

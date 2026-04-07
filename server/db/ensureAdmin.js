@@ -6,12 +6,16 @@ const ensureAdminExists = async () => {
   try {
     connection = await pool.getConnection();
 
-    // Admin credentials
-    const fullName = "Admin";
-    const phoneNumber = "+998915817711";
-    const password = "DecodeM3";
+    const fullName = process.env.ADMIN_FULL_NAME || "Admin";
+    const phoneNumber = process.env.ADMIN_PHONE_NUMBER;
+    const password = process.env.ADMIN_PASSWORD;
     const role = "admin";
     const status = "active";
+
+    if (!phoneNumber || !password) {
+      console.log("Admin auto-create skipped: ADMIN_PHONE_NUMBER and ADMIN_PASSWORD are not set");
+      return;
+    }
 
     // Check if admin already exists
     const [existingAdmin] = await connection.execute(
@@ -20,7 +24,7 @@ const ensureAdminExists = async () => {
     );
 
     if (existingAdmin.length > 0) {
-      console.log("✅ Admin user already exists");
+      console.log("Admin user already exists");
       return;
     }
 
@@ -29,19 +33,17 @@ const ensureAdminExists = async () => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Insert new admin user
-    const result = await connection.execute(
+    await connection.execute(
       "INSERT INTO users (full_name, phone_number, password, role, status) VALUES (?, ?, ?, ?, ?)",
       [fullName, phoneNumber, hashedPassword, role, status]
     );
 
-    console.log("✅ Admin user created automatically!");
-    console.log("   Phone:", phoneNumber);
-    console.log("   Password:", password);
+    console.log("Admin user created automatically.");
   } catch (err) {
-    console.error("⚠️  Could not create admin user:", err.message);
+    console.error("Could not create admin user:", err.message);
   } finally {
     if (connection) {
-      await connection.end();
+      connection.release();
     }
   }
 };

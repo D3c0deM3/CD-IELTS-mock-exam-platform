@@ -73,6 +73,25 @@ const audioUpload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
 });
 
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, "../uploads/material-images");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}_${uuidv4()}_${file.originalname}`;
+    cb(null, uniqueName);
+  },
+});
+
+const imageUpload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 30 * 1024 * 1024 },
+});
+
 const normalizeJsonInput = (value) => {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -88,6 +107,192 @@ const normalizeJsonInput = (value) => {
   }
 
   throw new Error("Invalid JSON input");
+};
+
+const IMAGE_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+];
+
+const humanizeKey = (value) =>
+  String(value || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+
+const cloneJson = (value) => JSON.parse(JSON.stringify(value));
+
+const buildBaseContextLabel = (ctx) => {
+  if (ctx.taskLabel) return ctx.taskLabel;
+  if (ctx.partLabel) return ctx.partLabel;
+  if (ctx.passageLabel) return ctx.passageLabel;
+  if (ctx.sectionLabel) return ctx.sectionLabel;
+  return "Test Asset";
+};
+
+const buildSinglePlaceholderLabel = (ctx, node) => {
+  const base = buildBaseContextLabel(ctx);
+  const detail =
+    node.title ||
+    ctx.componentTitle ||
+    (node.type ? humanizeKey(node.type) : "") ||
+    "Image";
+
+  if (!detail || detail === base) return base;
+  return `${base} - ${detail}`;
+};
+
+const buildFieldPlaceholderLabel = (ctx, fieldName) => {
+  const base = buildBaseContextLabel(ctx);
+  return `${base} - ${humanizeKey(fieldName)}`;
+};
+
+const extractImageSlots = (content) => {
+  const slotsByKey = new Map();
+
+  const addSlot = (placeholderKey, slotData) => {
+    if (!placeholderKey || slotsByKey.has(placeholderKey)) return;
+    slotsByKey.set(placeholderKey, {
+      placeholder_key: placeholderKey,
+      ...slotData,
+    });
+  };
+
+  const visit = (node, ctx = {}) => {
+    if (Array.isArray(node)) {
+      node.forEach((item) => visit(item, ctx));
+      return;
+    }
+
+    if (!node || typeof node !== "object") {
+      return;
+    }
+
+    let nextCtx = { ...ctx };
+
+    if (node.type === "listening" || node.type === "reading" || node.type === "writing") {
+      nextCtx.sectionLabel =
+        node.section_number != null
+          ? `${humanizeKey(node.type)} Section ${node.section_number}`
+          : humanizeKey(node.type);
+    }
+
+    if (node.part_number != null) {
+      nextCtx.partLabel = `Listening Section ${node.part_number}`;
+    }
+
+    if (node.passage_number != null) {
+      nextCtx.passageLabel = `Reading Passage ${node.passage_number}`;
+    }
+
+    if (node.task_number != null) {
+      nextCtx.taskLabel = `Writing Task ${node.task_number}`;
+    }
+
+    if (node.type || node.title) {
+      nextCtx.componentType = node.type || nextCtx.componentType;
+      nextCtx.componentTitle = node.title || nextCtx.componentTitle;
+    }
+
+    if (node.image_placeholder_key) {
+      addSlot(node.image_placeholder_key, {
+        label: buildSinglePlaceholderLabel(nextCtx, node),
+        context_type: node.type || nextCtx.componentType || "image",
+        context_label: buildBaseContextLabel(nextCtx),
+      });
+    }
+
+    if (node.image_placeholder_keys && typeof node.image_placeholder_keys === "object") {
+      Object.entries(node.image_placeholder_keys).forEach(([fieldName, placeholderKey]) => {
+        addSlot(placeholderKey, {
+          label: buildFieldPlaceholderLabel(nextCtx, fieldName),
+          context_type: node.visual_type || node.type || nextCtx.componentType || "image",
+          context_label: buildBaseContextLabel(nextCtx),
+        });
+      });
+    }
+
+    Object.values(node).forEach((value) => visit(value, nextCtx));
+  };
+
+  visit(content);
+  return Array.from(slotsByKey.values());
+};
+
+const listImageAssets = async (setId) => {
+  const [rows] = await db.execute(
+    `SELECT
+      id,
+      set_id,
+      placeholder_key,
+      label,
+      context_type,
+      context_label,
+      file_name,
+      file_url,
+      file_size,
+      mime_type,
+      updated_at
+     FROM test_material_set_images
+     WHERE set_id = ?
+     ORDER BY placeholder_key ASC`,
+    [setId]
+  );
+
+  return rows;
+};
+
+const injectImageAssetsIntoContent = (content, imageAssets) => {
+  const clonedContent = cloneJson(content);
+  const assetsByKey = Object.fromEntries(
+    imageAssets.map((asset) => [asset.placeholder_key, asset])
+  );
+
+  const visit = (node) => {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+
+    if (!node || typeof node !== "object") {
+      return;
+    }
+
+    if (node.image_placeholder_key) {
+      const asset = assetsByKey[node.image_placeholder_key];
+      if (asset) {
+        node.image_url = asset.file_url;
+        node.image_asset = asset;
+      }
+    }
+
+    if (node.image_placeholder_keys && typeof node.image_placeholder_keys === "object") {
+      const resolvedUrls = { ...(node.image_urls || {}) };
+      Object.entries(node.image_placeholder_keys).forEach(([fieldName, placeholderKey]) => {
+        const asset = assetsByKey[placeholderKey];
+        if (asset) {
+          resolvedUrls[fieldName] = asset.file_url;
+        }
+      });
+      node.image_urls = resolvedUrls;
+    }
+
+    if (node.image_ref) {
+      const asset = assetsByKey[node.image_ref];
+      if (asset) {
+        node.image_url = asset.file_url;
+      }
+    }
+
+    Object.values(node).forEach(visit);
+  };
+
+  visit(clonedContent);
+  return clonedContent;
 };
 
 // POST /api/materials/upload - Upload material file
@@ -343,6 +548,7 @@ router.get("/sets", authMiddleware, ensureAdmin, async (req, res) => {
         ms.audio_file_url,
         ms.audio_file_size,
         ms.updated_at,
+        (SELECT COUNT(*) FROM test_material_set_images mi WHERE mi.set_id = ms.id) AS image_count,
         (ms.content_json IS NOT NULL AND ms.content_json <> '') AS has_content,
         (ms.answer_key_json IS NOT NULL AND ms.answer_key_json <> '') AS has_answers
       FROM test_material_sets ms
@@ -392,7 +598,23 @@ router.get("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
       return res.status(404).json({ error: "Material set not found" });
     }
 
-    res.json(rows[0]);
+    const materialSet = rows[0];
+    const imageAssets = await listImageAssets(setId);
+    let imageSlots = [];
+
+    if (materialSet.content_json) {
+      try {
+        imageSlots = extractImageSlots(JSON.parse(materialSet.content_json));
+      } catch (err) {
+        imageSlots = [];
+      }
+    }
+
+    res.json({
+      ...materialSet,
+      image_assets: imageAssets,
+      image_slots: imageSlots,
+    });
   } catch (err) {
     console.error("Error fetching material set:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -413,7 +635,11 @@ router.get("/sets/:setId/content", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "Content not found" });
     }
 
-          let content = JSON.parse(rows[0].content_json);
+      const imageAssets = await listImageAssets(setId);
+      let content = injectImageAssetsIntoContent(
+        JSON.parse(rows[0].content_json),
+        imageAssets
+      );
 
       // Auto-normalize db formats to client expectations
       if (content && content.sections) {
@@ -563,7 +789,7 @@ router.get("/sets/:setId/content", authMiddleware, async (req, res) => {
         content.sections = normalizedSections;
       }
 
-      res.json({ content });
+      res.json({ content, image_assets: imageAssets });
   } catch (err) {
     console.error("Error fetching content JSON:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -656,6 +882,9 @@ router.post("/sets", authMiddleware, ensureAdmin, async (req, res) => {
       name,
       has_content: Boolean(contentJsonValue),
       has_answers: Boolean(answersJsonValue),
+      image_slots: contentJsonValue
+        ? extractImageSlots(JSON.parse(contentJsonValue))
+        : [],
     });
   } catch (err) {
     console.error("Error creating material set:", err);
@@ -713,12 +942,145 @@ router.put("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
       return res.status(404).json({ error: "Material set not found" });
     }
 
-    res.json({ success: true });
+    let imageSlots = [];
+    if (content_json !== undefined && content_json !== "" && content_json !== null) {
+      imageSlots = extractImageSlots(JSON.parse(normalizeJsonInput(content_json)));
+    } else {
+      const [rows] = await db.execute(
+        "SELECT content_json FROM test_material_sets WHERE id = ?",
+        [setId]
+      );
+      if (rows[0]?.content_json) {
+        imageSlots = extractImageSlots(JSON.parse(rows[0].content_json));
+      }
+    }
+
+    res.json({ success: true, image_slots: imageSlots });
   } catch (err) {
     console.error("Error updating material set:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// POST /api/materials/sets/:setId/images - Upload image asset for a detected placeholder
+router.post(
+  "/sets/:setId/images",
+  authMiddleware,
+  ensureAdmin,
+  imageUpload.single("file"),
+  async (req, res) => {
+    const { setId } = req.params;
+    const { placeholder_key, label, context_type, context_label } = req.body;
+
+    if (!placeholder_key) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({ error: "placeholder_key is required" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file provided" });
+    }
+
+    if (!IMAGE_MIME_TYPES.includes(req.file.mimetype)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        error: "Only PNG, JPG, WEBP, GIF, or SVG image files are allowed",
+      });
+    }
+
+    try {
+      const [setRows] = await db.execute(
+        "SELECT id, content_json FROM test_material_sets WHERE id = ?",
+        [setId]
+      );
+
+      if (setRows.length === 0) {
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ error: "Material set not found" });
+      }
+
+      const availableSlots = setRows[0].content_json
+        ? extractImageSlots(JSON.parse(setRows[0].content_json)).map(
+            (slot) => slot.placeholder_key
+          )
+        : [];
+
+      if (availableSlots.length > 0 && !availableSlots.includes(placeholder_key)) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({
+          error: `Unknown placeholder_key "${placeholder_key}" for this material set`,
+        });
+      }
+
+      const [existing] = await db.execute(
+        "SELECT id, file_path FROM test_material_set_images WHERE set_id = ? AND placeholder_key = ?",
+        [setId, placeholder_key]
+      );
+
+      if (existing[0]?.file_path && fs.existsSync(existing[0].file_path)) {
+        fs.unlinkSync(existing[0].file_path);
+      }
+
+      const fileUrl = `/uploads/material-images/${req.file.filename}`;
+
+      if (existing.length > 0) {
+        await db.execute(
+          `UPDATE test_material_set_images
+           SET label = ?, context_type = ?, context_label = ?, file_name = ?, file_path = ?, file_url = ?, file_size = ?, mime_type = ?, uploaded_by = ?, updated_at = NOW()
+           WHERE id = ?`,
+          [
+            label || null,
+            context_type || null,
+            context_label || null,
+            req.file.originalname,
+            req.file.path,
+            fileUrl,
+            req.file.size,
+            req.file.mimetype,
+            req.user.id,
+            existing[0].id,
+          ]
+        );
+      } else {
+        await db.execute(
+          `INSERT INTO test_material_set_images
+           (set_id, placeholder_key, label, context_type, context_label, file_name, file_path, file_url, file_size, mime_type, uploaded_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          [
+            setId,
+            placeholder_key,
+            label || null,
+            context_type || null,
+            context_label || null,
+            req.file.originalname,
+            req.file.path,
+            fileUrl,
+            req.file.size,
+            req.file.mimetype,
+            req.user.id,
+          ]
+        );
+      }
+
+      const imageAssets = await listImageAssets(setId);
+
+      res.json({
+        success: true,
+        placeholder_key,
+        file_url: fileUrl,
+        image_assets: imageAssets,
+      });
+    } catch (err) {
+      console.error("Image upload error:", err);
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
 
 // POST /api/materials/sets/:setId/audio - Upload audio file (admin)
 router.post(
@@ -809,6 +1171,16 @@ router.delete("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
       fs.unlinkSync(audioPath);
     }
 
+    const [imageRows] = await db.execute(
+      "SELECT file_path FROM test_material_set_images WHERE set_id = ?",
+      [setId]
+    );
+    imageRows.forEach((image) => {
+      if (image.file_path && fs.existsSync(image.file_path)) {
+        fs.unlinkSync(image.file_path);
+      }
+    });
+
     const [materials] = await db.execute(
       "SELECT id, file_path FROM test_materials WHERE test_id = ?",
       [testId]
@@ -829,6 +1201,7 @@ router.delete("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
     res.json({
       success: true,
       deleted_material_files: materials.length,
+      deleted_image_files: imageRows.length,
     });
   } catch (err) {
     console.error("Error deleting material set:", err);
