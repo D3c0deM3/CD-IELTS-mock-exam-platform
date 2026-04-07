@@ -1336,6 +1336,42 @@
   border-color: #404040;
 }
 
+.matching-list-image-card {
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+}
+
+[data-theme="dark"] .matching-list-image-card {
+  background: #373737;
+  border-color: #404040;
+}
+
+.matching-list-image {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+  max-height: 480px;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+[data-theme="dark"] .matching-list-image {
+  background: #1f1f1f;
+}
+
+.matching-list-image-note {
+  margin: 10px 0 0 0;
+  font-size: 12px;
+  color: #666666;
+}
+
+[data-theme="dark"] .matching-list-image-note {
+  color: #b8b8b8;
+}
+
 .matching-list-options .draggable-options {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

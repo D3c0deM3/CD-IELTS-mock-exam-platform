@@ -1,3 +1,5 @@
+import { resolveContentMediaUrls } from "./mediaUrl";
+
 export const GAP_PLACEHOLDER_REGEX =
   /(\(?\d+\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,}))/g;
 
@@ -157,9 +159,14 @@ const normalizeListeningComponent = (component, questions) => {
     );
 
     return {
+      ...normalized,
       type: "matching_list",
       title: normalized.title,
       instructions: normalized.instructions,
+      image_url: normalized.image_url,
+      image_placeholder_key: normalized.image_placeholder_key,
+      image_asset: normalized.image_asset,
+      image_source_note: normalized.image_source_note,
       options_box: {
         title: normalized.options_box?.title || "Map Labels",
         options,
@@ -322,9 +329,11 @@ export const normalizeTestContent = (content) => {
     return content;
   }
 
+  const resolvedContent = resolveContentMediaUrls(content);
+
   return {
-    ...content,
-    sections: asArray(content.sections).map((section) => {
+    ...resolvedContent,
+    sections: asArray(resolvedContent.sections).map((section) => {
       if (section.type === "listening") {
         const parts = asArray(section.parts).map((part, index) => {
           const questions = asArray(part.questions).map(normalizeListeningQuestion);

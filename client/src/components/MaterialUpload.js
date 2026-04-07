@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import API_CONFIG from "../config/api";
 import { apiClient } from "../services/api";
+import { resolveImageAsset, resolveMediaUrl } from "../utils/mediaUrl";
+import { parseImageSlotsFromJsonText } from "../utils/materialImageSlots";
 import "./MaterialUpload.css";
 
 const contentSample = `{
@@ -43,6 +45,21 @@ const answersSample = `{
   }
 }`;
 
+const mergeSlots = (...slotGroups) => {
+  const slotsByKey = new Map();
+
+  slotGroups.flat().forEach((slot) => {
+    if (!slot?.placeholder_key) return;
+
+    slotsByKey.set(slot.placeholder_key, {
+      ...slotsByKey.get(slot.placeholder_key),
+      ...slot,
+    });
+  });
+
+  return Array.from(slotsByKey.values());
+};
+
 const MaterialUpload = ({ initialTestId }) => {
   const [activeTab, setActiveTab] = useState("content");
   const [tests, setTests] = useState([]);
@@ -56,11 +73,31 @@ const MaterialUpload = ({ initialTestId }) => {
   const [answerJson, setAnswerJson] = useState("");
   const [audioFile, setAudioFile] = useState(null);
   const [audioMeta, setAudioMeta] = useState(null);
+  const [savedImageSlots, setSavedImageSlots] = useState([]);
+  const [imageAssets, setImageAssets] = useState([]);
+  const [imageFiles, setImageFiles] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [uploadingImageKey, setUploadingImageKey] = useState("");
   const [isDeletingSet, setIsDeletingSet] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const detectedImageSlots = useMemo(
+    () => parseImageSlotsFromJsonText(contentJson),
+    [contentJson]
+  );
+  const imageSlots = useMemo(
+    () => mergeSlots(savedImageSlots, detectedImageSlots),
+    [savedImageSlots, detectedImageSlots]
+  );
+  const imageAssetsByKey = useMemo(
+    () =>
+      Object.fromEntries(
+        (imageAssets || []).map((asset) => [asset.placeholder_key, asset])
+      ),
+    [imageAssets]
+  );
 
   const refreshSets = async (testId) => {
     if (!testId) return;
@@ -103,6 +140,10 @@ const MaterialUpload = ({ initialTestId }) => {
       setAnswerJson("");
       setAudioMeta(null);
       setAudioFile(null);
+      setSavedImageSlots([]);
+      setImageAssets([]);
+      setImageFiles({});
+      setUploadingImageKey("");
       return;
     }
 
@@ -117,6 +158,10 @@ const MaterialUpload = ({ initialTestId }) => {
       setAnswerJson("");
       setAudioMeta(null);
       setAudioFile(null);
+      setSavedImageSlots([]);
+      setImageAssets([]);
+      setImageFiles({});
+      setUploadingImageKey("");
       return;
     }
 
@@ -126,6 +171,9 @@ const MaterialUpload = ({ initialTestId }) => {
         );
 
         setSetName(response.name || "");
+        setSavedImageSlots(response.image_slots || []);
+        setImageAssets((response.image_assets || []).map(resolveImageAsset));
+        setImageFiles({});
 
         if (response.content_json) {
           try {
@@ -152,7 +200,7 @@ const MaterialUpload = ({ initialTestId }) => {
         if (response.audio_file_url) {
           setAudioMeta({
             name: response.audio_file_name,
-            url: response.audio_file_url,
+            url: resolveMediaUrl(response.audio_file_url),
             size: response.audio_file_size,
           });
         } else {
@@ -230,14 +278,20 @@ const MaterialUpload = ({ initialTestId }) => {
         ...payload,
       });
       setSelectedSetId(String(response.id));
+      if (Array.isArray(response.image_slots)) {
+        setSavedImageSlots(response.image_slots);
+      }
       await refreshSets(selectedTest);
       return response.id;
     }
 
-    await apiClient.put(`/api/materials/sets/${selectedSetId}`, {
+    const response = await apiClient.put(`/api/materials/sets/${selectedSetId}`, {
       name: setName.trim(),
       ...payload,
     });
+    if (Array.isArray(response.image_slots)) {
+      setSavedImageSlots(response.image_slots);
+    }
     await refreshSets(selectedTest);
     return selectedSetId;
   };
@@ -314,7 +368,7 @@ const MaterialUpload = ({ initialTestId }) => {
       );
       setAudioMeta({
         name: response.data.audio_file_name,
-        url: response.data.audio_file_url,
+        url: resolveMediaUrl(response.data.audio_file_url),
         size: response.data.audio_file_size,
       });
       setAudioFile(null);
@@ -329,6 +383,79 @@ const MaterialUpload = ({ initialTestId }) => {
       );
     } finally {
       setIsUploadingAudio(false);
+    }
+  };
+
+  const handleImageFileChange = (placeholderKey, file) => {
+    setImageFiles((prev) => ({
+      ...prev,
+      [placeholderKey]: file || null,
+    }));
+  };
+
+  const handleImageUpload = async (slot) => {
+    clearMessages();
+
+    const selectedFile = imageFiles[slot.placeholder_key];
+    if (!selectedFile) {
+      setError("Select an image file to upload.");
+      return;
+    }
+
+    setUploadingImageKey(slot.placeholder_key);
+
+    try {
+      let targetSetId = selectedSetId;
+      const slotExistsOnServer = savedImageSlots.some(
+        (savedSlot) => savedSlot.placeholder_key === slot.placeholder_key
+      );
+
+      if (!targetSetId || !slotExistsOnServer) {
+        if (!contentJson.trim()) {
+          throw new Error(
+            "Paste and save the content JSON first so image placeholders can be registered."
+          );
+        }
+
+        validateContent(contentJson);
+        targetSetId = String(await upsertSet({ content_json: contentJson }));
+      }
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("placeholder_key", slot.placeholder_key);
+      formData.append("label", slot.label || slot.placeholder_key);
+      formData.append("context_type", slot.context_type || "image");
+      formData.append("context_label", slot.context_label || "Test Asset");
+
+      const token = localStorage.getItem("accessToken");
+      const response = await axios.post(
+        `${API_CONFIG.BASE_URL}/api/materials/sets/${targetSetId}/images`,
+        formData,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        }
+      );
+
+      setImageAssets((response.data.image_assets || []).map(resolveImageAsset));
+      setSavedImageSlots((prev) => mergeSlots(prev, [slot]));
+      setImageFiles((prev) => ({
+        ...prev,
+        [slot.placeholder_key]: null,
+      }));
+      setSuccess(`${slot.label || slot.placeholder_key} image uploaded successfully.`);
+      await refreshSets(selectedTest);
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.error ||
+          err?.message ||
+          "Failed to upload image."
+      );
+    } finally {
+      setUploadingImageKey("");
     }
   };
 
@@ -352,6 +479,10 @@ const MaterialUpload = ({ initialTestId }) => {
       setAnswerJson("");
       setAudioMeta(null);
       setAudioFile(null);
+      setSavedImageSlots([]);
+      setImageAssets([]);
+      setImageFiles({});
+      setUploadingImageKey("");
       await refreshSets(selectedTest);
     } catch (err) {
       setError(
@@ -470,6 +601,13 @@ const MaterialUpload = ({ initialTestId }) => {
           >
             Audio
           </button>
+          <button
+            type="button"
+            className={activeTab === "images" ? "active" : ""}
+            onClick={() => setActiveTab("images")}
+          >
+            Images
+          </button>
         </div>
 
         <div className="material-panel">
@@ -480,7 +618,9 @@ const MaterialUpload = ({ initialTestId }) => {
                   <h3>Content JSON</h3>
                   <p>
                     Use the same structure as the existing mock JSON files in
-                    `client/src/pages`.
+                    `client/src/pages`. Dynamic map or task images can be
+                    declared with image placeholder keys, then uploaded in the
+                    Images tab.
                   </p>
                 </div>
                 <label className="material-file">
@@ -585,11 +725,122 @@ const MaterialUpload = ({ initialTestId }) => {
                 <button
                   type="button"
                   onClick={handleAudioUpload}
-                  disabled={!audioFile || isUploadingAudio || !selectedSetId}
+                  disabled={!audioFile || isUploadingAudio || !canSave}
                 >
                   {isUploadingAudio ? "Uploading..." : "Upload Audio"}
                 </button>
               </div>
+            </div>
+          )}
+
+          {activeTab === "images" && (
+            <div className="material-panel__section">
+              <div className="material-panel__row">
+                <div>
+                  <h3>Dynamic Images</h3>
+                  <p>
+                    Placeholder slots are detected from the current content
+                    JSON. Upload map or task images once, and they will be
+                    injected into that material set automatically.
+                  </p>
+                </div>
+                <div className="material-image-summary">
+                  {imageSlots.length} placeholder{imageSlots.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              {imageSlots.length === 0 ? (
+                <div className="material-placeholder">
+                  No image placeholders detected yet. Paste content JSON with
+                  fields like `image_placeholder_key` or `image_placeholder_keys`
+                  to enable image uploads.
+                </div>
+              ) : (
+                <div className="material-image-slots">
+                  {imageSlots.map((slot) => {
+                    const asset = imageAssetsByKey[slot.placeholder_key];
+                    const pendingFile = imageFiles[slot.placeholder_key];
+                    const isUploading = uploadingImageKey === slot.placeholder_key;
+
+                    return (
+                      <div
+                        key={slot.placeholder_key}
+                        className="material-image-slot"
+                      >
+                        <div className="material-image-slot__header">
+                          <div>
+                            <h4>{slot.label || slot.placeholder_key}</h4>
+                            <p>{slot.context_label || "Test Asset"}</p>
+                          </div>
+                          <span className="material-image-slot__type">
+                            {slot.context_type || "image"}
+                          </span>
+                        </div>
+
+                        <div className="material-image-slot__meta">
+                          <span>
+                            <strong>Placeholder:</strong> {slot.placeholder_key}
+                          </span>
+                          <span>
+                            <strong>Status:</strong>{" "}
+                            {asset ? "Image uploaded" : "Awaiting upload"}
+                          </span>
+                          {asset?.file_name && (
+                            <span>
+                              <strong>Current file:</strong> {asset.file_name}
+                            </span>
+                          )}
+                        </div>
+
+                        {asset?.file_url && (
+                          <a
+                            className="material-image-slot__link"
+                            href={asset.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open current image
+                          </a>
+                        )}
+
+                        <div className="material-image-slot__actions">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onClick={(event) => {
+                              event.target.value = null;
+                            }}
+                            onChange={(event) =>
+                              handleImageFileChange(
+                                slot.placeholder_key,
+                                event.target.files?.[0]
+                              )
+                            }
+                            disabled={!selectedTest}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleImageUpload(slot)}
+                            disabled={!pendingFile || isUploading || !canSave}
+                          >
+                            {isUploading
+                              ? "Uploading..."
+                              : asset
+                              ? "Replace Image"
+                              : "Upload Image"}
+                          </button>
+                        </div>
+
+                        {pendingFile && (
+                          <div className="material-image-slot__pending">
+                            Ready: {pendingFile.name}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -15,7 +15,7 @@ const getApiUrl = () => {
   }
 
   // Default to production backend
-  return "https://cd-ielts-mock-exam-platform-production.up.railway.app";
+  return "https://cd-ielts-mock-backend-11ea73f519e8.herokuapp.com";
 };
 
 // Centralized API configuration

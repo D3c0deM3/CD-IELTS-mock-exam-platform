@@ -656,6 +656,21 @@ const MatchingListRenderer = ({
         {matchingData.instructions}
       </div>
 
+      {matchingData.image_url && (
+        <div className="matching-list-image-card">
+          <img
+            src={matchingData.image_url}
+            alt={matchingData.title || "Listening map"}
+            className="matching-list-image"
+          />
+          {matchingData.image_source_note && (
+            <p className="matching-list-image-note">
+              {matchingData.image_source_note}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="matching-items-list">
         {matchingData.items.map((item, idx) => {
           const question = questions.find((q) => q.id === item.question_id);
@@ -1046,6 +1061,8 @@ const VisualStructureRenderer = ({
                     matchingData={{
                       title: component.title,
                       instructions: component.instructions,
+                      image_url: component.image_url,
+                      image_source_note: component.image_source_note,
                       options_box: {
                         title: "Map Labels",
                         options: component.map_letters || [],

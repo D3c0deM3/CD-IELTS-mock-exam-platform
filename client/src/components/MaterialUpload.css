@@ -274,6 +274,105 @@
   color: var(--text, #0f172a);
 }
 
+.material-image-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 110px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--paper, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  color: var(--text, #0f172a);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.material-image-slots {
+  display: grid;
+  gap: 16px;
+}
+
+.material-image-slot {
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--paper, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.material-image-slot__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.material-image-slot__header h4 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  color: var(--text, #0f172a);
+}
+
+.material-image-slot__header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #5f6b7a);
+}
+
+.material-image-slot__type {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft, rgba(15, 118, 110, 0.12));
+  color: var(--accent, #0f766e);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.material-image-slot__meta {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text, #0f172a);
+}
+
+.material-image-slot__link {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 14px;
+  color: var(--accent, #0f766e);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.material-image-slot__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.material-image-slot__actions input[type="file"] {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--paper, #ffffff);
+  font-size: 12px;
+  color: var(--text, #0f172a);
+}
+
+.material-image-slot__pending {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted, #5f6b7a);
+  font-weight: 600;
+}
+
 .material-message {
   margin-top: 18px;
   padding: 12px 14px;
@@ -311,5 +410,11 @@
 
   .material-tabs {
     gap: 8px;
+  }
+
+  .material-image-slot__header,
+  .material-image-slot__actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

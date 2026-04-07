@@ -324,6 +324,174 @@ const ChartRenderer = ({ graphData }) => {
   );
 };
 
+const humanizeAssetLabel = (value) =>
+  String(value || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const isDisplayableImageUrl = (value) =>
+  typeof value === "string" &&
+  value.trim().length > 0 &&
+  !value.startsWith("dynamic://");
+
+const WritingVisualRenderer = ({ task, theme }) => {
+  if (!task) return null;
+
+  const imageUrls = task.image_urls || {};
+  const mapTitles = Array.isArray(task.map_titles) ? task.map_titles : [];
+  const fullTaskImage = isDisplayableImageUrl(imageUrls.full_task_image)
+    ? imageUrls.full_task_image
+    : "";
+  const pairedMapImages = [
+    {
+      key: "current_map",
+      title: mapTitles[0] || "Current Map",
+      url: imageUrls.current_map,
+    },
+    {
+      key: "planned_development_map",
+      title: mapTitles[1] || "Planned Development",
+      url: imageUrls.planned_development_map,
+    },
+  ].filter((entry) => isDisplayableImageUrl(entry.url));
+  const genericImageEntries = Object.entries(imageUrls)
+    .filter(
+      ([key, value]) =>
+        !["full_task_image", "current_map", "planned_development_map"].includes(
+          key
+        ) && isDisplayableImageUrl(value)
+    )
+    .map(([key, value]) => ({
+      key,
+      title: humanizeAssetLabel(key),
+      url: value,
+    }));
+
+  const hasInjectedImages =
+    Boolean(fullTaskImage) ||
+    pairedMapImages.length > 0 ||
+    genericImageEntries.length > 0;
+  const dualMaps = Array.isArray(task.visual_content?.maps)
+    ? task.visual_content.maps
+    : [];
+  const mapDataMaps = Array.isArray(task.map_data?.maps) ? task.map_data.maps : [];
+
+  return (
+    <div className="writing-visual-stack">
+      {task.type === "graph_description" && task.graph_data && (
+        <div className="graph-wrapper">
+          <ChartRenderer key={theme} graphData={task.graph_data} />
+        </div>
+      )}
+
+      {hasInjectedImages && (
+        <>
+          {fullTaskImage && (
+            <div className="writing-image-card writing-image-card--full">
+              <h4 className="writing-image-title">
+                {task.title || `Task ${task.task_number}`}
+              </h4>
+              <img
+                src={fullTaskImage}
+                alt={task.title || `Writing task ${task.task_number}`}
+                className="writing-image"
+              />
+            </div>
+          )}
+
+          {!fullTaskImage && pairedMapImages.length > 0 && (
+            <div className="writing-image-grid">
+              {pairedMapImages.map((entry) => (
+                <div key={entry.key} className="writing-image-card">
+                  <h4 className="writing-image-title">{entry.title}</h4>
+                  <img
+                    src={entry.url}
+                    alt={entry.title}
+                    className="writing-image"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!fullTaskImage && genericImageEntries.length > 0 && (
+            <div className="writing-image-grid">
+              {genericImageEntries.map((entry) => (
+                <div key={entry.key} className="writing-image-card">
+                  <h4 className="writing-image-title">{entry.title}</h4>
+                  <img
+                    src={entry.url}
+                    alt={entry.title}
+                    className="writing-image"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {!hasInjectedImages &&
+        task.visual_content &&
+        task.visual_content.type === "dual_maps" &&
+        dualMaps.length > 0 && (
+          <div className="writing-image-grid">
+            {dualMaps.map((map, index) => (
+              <div key={index} className="writing-image-card writing-map-card">
+                <h4 className="writing-image-title">{map.title}</h4>
+                {map.compass && (
+                  <p className="writing-map-caption">{map.compass}</p>
+                )}
+                <ul className="writing-map-list">
+                  {map.layout &&
+                    map.layout.map((item, itemIndex) => (
+                      <li key={itemIndex}>{item}</li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+
+      {!hasInjectedImages &&
+        task.visual_content &&
+        task.visual_content.type !== "dual_maps" && (
+          <div className="writing-visual-fallback">
+            <pre>{JSON.stringify(task.visual_content, null, 2)}</pre>
+          </div>
+        )}
+
+      {!hasInjectedImages && mapDataMaps.length > 0 && (
+        <div className="writing-image-grid">
+          {mapDataMaps.map((map, index) => (
+            <div key={index} className="writing-image-card writing-map-card">
+              <h4 className="writing-image-title">{map.title}</h4>
+              {map.compass && (
+                <p className="writing-map-caption">
+                  N: {map.compass.N}, W: {map.compass.W}, E: {map.compass.E}, S:{" "}
+                  {map.compass.S}
+                </p>
+              )}
+              <ul className="writing-map-list">
+                {map.features &&
+                  map.features.map((feature, featureIndex) => (
+                    <li key={featureIndex}>
+                      <strong>{feature.label}</strong>: {feature.position}
+                    </li>
+                  ))}
+                {map.layout &&
+                  map.layout.map((item, itemIndex) => (
+                    <li key={`layout-${itemIndex}`}>{item}</li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== TASK RENDERER ====================
 const TaskRenderer = ({ task, answers, onAnswerChange }) => {
   if (!task) return null;
@@ -903,68 +1071,7 @@ const WritingTestDashboard = () => {
                 </div>
               )}
 
-              {currentTask.type === "graph_description" && currentTask.graph_data && (
-                <div className="graph-wrapper">
-                  <ChartRenderer key={theme} graphData={currentTask.graph_data} />
-                </div>
-              )}
-
-              {currentTask.visual_content && currentTask.visual_content.type === "dual_maps" && (
-                <div className="dual-maps-container" style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
-                  {currentTask.visual_content.maps.map((map, i) => (
-                    <div key={i} className="map-box" style={{ flex: 1, border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-                      <h4 style={{textAlign: 'center', marginBottom: '10px'}}>{map.title}</h4>
-                      {map.compass && <p style={{textAlign: 'right', fontWeight: 'bold', margin: '0 0 10px 0'}}>{map.compass}</p>}
-                      <ul style={{ paddingLeft: '20px' }}>
-                        {map.layout && map.layout.map((item, j) => (
-                          <li key={j} style={{marginBottom: '5px'}}>{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {currentTask.visual_content && currentTask.visual_content.type !== "dual_maps" && (
-                <div className="generic-visual-content" style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f5f5f5', border: '1px solid #ddd' }}>
-                   <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'inherit'}}>{JSON.stringify(currentTask.visual_content, null, 2)}</pre>
-                </div>
-              )}
-
-              {currentTask.map_data && currentTask.map_data.maps && (
-                <div className="dual-maps-container" style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
-                  {currentTask.map_data.maps.map((map, i) => (
-                    <div key={i} className="map-box" style={{ flex: 1, border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-                      <h4 style={{textAlign: 'center', marginBottom: '10px'}}>{map.title}</h4>
-                      {map.compass && <p style={{textAlign: 'right', fontWeight: 'bold', margin: '0 0 10px 0'}}>N: {map.compass.N}, W: {map.compass.W}, E: {map.compass.E}, S: {map.compass.S}</p>}
-                      <ul style={{ paddingLeft: '20px' }}>
-                        {map.features && map.features.map((feature, j) => (
-                          <li key={j} style={{marginBottom: '5px'}}><strong>{feature.label}</strong>: {feature.position}</li>
-                        ))}
-                        {map.layout && map.layout.map((item, j) => (
-                          <li key={'l'+j} style={{marginBottom: '5px'}}>{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-
-
-              {currentTask.visual_content && currentTask.visual_content.type === "dual_maps" && (
-                <div className="maps-wrapper" style={{ display: 'flex', gap: '20px', marginTop: '20px', flexDirection: 'column' }}>
-                  {currentTask.visual_content.maps.map((mapData, idx) => (
-                    <div key={idx} className="map-container" style={{ border: '1px solid var(--border-color)', padding: '15px', borderRadius: '8px' }}>
-                       <h3 style={{ textAlign: 'center', marginBottom: '10px' }}>{mapData.title}</h3>
-                       <ul style={{ listStyleType: 'disc', paddingLeft: '20px' }}>
-                         {mapData.layout && mapData.layout.map((item, idxx) => (
-                           <li key={idxx} style={{ marginBottom: '5px' }}>{item}</li>
-                         ))}
-                       </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <WritingVisualRenderer task={currentTask} theme={theme} />
 
               {currentTask.questions && currentTask.questions.length > 0 && (
                 <div className="topic-questions" style={{ marginTop: '20px' }}>
