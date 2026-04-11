@@ -25,6 +25,72 @@ const getBundledTestData = (testMaterialsId) => {
   }
 };
 
+const createHighlightSpan = (highlightId, onRemoveHighlight) => {
+  const span = document.createElement("span");
+  span.className = "text-highlight";
+  span.dataset.highlightId = highlightId;
+
+  span.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!e.ctrlKey && !e.metaKey) return;
+
+    const parent = span.parentNode;
+    if (parent) {
+      while (span.firstChild) {
+        parent.insertBefore(span.firstChild, span);
+      }
+      parent.removeChild(span);
+    }
+
+    if (onRemoveHighlight) {
+      onRemoveHighlight(highlightId);
+    }
+  });
+
+  return span;
+};
+
+const isRangeInsideNode = (range, parentNode) =>
+  Boolean(
+    range &&
+      parentNode &&
+      parentNode.contains(range.commonAncestorContainer)
+  );
+
+const createRangeFromTextOffsets = (container, startOffset, endOffset) => {
+  if (!container || startOffset == null || endOffset == null) return null;
+
+  const range = document.createRange();
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false
+  );
+
+  let currentOffset = 0;
+  let startSet = false;
+  let node;
+
+  while ((node = walker.nextNode())) {
+    const nextOffset = currentOffset + node.textContent.length;
+
+    if (!startSet && startOffset >= currentOffset && startOffset <= nextOffset) {
+      range.setStart(node, startOffset - currentOffset);
+      startSet = true;
+    }
+
+    if (startSet && endOffset >= currentOffset && endOffset <= nextOffset) {
+      range.setEnd(node, endOffset - currentOffset);
+      return range;
+    }
+
+    currentOffset = nextOffset;
+  }
+
+  return null;
+};
+
 // ==================== HIGHLIGHT RE-APPLICATION HELPER ====================
 const reapplyHighlights = (
   highlightsList,
@@ -34,24 +100,12 @@ const reapplyHighlights = (
   if (!highlightsList || highlightsList.length === 0 || !passageContent) return;
 
   try {
-    // Collect all text nodes first
-    const textNodes = [];
-    const walker = document.createTreeWalker(
-      passageContent,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
-
-    let node;
-    while ((node = walker.nextNode())) {
-      textNodes.push(node);
-    }
-
     // Sort highlights by position to apply them in order
-    const sortedHighlights = highlightsList.sort((a, b) => {
-      const aPos = passageContent.textContent.indexOf(a.text);
-      const bPos = passageContent.textContent.indexOf(b.text);
+    const sortedHighlights = [...highlightsList].sort((a, b) => {
+      const aPos =
+        a.startOffset ?? passageContent.textContent.indexOf(a.text);
+      const bPos =
+        b.startOffset ?? passageContent.textContent.indexOf(b.text);
       return aPos - bPos;
     });
 
@@ -69,54 +123,54 @@ const reapplyHighlights = (
       let currentOccurrence = 0;
 
       try {
-        textNodes.forEach((textNode) => {
-          if (currentOccurrence >= targetOccurrence) return;
+        let range = createRangeFromTextOffsets(
+          passageContent,
+          highlight.startOffset,
+          highlight.endOffset
+        );
 
-          const nodeText = textNode.textContent;
-          if (!nodeText.includes(text)) return;
+        if (!range) {
+          const walker = document.createTreeWalker(
+            passageContent,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+          );
 
-          // Only process if this is still a valid text node
-          if (textNode.parentNode === null) return;
+          let textNode;
+          while ((textNode = walker.nextNode())) {
+            if (currentOccurrence >= targetOccurrence) break;
 
-          const index = nodeText.indexOf(text);
-          if (index < 0) return;
+            const nodeText = textNode.textContent;
+            if (!nodeText.includes(text)) continue;
+            if (textNode.parentNode === null) continue;
 
-          currentOccurrence++;
+            const index = nodeText.indexOf(text);
+            if (index < 0) continue;
 
-          if (currentOccurrence !== targetOccurrence) return;
+            currentOccurrence++;
 
-          // Create range
-          const range = document.createRange();
-          range.setStart(textNode, index);
-          range.setEnd(textNode, index + text.length);
+            if (currentOccurrence !== targetOccurrence) continue;
 
-          const span = document.createElement("span");
-          span.className = "text-highlight";
-          span.style.backgroundColor = "#FFFF00";
-          span.style.cursor = "pointer";
-          span.style.fontWeight = "bold";
-          span.style.color = "#000";
-          span.dataset.highlightId = highlight.id;
+            range = document.createRange();
+            range.setStart(textNode, index);
+            range.setEnd(textNode, index + text.length);
+          }
+        }
 
-          range.surroundContents(span);
+        if (range) {
+          const span = createHighlightSpan(
+            highlight.id,
+            onRemoveHighlight
+          );
 
-          // Add click handler
-          span.addEventListener("click", (e) => {
-            e.stopPropagation();
-            if (e.ctrlKey || e.metaKey) {
-              const parent = span.parentNode;
-              if (parent) {
-                while (span.firstChild) {
-                  parent.insertBefore(span.firstChild, span);
-                }
-                parent.removeChild(span);
-              }
-              if (onRemoveHighlight) {
-                onRemoveHighlight(highlight.id);
-              }
-            }
-          });
-        });
+          try {
+            range.surroundContents(span);
+          } catch {
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+          }
+        }
       } catch (err) {
         // Silently fail for this specific highlight
       }
@@ -613,6 +667,7 @@ const ReadingTestDashboard = () => {
   const navigate = useNavigate();
   useActivityMonitor("reading_dashboard");
   const passageContentRef = useRef(null);
+  const selectedRangeRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("ielts_mock_theme") || "light";
   });
@@ -964,14 +1019,23 @@ const ReadingTestDashboard = () => {
   // ==================== TEXT HIGHLIGHTING HANDLERS ====================
   const handleContextMenu = (e) => {
     e.preventDefault();
-    const selected = window.getSelection().toString().trim();
+    e.stopPropagation();
 
-    if (selected.length === 0) {
+    const selection = window.getSelection();
+    const selected = selection.toString().trim();
+
+    if (
+      selected.length === 0 ||
+      !selection.rangeCount ||
+      !isRangeInsideNode(selection.getRangeAt(0), passageContentRef.current)
+    ) {
+      selectedRangeRef.current = null;
       setContextMenu(null);
       return;
     }
 
     setSelectedText(selected);
+    selectedRangeRef.current = selection.getRangeAt(0).cloneRange();
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -980,27 +1044,30 @@ const ReadingTestDashboard = () => {
 
   const highlightSelectedText = () => {
     const selection = window.getSelection();
+    const range =
+      selectedRangeRef.current ||
+      (selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null);
+    const text = selectedText || selection.toString().trim();
 
-    if (selection.toString().length === 0) {
+    if (
+      !range ||
+      text.length === 0 ||
+      !isRangeInsideNode(range, passageContentRef.current)
+    ) {
       setContextMenu(null);
       return;
     }
 
-    const range = selection.getRangeAt(0);
-    const span = document.createElement("span");
-    span.className = "text-highlight";
-    span.style.backgroundColor = "#FFFF00";
-    span.style.cursor = "pointer";
-    span.style.fontWeight = "bold";
-    span.style.color = "#000";
+    const highlightId = Date.now();
+    const span = createHighlightSpan(highlightId, handleRemoveHighlight);
 
     try {
-      range.surroundContents(span);
-
       // Capture context around the highlighted text to identify specific occurrence
       const rangeClone = range.cloneRange();
       rangeClone.setStart(passageContentRef.current, 0);
       const precedingText = rangeClone.toString();
+      const endOffset = precedingText.length;
+      const startOffset = Math.max(0, endOffset - text.length);
       const contextBefore = precedingText.slice(
         Math.max(0, precedingText.length - 30)
       );
@@ -1010,59 +1077,39 @@ const ReadingTestDashboard = () => {
         passageContentRef.current,
         passageContentRef.current.childNodes.length
       );
-      const followingText = rangeClone2
-        .toString()
-        .slice(selection.toString().length);
+      const followingText = rangeClone2.toString().slice(text.length);
       const contextAfter = followingText.slice(0, 30);
 
       const highlight = {
-        id: Date.now(),
-        text: selection.toString(),
+        id: highlightId,
+        text,
         contextBefore,
         contextAfter,
+        startOffset,
+        endOffset,
         timestamp: new Date().toLocaleTimeString(),
       };
 
+      try {
+        range.surroundContents(span);
+      } catch {
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+      }
+
       // Get current passage key (using passage number as identifier)
       const passageKey = `passage_${currentPassageIndex}`;
-      const currentPassageHighlights = highlightsByPassage[passageKey] || [];
-
-      setHighlightsByPassage({
-        ...highlightsByPassage,
-        [passageKey]: [...currentPassageHighlights, highlight],
-      });
-
-      span.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (e.ctrlKey || e.metaKey) {
-          const parent = span.parentNode;
-          while (span.firstChild) {
-            parent.insertBefore(span.firstChild, span);
-          }
-          parent.removeChild(span);
-
-          const passageKey = `passage_${currentPassageIndex}`;
-          const updatedHighlights = (
-            highlightsByPassage[passageKey] || []
-          ).filter((h) => h.id !== highlight.id);
-
-          if (updatedHighlights.length === 0) {
-            const newHighlightsByPassage = { ...highlightsByPassage };
-            delete newHighlightsByPassage[passageKey];
-            setHighlightsByPassage(newHighlightsByPassage);
-          } else {
-            setHighlightsByPassage({
-              ...highlightsByPassage,
-              [passageKey]: updatedHighlights,
-            });
-          }
-        }
-      });
+      setHighlightsByPassage((prev) => ({
+        ...prev,
+        [passageKey]: [...(prev[passageKey] || []), highlight],
+      }));
     } catch (err) {
       console.warn("Could not highlight text (complex selection):", err);
     }
 
     setContextMenu(null);
+    selectedRangeRef.current = null;
+    setSelectedText("");
     selection.removeAllRanges();
   };
 
@@ -1070,22 +1117,24 @@ const ReadingTestDashboard = () => {
   const handleRemoveHighlight = useCallback(
     (highlightId) => {
       const passageKey = `passage_${currentPassageIndex}`;
-      const updatedHighlights = (highlightsByPassage[passageKey] || []).filter(
-        (h) => h.id !== highlightId
-      );
+      setHighlightsByPassage((prev) => {
+        const updatedHighlights = (prev[passageKey] || []).filter(
+          (h) => h.id !== highlightId
+        );
 
-      if (updatedHighlights.length === 0) {
-        const newHighlightsByPassage = { ...highlightsByPassage };
-        delete newHighlightsByPassage[passageKey];
-        setHighlightsByPassage(newHighlightsByPassage);
-      } else {
-        setHighlightsByPassage({
-          ...highlightsByPassage,
+        if (updatedHighlights.length === 0) {
+          const next = { ...prev };
+          delete next[passageKey];
+          return next;
+        }
+
+        return {
+          ...prev,
           [passageKey]: updatedHighlights,
-        });
-      }
+        };
+      });
     },
-    [currentPassageIndex, highlightsByPassage]
+    [currentPassageIndex]
   );
 
   // Close context menu on click anywhere
@@ -1135,7 +1184,7 @@ const ReadingTestDashboard = () => {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [currentPassageIndex, testData, handleRemoveHighlight]);
+  }, [currentPassageIndex, highlightsByPassage, testData, handleRemoveHighlight]);
 
   // ==================== SUBMIT TEST HANDLER ====================
   const handleSubmitTest = useCallback(() => {
@@ -1259,7 +1308,11 @@ const ReadingTestDashboard = () => {
             left: contextMenu.x,
           }}
         >
-          <button className="context-menu-item" onClick={highlightSelectedText}>
+          <button
+            className="context-menu-item"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={highlightSelectedText}
+          >
             <span className="menu-icon">🔆</span>
             Highlight
           </button>
