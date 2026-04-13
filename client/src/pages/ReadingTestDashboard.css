@@ -148,6 +148,21 @@
   text-align: justify;
 }
 
+.passage-missing-note {
+  padding: 16px;
+  border: 1px solid #d4d4d4;
+  border-radius: 8px;
+  background: #f7f7f7;
+  color: #525252;
+  line-height: 1.6;
+}
+
+[data-theme="dark"] .passage-missing-note {
+  background: #2a2a2a;
+  color: #d4d4d4;
+  border-color: #444444;
+}
+
 .paragraph-with-marker {
   margin-top: 12px;
 }

@@ -9,6 +9,7 @@ const asArray = (value) => (Array.isArray(value) ? value : []);
 
 const toText = (value) => {
   if (value === undefined || value === null) return "";
+  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join("\n");
   return String(value);
 };
 
@@ -22,10 +23,16 @@ export const extractQuestionIdFromText = (value) => {
   return match ? Number.parseInt(match[1], 10) : null;
 };
 
-const normalizeOptions = (options) =>
-  asArray(options)
+const normalizeOptions = (options) => {
+  const optionArray =
+    options && typeof options === "object" && !Array.isArray(options)
+      ? Object.entries(options).map(([key, value]) => `${key} ${toText(value)}`)
+      : asArray(options);
+
+  return optionArray
     .map((option) => toText(option).trim())
     .filter(Boolean);
+};
 
 const normalizeListeningQuestion = (question, index) => {
   const normalized = {
@@ -34,11 +41,19 @@ const normalizeListeningQuestion = (question, index) => {
   };
 
   const typeAliases = {
+    diagram_label: "gap_fill",
+    form_completion: "gap_fill",
     map_labeling: "matching",
     map_labelling: "matching",
     matching_features: "matching",
     matching_information: "matching",
+    multiple_answer: "multiple_selection",
     multiple_choice_single: "multiple_choice",
+    multiple_choice_multi: "multiple_selection",
+    note_completion: "gap_fill",
+    plan_labeling: "matching",
+    sentence_completion: "gap_fill",
+    table_completion: "gap_fill",
   };
 
   normalized.type = typeAliases[normalized.type] || normalized.type;
@@ -47,19 +62,33 @@ const normalizeListeningQuestion = (question, index) => {
     normalized.prompt = normalized.question;
   }
 
+  if (!normalized.prompt && normalized.statement) {
+    normalized.prompt = normalized.statement;
+  }
+
   if (!normalized.question && normalized.prompt) {
     normalized.question = normalized.prompt;
+  }
+
+  if (!normalized.statement && (normalized.prompt || normalized.question)) {
+    normalized.statement = normalized.prompt || normalized.question;
   }
 
   const matchingOptions = normalizeOptions(
     normalized.matching_options || normalized.options
   );
 
-  if (normalized.type === "matching" && matchingOptions.length > 0) {
+  if (
+    (normalized.type === "matching" || normalized.type === "classification") &&
+    matchingOptions.length > 0
+  ) {
     normalized.matching_options = matchingOptions;
   }
 
-  if (normalized.type === "multiple_choice") {
+  if (
+    normalized.type === "multiple_choice" ||
+    normalized.type === "multiple_selection"
+  ) {
     normalized.options = normalizeOptions(normalized.options);
   }
 
@@ -90,6 +119,7 @@ const normalizeStructuredItem = (item) => {
       type: "question",
       question_id: questionId,
       content,
+      label: item.label || content,
     };
   }
 
@@ -97,6 +127,7 @@ const normalizeStructuredItem = (item) => {
     ...item,
     type: item.type || "text",
     content,
+    label: item.label || content,
   };
 };
 
@@ -230,9 +261,18 @@ const normalizeListeningVisualStructure = (visualStructure, questions) => {
   }
 
   if (visualStructure.type === "form") {
+    const sections = asArray(visualStructure.sections);
     return {
       ...visualStructure,
-      sections: asArray(visualStructure.sections).map((section) => ({
+      sections: (sections.length
+        ? sections
+        : [
+            {
+              title: visualStructure.subtitle || visualStructure.title || "",
+              items: asArray(visualStructure.items),
+            },
+          ]
+      ).map((section) => ({
         ...section,
         items: asArray(section.items).map(normalizeStructuredItem),
       })),
@@ -249,12 +289,26 @@ const normalizeReadingQuestion = (question, index) => {
   };
 
   const typeAliases = {
+    flow_chart: "gap_fill",
+    heading_matching: "matching",
+    label: "gap_fill",
+    notes_completion: "gap_fill",
+    researcher_matching: "matching",
+    sentence_completion: "gap_fill",
+    sentence_completion_matching: "matching",
+    sentence_ending: "matching",
+    short_answer: "gap_fill",
+    summary: "gap_fill",
+    summary_completion: "gap_fill",
+    summary_matching: "matching",
     true_false_not_given: "true_false_ng",
+    true_false_notgiven: "true_false_ng",
     yes_no_notgiven: "yes_no_ng",
     yes_no_not_given: "yes_no_ng",
     word_bank_matching: "matching",
     map_labeling: "matching",
     map_labelling: "matching",
+    matching_headings: "matching",
   };
 
   normalized.type = typeAliases[normalized.type] || normalized.type;
@@ -263,8 +317,16 @@ const normalizeReadingQuestion = (question, index) => {
     normalized.prompt = normalized.question;
   }
 
+  if (!normalized.prompt && normalized.statement) {
+    normalized.prompt = normalized.statement;
+  }
+
   if (!normalized.question && normalized.prompt) {
     normalized.question = normalized.prompt;
+  }
+
+  if (!normalized.statement && (normalized.prompt || normalized.question)) {
+    normalized.statement = normalized.prompt || normalized.question;
   }
 
   if (normalized.type === "true_false_ng") {
@@ -288,7 +350,11 @@ const normalizeReadingQuestion = (question, index) => {
   const matchingOptions = normalizeOptions(
     normalized.matching_options || normalized.options
   );
-  if (normalized.type === "matching" && matchingOptions.length > 0) {
+  if (
+    (normalized.type === "matching" ||
+      normalized.type === "paragraph_matching") &&
+    matchingOptions.length > 0
+  ) {
     normalized.matching_options = matchingOptions;
   }
 
@@ -340,6 +406,8 @@ export const normalizeTestContent = (content) => {
           return {
             ...part,
             part_number: Number.parseInt(part?.part_number, 10) || index + 1,
+            instructions: toText(part.instructions),
+            context: toText(part.context),
             questions,
             visual_structure: normalizeListeningVisualStructure(
               part.visual_structure,

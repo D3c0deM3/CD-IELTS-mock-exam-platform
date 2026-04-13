@@ -140,6 +140,97 @@ const extractGapContent = (text) => {
   return { isGap: false };
 };
 
+const GAP_TOKEN_ONLY_REGEX =
+  /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/;
+
+const getQuestionText = (question) =>
+  question?.question || question?.prompt || question?.statement || "";
+
+const getOptionValue = (option, index) => {
+  const text = String(option || "").trim();
+  const explicitLetter = text.match(/^([A-Z])(?:[\).])?\s+/);
+  if (explicitLetter) return explicitLetter[1];
+  return String.fromCharCode(65 + index);
+};
+
+const getOptionLabel = (option) =>
+  String(option || "")
+    .trim()
+    .replace(/^[A-Z](?:[\).])?\s+/, "");
+
+const getSelectedLetter = (answer) =>
+  Array.isArray(answer) ? answer[0] || "" : answer || "";
+
+const renderInlineGapText = ({
+  text,
+  questions,
+  answers,
+  onAnswerChange,
+  fallbackQuestionId = null,
+  inputClassName = "gap-fill-input",
+}) => {
+  const parts = String(text || "").split(GAP_PLACEHOLDER_REGEX);
+
+  return parts.map((part, index) => {
+    if (!part) return null;
+    const gapMatch = part.match(GAP_TOKEN_ONLY_REGEX);
+
+    if (!gapMatch) {
+      return <span key={index}>{part}</span>;
+    }
+
+    const questionId = Number.parseInt(gapMatch[1], 10) || fallbackQuestionId;
+    const question =
+      questions.find((candidate) => candidate.id === questionId) ||
+      questions.find((candidate) => candidate.id === fallbackQuestionId);
+
+    if (!question) {
+      return <span key={index}>{part}</span>;
+    }
+
+    return (
+      <input
+        key={index}
+        type="text"
+        className={inputClassName}
+        value={answers[question.id] || ""}
+        onChange={(e) => onAnswerChange(question.id, e.target.value)}
+        placeholder={question.id}
+        maxLength={question.word_limit?.includes("ONE WORD") ? 20 : 40}
+        autoComplete="off"
+      />
+    );
+  });
+};
+
+const OptionSelect = ({
+  question,
+  answer,
+  onAnswerChange,
+  placeholder = "-- Select an answer --",
+}) => {
+  const options = question?.matching_options || question?.options || [];
+
+  return (
+    <select
+      className="matching-select"
+      value={getSelectedLetter(answer)}
+      onChange={(e) => onAnswerChange(question.id, e.target.value)}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((option, index) => {
+        const value = getOptionValue(option, index);
+        const label = getOptionLabel(option);
+        return (
+          <option key={index} value={value}>
+            {label === value ? value : `${value}. ${label}`}
+          </option>
+        );
+      })}
+    </select>
+  );
+};
+
 // ==================== COMPONENT IMPORTS ====================
 const TableRenderer = ({ tableData, questions, answers, onAnswerChange }) => {
   if (!tableData) return null;
@@ -779,20 +870,16 @@ const FormRenderer = ({ formData, questions, answers, onAnswerChange }) => {
 
                 return (
                   <li key={itemIdx} className="form-item-row question-row">
-                    <label className="form-item-label">{item.label}</label>
-                    <input
-                      type="text"
-                      className="form-input gap-fill-input"
-                      value={answers[question.id] || ""}
-                      onChange={(e) =>
-                        onAnswerChange(question.id, e.target.value)
-                      }
-                      placeholder={question.id}
-                      maxLength={
-                        question.word_limit?.includes("ONE WORD") ? 15 : 30
-                      }
-                      autoComplete="off"
-                    />
+                    <span className="form-item-label">
+                      {renderInlineGapText({
+                        text: item.content || item.label || question.prompt,
+                        questions,
+                        answers,
+                        onAnswerChange,
+                        fallbackQuestionId: question.id,
+                        inputClassName: "form-input gap-fill-input",
+                      })}
+                    </span>
                   </li>
                 );
               } else if (item.type === "given") {
@@ -821,6 +908,132 @@ const FormRenderer = ({ formData, questions, answers, onAnswerChange }) => {
           </ul>
         </div>
       ))}
+    </div>
+  );
+};
+
+const FormAndClassificationRenderer = ({
+  formData,
+  questions,
+  answers,
+  onAnswerChange,
+}) => {
+  if (!formData) return null;
+
+  return (
+    <div className="visual-form hybrid-form">
+      {formData.title && <h3 className="form-title">{formData.title}</h3>}
+      {(formData.subsections || []).map((section, sectionIdx) => (
+        <div key={sectionIdx} className="form-section">
+          {section.title && (
+            <h4 className="form-section-title">{section.title}</h4>
+          )}
+          {section.prompt && (
+            <p className="component-instructions">{section.prompt}</p>
+          )}
+          <ul className="form-items">
+            {(section.items || []).map((item, itemIdx) => {
+              const questionId = extractQuestionIdFromText(item);
+              const question = questions.find((q) => q.id === questionId);
+
+              if (question?.type === "classification") {
+                return (
+                  <li key={itemIdx} className="form-item-row question-row">
+                    <span className="form-item-label">
+                      <span className="question-num">{question.id}</span>{" "}
+                      {getQuestionText(question) ||
+                        String(item).replace(/^\d+\s*/, "")}
+                    </span>
+                    <OptionSelect
+                      question={{
+                        ...question,
+                        options:
+                          question.options ||
+                          Object.entries(section.options || {}).map(
+                            ([key, value]) => `${key} ${value}`
+                          ),
+                      }}
+                      answer={answers[question.id]}
+                      onAnswerChange={onAnswerChange}
+                    />
+                  </li>
+                );
+              }
+
+              return (
+                <li key={itemIdx} className="form-item-row">
+                  <span className="form-item-label">
+                    {renderInlineGapText({
+                      text: item,
+                      questions,
+                      answers,
+                      onAnswerChange,
+                      fallbackQuestionId: questionId,
+                      inputClassName: "form-input gap-fill-input",
+                    })}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const SelectionAndNotesRenderer = ({
+  visualStructure,
+  questions,
+  answers,
+  onAnswerChange,
+}) => {
+  const selectionQuestions = questions.filter(
+    (question) => question.type === "multiple_selection"
+  );
+  const noteQuestions = questions.filter(
+    (question) => question.type === "gap_fill"
+  );
+
+  return (
+    <div className="visual-structured-notes selection-and-notes">
+      {selectionQuestions.length > 0 && (
+        <div className="form-section">
+          <h3 className="form-section-title">Questions</h3>
+          {selectionQuestions.map((question) => (
+            <StandaloneQuestionRenderer
+              key={question.id}
+              question={question}
+              answer={answers[question.id]}
+              onAnswerChange={onAnswerChange}
+            />
+          ))}
+        </div>
+      )}
+
+      {(visualStructure.seminar_outline || visualStructure.items) && (
+        <div className="form-section">
+          {visualStructure.title && (
+            <h3 className="form-section-title">{visualStructure.title}</h3>
+          )}
+          <ul className="ielts-notes">
+            {(visualStructure.seminar_outline || visualStructure.items || []).map(
+              (item, index) => (
+                <li key={index} className="note-item-with-gap">
+                  {renderInlineGapText({
+                    text: item,
+                    questions: noteQuestions,
+                    answers,
+                    onAnswerChange,
+                    fallbackQuestionId: extractQuestionIdFromText(item),
+                    inputClassName: "notes-gap-input",
+                  })}
+                </li>
+              )
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };
@@ -1180,6 +1393,52 @@ const VisualStructureRenderer = ({
         </>
       );
 
+    case "form_and_classification":
+      return (
+        <>
+          {partInstructions && (
+            <div className="test-instructions">
+              <h2>Instructions</h2>
+              <p>{partInstructions}</p>
+              {partContext && (
+                <p className="context-text">
+                  <strong>Context:</strong> {partContext}
+                </p>
+              )}
+            </div>
+          )}
+          <FormAndClassificationRenderer
+            formData={visualStructure}
+            questions={questions}
+            answers={answers}
+            onAnswerChange={onAnswerChange}
+          />
+        </>
+      );
+
+    case "multiple_selection_and_notes":
+      return (
+        <>
+          {partInstructions && (
+            <div className="test-instructions">
+              <h2>Instructions</h2>
+              <p>{partInstructions}</p>
+              {partContext && (
+                <p className="context-text">
+                  <strong>Context:</strong> {partContext}
+                </p>
+              )}
+            </div>
+          )}
+          <SelectionAndNotesRenderer
+            visualStructure={visualStructure}
+            questions={questions}
+            answers={answers}
+            onAnswerChange={onAnswerChange}
+          />
+        </>
+      );
+
     default:
       return (
         <>
@@ -1214,18 +1473,29 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
     return (
       <div className="question-card gap-fill-card standalone">
         <div className="question-body">
-          <p className="question-prompt">{question.prompt}</p>
+          <p className="question-prompt">
+            {renderInlineGapText({
+              text: getQuestionText(question),
+              questions: [question],
+              answers: { [question.id]: answer },
+              onAnswerChange,
+              fallbackQuestionId: question.id,
+              inputClassName: "answer-input gap-fill-input",
+            })}
+          </p>
           <div className="gap-input-container">
             <span className="question-num">{question.id}</span>
-            <input
-              type="text"
-              className="answer-input gap-fill-input"
-              value={answer || ""}
-              onChange={(e) => onAnswerChange(question.id, e.target.value)}
-              placeholder="Type your answer..."
-              maxLength={question.word_limit?.includes("ONE WORD") ? 15 : 30}
-              autoComplete="off"
-            />
+            {!getQuestionText(question).match(GAP_PLACEHOLDER_REGEX) && (
+              <input
+                type="text"
+                className="answer-input gap-fill-input"
+                value={answer || ""}
+                onChange={(e) => onAnswerChange(question.id, e.target.value)}
+                placeholder="Type your answer..."
+                maxLength={question.word_limit?.includes("ONE WORD") ? 20 : 40}
+                autoComplete="off"
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1236,10 +1506,11 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
     return (
       <div className="question-card mc-card standalone">
         <div className="question-body">
-          <p className="mc-question-text">{question.question}</p>
+          <p className="mc-question-text">{getQuestionText(question)}</p>
           <div className="options-list">
             {question.options.map((option, idx) => {
-              const letter = String.fromCharCode(65 + idx);
+              const letter = getOptionValue(option, idx);
+              const label = getOptionLabel(option);
               const isSelected = answer === letter;
               return (
                 <label
@@ -1256,7 +1527,9 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
                     }
                   />
                   <span className="option-letter">{letter}</span>
-                  <span className="option-content">{option}</span>
+                  <span className="option-content">
+                    {label === letter ? letter : label}
+                  </span>
                 </label>
               );
             })}
@@ -1268,6 +1541,8 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
 
   if (
     question.type === "matching" ||
+    question.type === "classification" ||
+    question.type === "multiple_selection" ||
     question.type === "map_labeling" ||
     question.type === "map_labelling"
   ) {
@@ -1285,21 +1560,11 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
             </p>
           )}
           <div className="select-container">
-            <select
-              className="matching-select"
-              value={answer || ""}
-              onChange={(e) => onAnswerChange(question.id, e.target.value)}
-            >
-              <option value="">-- Select an answer --</option>
-              {matchingOptions.map((option, idx) => {
-                const letter = option.split(" ")[0];
-                return (
-                  <option key={idx} value={letter}>
-                    {option}
-                  </option>
-                );
-              })}
-            </select>
+            <OptionSelect
+              question={{ ...question, options: matchingOptions }}
+              answer={answer}
+              onAnswerChange={onAnswerChange}
+            />
           </div>
           {answer && (
             <div className="answer-preview-box">
@@ -1348,7 +1613,35 @@ const StandaloneQuestionRenderer = ({ question, answer, onAnswerChange }) => {
     );
   }
 
-  return null;
+  return (
+    <div className="question-card standalone">
+      <div className="question-body">
+        <p className="question-prompt">{getQuestionText(question)}</p>
+        {question.options?.length > 0 ? (
+          <div className="select-container">
+            <OptionSelect
+              question={question}
+              answer={answer}
+              onAnswerChange={onAnswerChange}
+            />
+          </div>
+        ) : (
+          <div className="gap-input-container">
+            <span className="question-num">{question.id}</span>
+            <input
+              type="text"
+              className="answer-input gap-fill-input"
+              value={answer || ""}
+              onChange={(e) => onAnswerChange(question.id, e.target.value)}
+              placeholder="Type your answer..."
+              maxLength={40}
+              autoComplete="off"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 // ==================== MAIN DASHBOARD COMPONENT ====================
@@ -1370,6 +1663,7 @@ const ListeningTestDashboard = () => {
   const [loadError, setLoadError] = useState("");
   const [audioLoaded, setAudioLoaded] = useState(false);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [audioPlaybackError, setAudioPlaybackError] = useState("");
   const audioRef = useRef(null);
 
   // ==================== AUDIO PLAYBACK ====================
@@ -1689,6 +1983,7 @@ const ListeningTestDashboard = () => {
             );
           } catch (preloadErr) {
             console.error("✗ Failed to preload audio:", preloadErr);
+            setAudioPlaybackError(preloadErr.message || "Audio could not be loaded.");
             setAudioLoaded(true);
             return;
           }
@@ -1711,6 +2006,7 @@ const ListeningTestDashboard = () => {
         const totalTime = Math.ceil(duration) + 300;
         setTimeRemaining(totalTime);
         setAudioDuration(duration);
+        setDuration(duration);
 
         console.log(
           `📊 Timer set - Duration: ${duration.toFixed(
@@ -1737,10 +2033,16 @@ const ListeningTestDashboard = () => {
         console.log("▶ Starting audio playback...");
         try {
           await audioService.playAudio();
+          setAudioPlaybackError("");
+          setIsPlaying(true);
           setAudioLoaded(true);
           console.log("✓ Audio now playing");
         } catch (playErr) {
           console.error("✗ Playback error:", playErr);
+          setAudioPlaybackError(
+            "Your browser blocked automatic audio playback. Select Start audio to continue."
+          );
+          setIsPlaying(false);
           setAudioLoaded(true);
         }
       } catch (err) {
@@ -1771,6 +2073,7 @@ const ListeningTestDashboard = () => {
 
     const handlePlayPause = () => {
       audioStorageState.setIsPlayingStored(audio.paused === false);
+      setIsPlaying(audio.paused === false);
     };
 
     // Add event listeners for audio time tracking
@@ -1980,6 +2283,30 @@ const ListeningTestDashboard = () => {
     e.target.style.setProperty("--volume-value", `${newVolume}%`);
     // Set audio volume using audioService
     audioService.setVolume(newVolume / 100);
+  };
+
+  const handleManualAudioStart = async () => {
+    try {
+      let audio = audioService.getAudioElement();
+      if (!audio) {
+        const participant = JSON.parse(
+          localStorage.getItem("currentParticipant") || "{}"
+        );
+        const testMaterialsId = Number(participant.test_materials_id) || null;
+        const result = await audioService.preloadAudio(testMaterialsId);
+        audio = result.audio;
+        setAudioDuration(result.duration);
+        setDuration(result.duration);
+      }
+
+      audioRef.current = audio;
+      await audioService.playAudio();
+      setAudioPlaybackError("");
+      setAudioLoaded(true);
+      setIsPlaying(true);
+    } catch (err) {
+      setAudioPlaybackError(err.message || "Audio could not be started.");
+    }
   };
 
   // ==================== TEXT HIGHLIGHTING HANDLERS ====================
@@ -2253,10 +2580,24 @@ const ListeningTestDashboard = () => {
             <span className="volume-percent">{volume}%</span>
           </div>
 
+          <div className="audio-status">
+            <span className={isPlaying ? "audio-dot playing" : "audio-dot"} />
+            <span>{isPlaying ? "Playing" : audioLoaded ? "Ready" : "Loading"}</span>
+          </div>
+
           {/* Theme Toggle */}
           <ThemeToggle />
         </div>
       </div>
+
+      {audioPlaybackError && (
+        <div className="audio-start-banner">
+          <span>{audioPlaybackError}</span>
+          <button type="button" onClick={handleManualAudioStart}>
+            Start audio
+          </button>
+        </div>
+      )}
 
       {/* ==================== MAIN CONTENT ==================== */}
       <div className="test-container">

@@ -339,9 +339,11 @@ const WritingVisualRenderer = ({ task, theme }) => {
 
   const imageUrls = task.image_urls || {};
   const mapTitles = Array.isArray(task.map_titles) ? task.map_titles : [];
-  const fullTaskImage = isDisplayableImageUrl(imageUrls.full_task_image)
-    ? imageUrls.full_task_image
-    : "";
+  const fullTaskImage = [
+    imageUrls.full_task_image,
+    task.image_url,
+    task.image_asset?.file_url,
+  ].find(isDisplayableImageUrl) || "";
   const pairedMapImages = [
     {
       key: "current_map",
@@ -371,6 +373,10 @@ const WritingVisualRenderer = ({ task, theme }) => {
     Boolean(fullTaskImage) ||
     pairedMapImages.length > 0 ||
     genericImageEntries.length > 0;
+  const missingImagePlaceholders = [
+    task.image_placeholder_key,
+    ...Object.values(task.image_placeholder_keys || {}),
+  ].filter(Boolean);
   const dualMaps = Array.isArray(task.visual_content?.maps)
     ? task.visual_content.maps
     : [];
@@ -430,6 +436,17 @@ const WritingVisualRenderer = ({ task, theme }) => {
           )}
         </>
       )}
+
+      {!hasInjectedImages &&
+        missingImagePlaceholders.length > 0 &&
+        task.task_number === 1 && (
+          <div className="writing-visual-fallback">
+            <p>
+              The visual for this task is linked to the uploaded material, but
+              no image asset has been attached to this placeholder yet.
+            </p>
+          </div>
+        )}
 
       {!hasInjectedImages &&
         task.visual_content &&

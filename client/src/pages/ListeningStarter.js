@@ -94,10 +94,6 @@ function ListeningStarter() {
 
     preloadTestAudio();
 
-    // Cleanup on unmount
-    return () => {
-      audioService.clearAudioCache();
-    };
   }, []);
 
   // Fullscreen lock and comprehensive keyboard restrictions

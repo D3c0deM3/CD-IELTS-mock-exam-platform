@@ -204,6 +204,93 @@ const extractInstructionsForRange = (fullInstructions, questionIds) => {
   return null;
 };
 
+const GAP_TOKEN_ONLY_REGEX =
+  /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/;
+
+const getQuestionText = (question) =>
+  question?.question || question?.prompt || question?.statement || "";
+
+const getOptionValue = (option, index) => {
+  const text = String(option || "").trim();
+  const explicitLetter = text.match(/^([A-Z])(?:[\).])?\s+/);
+  if (explicitLetter) return explicitLetter[1];
+  return String.fromCharCode(65 + index);
+};
+
+const getOptionLabel = (option) =>
+  String(option || "")
+    .trim()
+    .replace(/^[A-Z](?:[\).])?\s+/, "");
+
+const InlineGapText = ({
+  text,
+  question,
+  answers,
+  onAnswerChange,
+  className = "gap-fill-input",
+}) => {
+  const source = String(text || "");
+  const hasInlineGap = source.match(GAP_PLACEHOLDER_REGEX);
+
+  if (!hasInlineGap) {
+    return (
+      <>
+        <span>{source}</span>{" "}
+        <input
+          type="text"
+          className={className}
+          value={answers[question.id] || ""}
+          onChange={(e) => onAnswerChange(question.id, e.target.value)}
+          placeholder={`Q${question.id}`}
+          maxLength={40}
+          autoComplete="off"
+        />
+      </>
+    );
+  }
+
+  return source.split(GAP_PLACEHOLDER_REGEX).map((part, index) => {
+    if (!part) return null;
+    const gapMatch = part.match(GAP_TOKEN_ONLY_REGEX);
+    if (!gapMatch) return <span key={index}>{part}</span>;
+
+    return (
+      <input
+        key={index}
+        type="text"
+        className={className}
+        value={answers[question.id] || ""}
+        onChange={(e) => onAnswerChange(question.id, e.target.value)}
+        placeholder={`Q${question.id}`}
+        maxLength={40}
+        autoComplete="off"
+      />
+    );
+  });
+};
+
+const OptionSelect = ({ question, answer, onAnswerChange }) => {
+  const options = question.matching_options || question.options || [];
+  return (
+    <select
+      className="matching-select"
+      value={answer || ""}
+      onChange={(e) => onAnswerChange(question.id, e.target.value)}
+    >
+      <option value="">-- Select an answer --</option>
+      {options.map((option, index) => {
+        const value = getOptionValue(option, index);
+        const label = getOptionLabel(option);
+        return (
+          <option key={index} value={value}>
+            {label === value ? value : `${value}. ${label}`}
+          </option>
+        );
+      })}
+    </select>
+  );
+};
+
 // ==================== PASSAGE RENDERER ====================
 const PassageRenderer = React.forwardRef(
   ({ passage, highlights, onContextMenu }, ref) => {
@@ -215,7 +302,7 @@ const PassageRenderer = React.forwardRef(
       <div ref={ref} className="reading-passage" onContextMenu={onContextMenu}>
         <h2 className="passage-title">{passage.title}</h2>
         <div className="passage-content">
-          {formattedContent.split("\n\n").map((paragraph, idx) => {
+          {formattedContent ? formattedContent.split("\n\n").map((paragraph, idx) => {
             // Check if paragraph starts with a letter marker (A-Z) followed by space
             const markerMatch = paragraph.match(/^([A-Z])\s+(.*)$/s);
 
@@ -236,7 +323,12 @@ const PassageRenderer = React.forwardRef(
                 {paragraph}
               </p>
             );
-          })}
+          }) : (
+            <p className="passage-missing-note">
+              Passage text was not included in this material file. The
+              questions are still available on the right.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -401,6 +493,23 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                   question.type === "word_bank_matching" ||
                   question.type === "map_labeling" ||
                   question.type === "map_labelling";
+                const hasGapFill = question.type === "gap_fill";
+                const hasMultipleChoice =
+                  question.type === "multiple_choice" &&
+                  (question.question || question.prompt) &&
+                  question.options;
+                const hasMatching =
+                  isMatchingQuestion &&
+                  (question.question || question.prompt || question.statement) &&
+                  matchingOptions.length > 0;
+                const isRenderedByKnownType =
+                  question.type === "true_false_ng" ||
+                  isYesNoNotGiven ||
+                  hasGapFill ||
+                  hasMultipleChoice ||
+                  question.type === "paragraph_matching" ||
+                  hasMatching ||
+                  question.type === "summary_completion";
 
                 return (
                   <div key={question.id} className="question-card">
@@ -515,7 +624,8 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                           <p className="question-prompt">{question.question}</p>
                           <div className="mc-options">
                             {question.options.map((option, idx) => {
-                              const letter = option.charAt(0);
+                              const letter = getOptionValue(option, idx);
+                              const label = getOptionLabel(option);
                               return (
                                 <label key={idx} className="mc-option">
                                   <input
@@ -530,7 +640,9 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                                       )
                                     }
                                   />
-                                  <span>{option}</span>
+                                  <span>
+                                    {label === letter ? letter : `${letter}. ${label}`}
+                                  </span>
                                 </label>
                               );
                             })}
@@ -572,31 +684,22 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                         </div>
                       )}
 
-                    {isMatchingQuestion &&
+                    {hasMatching &&
                       (question.question || question.prompt) &&
                       matchingOptions.length > 0 && (
                         <div className="question-content">
                           <p className="question-prompt">
-                            {question.question || question.prompt}
+                            {getQuestionText(question)}
                           </p>
                           <div className="matching-select-wrapper">
-                            <select
-                              className="matching-select"
-                              value={answer || ""}
-                              onChange={(e) =>
-                                onAnswerChange(question.id, e.target.value)
-                              }
-                            >
-                              <option value="">-- Select an answer --</option>
-                              {matchingOptions.map((option, idx) => {
-                                const letter = option.split(" ")[0];
-                                return (
-                                  <option key={idx} value={letter}>
-                                    {option}
-                                  </option>
-                                );
-                              })}
-                            </select>
+                            <OptionSelect
+                              question={{
+                                ...question,
+                                options: matchingOptions,
+                              }}
+                              answer={answer}
+                              onAnswerChange={onAnswerChange}
+                            />
                           </div>
                         </div>
                       )}
@@ -652,6 +755,31 @@ const QuestionsRenderer = ({ passage, answers, onAnswerChange }) => {
                           </p>
                         </div>
                       )}
+
+                    {!isRenderedByKnownType && (
+                      <div className="question-content">
+                        <p className="question-prompt">
+                          {getQuestionText(question)}
+                        </p>
+                        {question.options?.length > 0 ||
+                        question.matching_options?.length > 0 ? (
+                          <div className="matching-select-wrapper">
+                            <OptionSelect
+                              question={question}
+                              answer={answer}
+                              onAnswerChange={onAnswerChange}
+                            />
+                          </div>
+                        ) : (
+                          <InlineGapText
+                            text={getQuestionText(question)}
+                            question={question}
+                            answers={answers}
+                            onAnswerChange={onAnswerChange}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

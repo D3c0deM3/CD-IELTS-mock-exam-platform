@@ -192,7 +192,7 @@ export const preloadAudio = async (testMaterialsId) => {
  * Play cached audio
  * @returns {Promise<void>}
  */
-export const playAudio = async () => {
+export const playAudio = async ({ restart = false } = {}) => {
   if (!audioCache) {
     throw new Error("Audio not preloaded. Call preloadAudio first.");
   }
@@ -201,8 +201,9 @@ export const playAudio = async () => {
     // Set initial volume to 1.0 (100%)
     audioCache.volume = 1.0;
 
-    // Reset playback position
-    audioCache.currentTime = 0;
+    if (restart) {
+      audioCache.currentTime = 0;
+    }
 
     // Play audio
     console.log("▶ Starting audio playback...");
