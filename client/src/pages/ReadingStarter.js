@@ -187,29 +187,6 @@ function ReadingStarter() {
       e.preventDefault();
     };
 
-    // Continuous fullscreen monitor using requestAnimationFrame
-    let fullscreenMonitorId = null;
-
-    const monitorFullscreen = () => {
-      const isCurrentlyFullscreen = !!(
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement
-      );
-
-      // If not in fullscreen, immediately try to re-enter
-      if (!isCurrentlyFullscreen) {
-        enterFullscreen().catch(() => {});
-      }
-
-      // Schedule next check at screen refresh rate
-      fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
-    };
-
-    // Start the fullscreen monitor
-    fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
-
     // Add keyboard listeners with both capture and bubble phases
     document.addEventListener("keydown", handleKeyDown, true);
     document.addEventListener("keydown", handleKeyDown, false);
@@ -247,11 +224,6 @@ function ReadingStarter() {
     document.addEventListener("contextmenu", handleContextMenu);
 
     return () => {
-      // Cancel the animation frame monitor
-      if (fullscreenMonitorId !== null) {
-        cancelAnimationFrame(fullscreenMonitorId);
-      }
-
       // Remove all keyboard listeners
       document.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("keydown", handleKeyDown, false);

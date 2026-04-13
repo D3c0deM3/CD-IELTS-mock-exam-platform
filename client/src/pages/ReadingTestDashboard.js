@@ -918,45 +918,7 @@ const ReadingTestDashboard = () => {
       return "";
     };
 
-    const handleFullscreenChange = () => {
-      // Check all fullscreen states for cross-browser support
-      const isCurrentlyFullscreen = !!(
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement
-      );
-
-      if (!isCurrentlyFullscreen) {
-        // User tried to exit fullscreen, immediately re-enter with minimal delay
-        setTimeout(() => {
-          enterFullscreen().catch(() => {});
-        }, 10);
-      }
-    };
-
-    // Continuous fullscreen monitor using requestAnimationFrame - runs at screen refresh rate (~60Hz)
-    let fullscreenMonitorId = null;
-
-    const monitorFullscreen = () => {
-      const isCurrentlyFullscreen = !!(
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement
-      );
-
-      // If not in fullscreen, immediately try to re-enter
-      if (!isCurrentlyFullscreen) {
-        enterFullscreen().catch(() => {});
-      }
-
-      // Schedule next check at screen refresh rate
-      fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
-    };
-
-    // Start the fullscreen monitor
-    fullscreenMonitorId = requestAnimationFrame(monitorFullscreen);
+    const handleFullscreenChange = () => {};
 
     // Block right-click context menu
     const handleContextMenu = (e) => {
@@ -1006,11 +968,6 @@ const ReadingTestDashboard = () => {
     document.addEventListener("contextmenu", handleContextMenu);
 
     return () => {
-      // Cancel the animation frame monitor
-      if (fullscreenMonitorId !== null) {
-        cancelAnimationFrame(fullscreenMonitorId);
-      }
-
       // Remove all keyboard listeners
       document.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("keydown", handleKeyDown, false);
