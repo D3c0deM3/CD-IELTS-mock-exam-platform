@@ -161,6 +161,109 @@ const getOptionLabel = (option) =>
 const getSelectedLetter = (answer) =>
   Array.isArray(answer) ? answer[0] || "" : answer || "";
 
+const normalizeVisualText = (value) =>
+  String(value || "")
+    .replace(/\[cite[^\]]*\]/gi, " ")
+    .replace(GAP_PLACEHOLDER_REGEX, " ")
+    .replace(/[^\w]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const getDirectQuestionIdsFromText = (text) => {
+  const ids = [];
+  const matches = String(text || "").matchAll(GAP_PLACEHOLDER_REGEX);
+  for (const match of matches) {
+    const questionId = Number.parseInt(match[0].match(/\d+/)?.[0], 10);
+    if (questionId && !ids.includes(questionId)) ids.push(questionId);
+  }
+  return ids;
+};
+
+const getQuestionCues = (question) => {
+  const text = getQuestionText(question);
+  const parts = text
+    .split(GAP_PLACEHOLDER_REGEX)
+    .map((part) =>
+      normalizeVisualText(part).replace(
+        new RegExp(`\\b${question.id}\\b`, "g"),
+        " "
+      )
+    )
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter((part) => part.length >= 3);
+
+  return parts;
+};
+
+const getQuestionIdsForVisualText = (text, questions) => {
+  const directIds = getDirectQuestionIdsFromText(text);
+  const ids = [...directIds];
+  const normalizedText = normalizeVisualText(text);
+
+  questions.forEach((question) => {
+    if (ids.includes(question.id)) return;
+
+    const cues = getQuestionCues(question);
+    const hasStrongCue = cues.some(
+      (cue) =>
+        cue.length >= 5 &&
+        (normalizedText.includes(cue) || cue.includes(normalizedText))
+    );
+    const mentionsQuestionNumber = new RegExp(`\\b${question.id}\\b`).test(
+      normalizedText
+    );
+    const hasShortCueWithNumber =
+      mentionsQuestionNumber &&
+      cues.some((cue) =>
+        cue
+          .split(" ")
+          .filter((word) => word.length > 2)
+          .some((word) => normalizedText.includes(word))
+      );
+
+    if (hasStrongCue || hasShortCueWithNumber) {
+      ids.push(question.id);
+    }
+  });
+
+  return ids;
+};
+
+const TextAnswerInput = ({
+  question,
+  answers,
+  onAnswerChange,
+  className = "gap-fill-input",
+}) => (
+  <input
+    type="text"
+    className={className}
+    value={answers[question.id] || ""}
+    onChange={(e) => onAnswerChange(question.id, e.target.value)}
+    placeholder={question.id}
+    maxLength={question.word_limit?.includes("ONE WORD") ? 20 : 40}
+    autoComplete="off"
+  />
+);
+
+const InlineAnswerSlot = ({
+  question,
+  answers,
+  onAnswerChange,
+  inputClassName = "gap-fill-input",
+}) => (
+  <span className="inline-answer-slot">
+    <span className="question-num">{question.id}</span>
+    <TextAnswerInput
+      question={question}
+      answers={answers}
+      onAnswerChange={onAnswerChange}
+      className={inputClassName}
+    />
+  </span>
+);
+
 const renderInlineGapText = ({
   text,
   questions,
@@ -189,18 +292,114 @@ const renderInlineGapText = ({
     }
 
     return (
-      <input
+      <TextAnswerInput
         key={index}
-        type="text"
+        question={question}
+        answers={answers}
+        onAnswerChange={onAnswerChange}
         className={inputClassName}
-        value={answers[question.id] || ""}
-        onChange={(e) => onAnswerChange(question.id, e.target.value)}
-        placeholder={question.id}
-        maxLength={question.word_limit?.includes("ONE WORD") ? 20 : 40}
-        autoComplete="off"
       />
     );
   });
+};
+
+const renderVisualLineWithAnswerInputs = ({
+  text,
+  questions,
+  answers,
+  onAnswerChange,
+  explicitQuestionIds = [],
+  inputClassName = "gap-fill-input",
+}) => {
+  const inferredQuestionIds = getQuestionIdsForVisualText(text, questions);
+  const questionIds = [
+    ...new Set([...inferredQuestionIds, ...explicitQuestionIds].filter(Boolean)),
+  ];
+  const directQuestionIds = getDirectQuestionIdsFromText(text);
+  const rendered = renderInlineGapText({
+    text,
+    questions,
+    answers,
+    onAnswerChange,
+    inputClassName,
+  });
+  const missingQuestionIds = questionIds.filter(
+    (questionId) => !directQuestionIds.includes(questionId)
+  );
+
+  return (
+    <>
+      {rendered}
+      {missingQuestionIds.map((questionId) => {
+        const question = questions.find((candidate) => candidate.id === questionId);
+        if (!question) return null;
+        return (
+          <InlineAnswerSlot
+            key={`fallback-${questionId}`}
+            question={question}
+            answers={answers}
+            onAnswerChange={onAnswerChange}
+            inputClassName={inputClassName}
+          />
+        );
+      })}
+    </>
+  );
+};
+
+const collectVisualQuestionIds = (node, questions) => {
+  const ids = new Set();
+
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (typeof value === "string") {
+      getQuestionIdsForVisualText(value, questions).forEach((id) => ids.add(id));
+      return;
+    }
+
+    if (!value || typeof value !== "object") return;
+
+    if (value.question_id) ids.add(value.question_id);
+    if (Array.isArray(value.question_ids)) {
+      value.question_ids.forEach((id) => ids.add(id));
+    }
+
+    Object.values(value).forEach(visit);
+  };
+
+  visit(node);
+  return ids;
+};
+
+const MissingQuestionsRenderer = ({
+  questions,
+  coveredQuestionIds,
+  answers,
+  onAnswerChange,
+}) => {
+  const missingQuestions = questions.filter(
+    (question) => !coveredQuestionIds.has(question.id)
+  );
+
+  if (missingQuestions.length === 0) return null;
+
+  return (
+    <div className="missing-question-fallback">
+      <h3>Additional Questions</h3>
+      {missingQuestions.map((question) => (
+        <StandaloneQuestionRenderer
+          key={question.id}
+          question={question}
+          answer={answers[question.id]}
+          onAnswerChange={onAnswerChange}
+        />
+      ))}
+    </div>
+  );
 };
 
 const OptionSelect = ({
@@ -363,60 +562,20 @@ const NotesRenderer = ({ notesData, questions, answers, onAnswerChange }) => {
             (explicitQuestionIds.length === notesData.items.length
               ? explicitQuestionIds[index]
               : null);
-          const question = questions.find((q) => q.id === questionId);
-
-          if (!question) {
-            return (
-              <li key={index} className="note-item">
-                {item}
-              </li>
-            );
-          }
-
-          // More robust regex to handle various dot patterns
-          const parts = item.split(GAP_PLACEHOLDER_REGEX);
+          const lineQuestionIds = [
+            ...getQuestionIdsForVisualText(item, questions),
+            questionId,
+          ].filter(Boolean);
 
           return (
             <li key={index} className="note-item-with-gap">
-              {parts.map((part, partIndex) => {
-                if (!part) return null;
-                // Filter out parts that are only dots, ellipsis, underscores, or whitespace
-                if (part.match(/^[\.\u2026_\s]+$/)) return null;
-                // Match gap pattern: number followed by dots/ellipsis
-                if (
-                  part.match(
-                    /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/
-                  )
-                ) {
-                  return (
-                    <input
-                      key={partIndex}
-                      type="text"
-                      className="notes-gap-input"
-                      value={answers[question.id] || ""}
-                      onChange={(e) =>
-                        onAnswerChange(question.id, e.target.value)
-                      }
-                      placeholder={question.id}
-                      maxLength={
-                        question.word_limit?.includes("ONE WORD") ? 15 : 30
-                      }
-                      style={{ minWidth: 90 }}
-                      autoComplete="off"
-                    />
-                  );
-                }
-
-                // Remove leading and trailing dots, ellipsis, underscores, and punctuation from text parts
-                const cleanedPart = part
-                  .replace(
-                    /^[\s.\u2026_,;:!?\-()[\]{}]+|[\s.\u2026_,;:!?\-()[\]{}]+$/g,
-                    ""
-                  )
-                  .trim();
-                if (!cleanedPart) return null;
-
-                return <span key={partIndex}>{cleanedPart}</span>;
+              {renderVisualLineWithAnswerInputs({
+                text: item,
+                questions,
+                answers,
+                onAnswerChange,
+                explicitQuestionIds: lineQuestionIds,
+                inputClassName: "notes-gap-input",
               })}
             </li>
           );
@@ -460,51 +619,15 @@ const StructuredNotesRenderer = ({
                   (q) => q.id === normalizedItem.question_id
                 );
                 if (question) {
-                  // More robust regex to handle various dot patterns
-                  const parts = normalizedItem.content.split(
-                    GAP_PLACEHOLDER_REGEX
-                  );
                   return (
                     <li key={itemIndex} className="structured-item-with-gap">
-                      {parts.map((part, partIndex) => {
-                        if (!part) return null;
-                        // Filter out parts that are only dots, ellipsis, underscores, or whitespace
-                        if (part.match(/^[\.\u2026_\s]+$/)) return null;
-                        // Match gap pattern: number followed by dots/ellipsis
-                        if (
-                          part.match(
-                            /^\(?(\d+)\)?(?:\s*[^\w\s]+\s*)?(?:\.{2,}|…+|_{2,})$/
-                          )
-                        ) {
-                          return (
-                            <input
-                              key={partIndex}
-                              type="text"
-                              className="structured-gap-input"
-                              value={answers[question.id] || ""}
-                              onChange={(e) =>
-                                onAnswerChange(question.id, e.target.value)
-                              }
-                              placeholder={question.id}
-                              maxLength={
-                                question.word_limit?.includes("ONE WORD")
-                                  ? 20
-                                  : 30
-                              }
-                            />
-                          );
-                        }
-
-                        // Remove leading and trailing dots, ellipsis, underscores, and punctuation from text parts
-                        const cleanedPart = part
-                          .replace(
-                            /^[\s.\u2026_,;:!?\-()[\]{}]+|[\s.\u2026_,;:!?\-()[\]{}]+$/g,
-                            ""
-                          )
-                          .trim();
-                        if (!cleanedPart) return null;
-
-                        return <span key={partIndex}>{cleanedPart}</span>;
+                      {renderVisualLineWithAnswerInputs({
+                        text: normalizedItem.content,
+                        questions,
+                        answers,
+                        onAnswerChange,
+                        explicitQuestionIds: [question.id],
+                        inputClassName: "structured-gap-input",
                       })}
                     </li>
                   );
@@ -871,12 +994,12 @@ const FormRenderer = ({ formData, questions, answers, onAnswerChange }) => {
                 return (
                   <li key={itemIdx} className="form-item-row question-row">
                     <span className="form-item-label">
-                      {renderInlineGapText({
+                      {renderVisualLineWithAnswerInputs({
                         text: item.content || item.label || question.prompt,
                         questions,
                         answers,
                         onAnswerChange,
-                        fallbackQuestionId: question.id,
+                        explicitQuestionIds: [question.id],
                         inputClassName: "form-input gap-fill-input",
                       })}
                     </span>
@@ -963,12 +1086,12 @@ const FormAndClassificationRenderer = ({
               return (
                 <li key={itemIdx} className="form-item-row">
                   <span className="form-item-label">
-                    {renderInlineGapText({
+                    {renderVisualLineWithAnswerInputs({
                       text: item,
                       questions,
                       answers,
                       onAnswerChange,
-                      fallbackQuestionId: questionId,
+                      explicitQuestionIds: [questionId],
                       inputClassName: "form-input gap-fill-input",
                     })}
                   </span>
@@ -1020,12 +1143,12 @@ const SelectionAndNotesRenderer = ({
             {(visualStructure.seminar_outline || visualStructure.items || []).map(
               (item, index) => (
                 <li key={index} className="note-item-with-gap">
-                  {renderInlineGapText({
+                  {renderVisualLineWithAnswerInputs({
                     text: item,
                     questions: noteQuestions,
                     answers,
                     onAnswerChange,
-                    fallbackQuestionId: extractQuestionIdFromText(item),
+                    explicitQuestionIds: [extractQuestionIdFromText(item)],
                     inputClassName: "notes-gap-input",
                   })}
                 </li>
@@ -1191,6 +1314,16 @@ const VisualStructureRenderer = ({
     );
   }
 
+  const coveredQuestionIds = collectVisualQuestionIds(visualStructure, questions);
+  const renderMissingQuestions = () => (
+    <MissingQuestionsRenderer
+      questions={questions}
+      coveredQuestionIds={coveredQuestionIds}
+      answers={answers}
+      onAnswerChange={onAnswerChange}
+    />
+  );
+
   switch (visualStructure.type) {
     case "mixed":
       return (
@@ -1321,6 +1454,7 @@ const VisualStructureRenderer = ({
               </div>
             );
           })}
+          {renderMissingQuestions()}
         </div>
       );
 
@@ -1344,6 +1478,7 @@ const VisualStructureRenderer = ({
             answers={answers}
             onAnswerChange={onAnswerChange}
           />
+          {renderMissingQuestions()}
         </>
       );
 
@@ -1367,6 +1502,7 @@ const VisualStructureRenderer = ({
             answers={answers}
             onAnswerChange={onAnswerChange}
           />
+          {renderMissingQuestions()}
         </>
       );
 
@@ -1390,6 +1526,7 @@ const VisualStructureRenderer = ({
             answers={answers}
             onAnswerChange={onAnswerChange}
           />
+          {renderMissingQuestions()}
         </>
       );
 
@@ -1413,6 +1550,7 @@ const VisualStructureRenderer = ({
             answers={answers}
             onAnswerChange={onAnswerChange}
           />
+          {renderMissingQuestions()}
         </>
       );
 
@@ -1436,6 +1574,7 @@ const VisualStructureRenderer = ({
             answers={answers}
             onAnswerChange={onAnswerChange}
           />
+          {renderMissingQuestions()}
         </>
       );
 

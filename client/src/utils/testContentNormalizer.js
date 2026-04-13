@@ -363,13 +363,26 @@ const normalizeReadingQuestion = (question, index) => {
 
 const normalizeReadingPassage = (passage, index) => {
   const questions = asArray(passage.questions).map(normalizeReadingQuestion);
+  const contentCandidates = [
+    passage.formatted_content,
+    passage.content,
+    passage.text,
+    passage.passage_text,
+    passage.text_content,
+    passage.passage_content,
+    passage.body,
+    passage.passage,
+    passage.paragraphs,
+  ];
+  const formattedContent = contentCandidates
+    .map(toText)
+    .find((candidate) => candidate.trim().length > 0);
+
   return {
     ...passage,
     passage_number:
       Number.parseInt(passage?.passage_number, 10) || index + 1,
-    formatted_content: toText(
-      passage.formatted_content || passage.content || passage.text
-    ),
+    formatted_content: formattedContent || "",
     visual_structure: {
       ...passage.visual_structure,
       question_groups: asArray(passage.visual_structure?.question_groups),

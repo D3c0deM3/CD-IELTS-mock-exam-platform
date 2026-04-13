@@ -295,8 +295,17 @@ const OptionSelect = ({ question, answer, onAnswerChange }) => {
 const PassageRenderer = React.forwardRef(
   ({ passage, highlights, onContextMenu }, ref) => {
     if (!passage) return null;
-    const formattedContent =
-      passage.formatted_content || passage.content || passage.text || "";
+    const formattedContent = [
+      passage.formatted_content,
+      passage.content,
+      passage.text,
+      passage.passage_text,
+      passage.text_content,
+      passage.passage_content,
+      passage.body,
+      passage.passage,
+      Array.isArray(passage.paragraphs) ? passage.paragraphs.join("\n\n") : "",
+    ].find((candidate) => String(candidate || "").trim().length > 0) || "";
 
     return (
       <div ref={ref} className="reading-passage" onContextMenu={onContextMenu}>
