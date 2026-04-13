@@ -55,6 +55,69 @@ const getRemoteAudioUrl = async (testMaterialsId) => {
   return null;
 };
 
+const getAudioCandidatesForTest = async (testMaterialsId) => {
+  const candidates = [];
+  const remoteAudioUrl = await getRemoteAudioUrl(testMaterialsId);
+  const bundledAudioUrl = getBundledAudioForTest(testMaterialsId);
+
+  if (remoteAudioUrl) candidates.push(remoteAudioUrl);
+  if (bundledAudioUrl) candidates.push(bundledAudioUrl);
+
+  // Last-resort local fallbacks keep the test usable if an uploaded audio URL is
+  // stale or the static upload is temporarily unavailable in development.
+  [listeningAudio, listeningAudio3].forEach((url) => {
+    if (url && !candidates.includes(url)) candidates.push(url);
+  });
+
+  return candidates;
+};
+
+const loadAudioElement = ({ audioUrl, test }) =>
+  new Promise((resolve, reject) => {
+    try {
+      const audio = new Audio();
+
+      audio.controlsList = "nodownload";
+      if (audioUrl.startsWith("http")) {
+        audio.crossOrigin = "anonymous";
+      }
+
+      const cleanup = () => {
+        audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+        audio.removeEventListener("error", handleError);
+      };
+
+      const handleLoadedMetadata = () => {
+        cleanup();
+        resolve({
+          duration: audio.duration,
+          audio,
+          audioUrl,
+        });
+      };
+
+      const handleError = (e) => {
+        cleanup();
+        console.error(
+          `✗ Audio loading error for test ${test}:`,
+          e.type,
+          "Source:",
+          audioUrl
+        );
+        reject(new Error(`Failed to load audio from ${audioUrl}: ${e.type}`));
+      };
+
+      audio.addEventListener("loadedmetadata", handleLoadedMetadata, {
+        once: true,
+      });
+      audio.addEventListener("error", handleError, { once: true });
+      audio.src = audioUrl;
+      audio.load();
+    } catch (err) {
+      reject(err);
+    }
+  });
+
 /**
  * Preload audio file with dev tools protection
  * Returns cached audio if already preloaded
@@ -100,86 +163,72 @@ export const preloadAudio = async (testMaterialsId) => {
   isPreloading = true;
   currentTestId = test;
 
-  const remoteAudioUrl = await getRemoteAudioUrl(test);
-  const resolvedAudioUrl = remoteAudioUrl || getBundledAudioForTest(test);
+  const audioCandidates = await getAudioCandidatesForTest(test);
 
-  if (!resolvedAudioUrl) {
+  if (audioCandidates.length === 0) {
     isPreloading = false;
     currentTestId = null;
     throw new Error(`No audio file configured for test materials ${test}`);
   }
 
-  preloadPromise = new Promise((resolve, reject) => {
+  preloadPromise = new Promise(async (resolve, reject) => {
     try {
-      const audio = new Audio();
+      const errors = [];
+      let loadedResult = null;
 
-      // Prevent user manipulation via dev tools
-      audio.controlsList = "nodownload";
-      audio.crossOrigin = "anonymous";
+      for (const audioUrl of audioCandidates) {
+        try {
+          loadedResult = await loadAudioElement({ audioUrl, test });
+          break;
+        } catch (err) {
+          errors.push(err.message);
+        }
+      }
 
-      // Get the correct audio file for this test (DB first, local fallback)
-      const audioUrl = resolvedAudioUrl;
-
-      // Load metadata to get duration
-      const handleLoadedMetadata = () => {
-        audioDuration = audio.duration;
-        audioCache = audio;
+      if (!loadedResult) {
         isPreloading = false;
-
-        // Remove event listeners to prevent memory leaks
-        audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
-        audio.removeEventListener("error", handleError);
-
-        // Make audio read-only in dev tools
-        Object.defineProperty(audio, "controls", {
-          set: function () {},
-          get: function () {
-            return false;
-          },
-        });
-        Object.defineProperty(audio, "muted", {
-          set: function () {},
-          get: function () {
-            return this._muted || false;
-          },
-        });
-
-        console.log(
-          `✓ Audio for test ${test} preloaded successfully. Duration: ${audioDuration.toFixed(
-            2
-          )}s`
+        currentTestId = null;
+        reject(
+          new Error(
+            `Failed to load audio for test materials ${test}. ${errors.join(
+              " | "
+            )}`
+          )
         );
+        return;
+      }
 
-        resolve({
-          duration: audioDuration,
-          audio: audio,
-        });
-      };
+      const { audio, audioUrl } = loadedResult;
+      audioDuration = loadedResult.duration;
+      audioCache = audio;
+      isPreloading = false;
 
-      const handleError = (e) => {
-        isPreloading = false;
-        audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
-        audio.removeEventListener("error", handleError);
-
-        console.error(
-          `✗ Audio loading error for test ${test}:`,
-          e.type,
-          "Source:",
-          audioUrl
-        );
-        reject(new Error(`Failed to load audio: ${e.type}`));
-      };
-
-      audio.addEventListener("loadedmetadata", handleLoadedMetadata, {
-        once: true,
+      Object.defineProperty(audio, "controls", {
+        set: function () {},
+        get: function () {
+          return false;
+        },
       });
-      audio.addEventListener("error", handleError, { once: true });
+      Object.defineProperty(audio, "muted", {
+        set: function () {},
+        get: function () {
+          return this._muted || false;
+        },
+      });
 
-      // Start loading the appropriate audio file
-      audio.src = audioUrl;
-      audio.load();
+      console.log(
+        `✓ Audio for test ${test} preloaded successfully from ${audioUrl}. Duration: ${audioDuration.toFixed(
+          2
+        )}s`
+      );
+
+      resolve({
+        duration: audioDuration,
+        audio,
+      });
     } catch (err) {
       isPreloading = false;
+      currentTestId = null;
       console.error("✗ Audio preload exception:", err);
       reject(err);
     }

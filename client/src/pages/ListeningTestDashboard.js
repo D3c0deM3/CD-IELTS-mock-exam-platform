@@ -230,6 +230,65 @@ const getQuestionIdsForVisualText = (text, questions) => {
   return ids;
 };
 
+const getQuestionIdsFromRangeText = (text, questions) => {
+  const value = String(text || "");
+  const ranges = [];
+  const rangePattern = /Questions?\s+(\d+)\s*(?:[-–—]|to|and)\s*(\d+)/gi;
+  let match;
+
+  while ((match = rangePattern.exec(value))) {
+    const start = Number.parseInt(match[1], 10);
+    const end = Number.parseInt(match[2], 10);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    const low = Math.min(start, end);
+    const high = Math.max(start, end);
+    for (let id = low; id <= high; id += 1) {
+      ranges.push(id);
+    }
+  }
+
+  const singlePattern = /Questions?\s+(\d+)\b/gi;
+  while ((match = singlePattern.exec(value))) {
+    const id = Number.parseInt(match[1], 10);
+    if (Number.isFinite(id)) ranges.push(id);
+  }
+
+  const validIds = new Set(questions.map((question) => question.id));
+  return [...new Set(ranges)].filter((id) => validIds.has(id));
+};
+
+const getQuestionIdsForComponent = (component, questions) => {
+  let ids = Array.isArray(component.question_ids) ? component.question_ids : [];
+
+  if (component.type === "matching_table" && component.matching_pairs) {
+    ids = component.matching_pairs.map((pair) => pair.question_id);
+  } else if (component.type === "matching_list" && component.items) {
+    ids = component.items.map((item) => item.question_id);
+  } else if (
+    (component.type === "map_labeling" || component.type === "map_labelling") &&
+    component.locations
+  ) {
+    ids = component.locations.map((location) => location.question_id);
+  } else if (component.questions) {
+    ids = component.questions
+      .map((question) => question.question_id || question.id)
+      .filter(Boolean);
+  }
+
+  if (!ids.length) {
+    ids = [
+      ...getQuestionIdsFromRangeText(component.title, questions),
+      ...getQuestionIdsFromRangeText(component.instructions, questions),
+    ];
+  }
+
+  if (!ids.length) {
+    ids = [...collectVisualQuestionIds(component, questions)];
+  }
+
+  return [...new Set(ids.filter(Boolean))];
+};
+
 const TextAnswerInput = ({
   question,
   answers,
@@ -358,6 +417,7 @@ const collectVisualQuestionIds = (node, questions) => {
 
     if (typeof value === "string") {
       getQuestionIdsForVisualText(value, questions).forEach((id) => ids.add(id));
+      getQuestionIdsFromRangeText(value, questions).forEach((id) => ids.add(id));
       return;
     }
 
@@ -1330,32 +1390,10 @@ const VisualStructureRenderer = ({
         <div className="mixed-visual-structure">
           {visualStructure.components.map((component, idx) => {
             // Extract question IDs based on component type
-            let componentQuestionIds = component.question_ids || [];
-
-            if (
-              component.type === "matching_table" &&
-              component.matching_pairs
-            ) {
-              componentQuestionIds = component.matching_pairs.map(
-                (p) => p.question_id
-              );
-            } else if (component.type === "matching_list" && component.items) {
-              componentQuestionIds = component.items.map(
-                (item) => item.question_id
-              );
-            } else if (component.type === "map_labeling" && component.locations) {
-              componentQuestionIds = component.locations.map(
-                (location) => location.question_id
-              );
-            } else if (component.type === "multiple_choice_block") {
-              // For multiple_choice_block, extract IDs from multiple_choice questions
-              componentQuestionIds = questions
-                .filter((q) => q.type === "multiple_choice")
-                .map((q) => q.id);
-            } else if (component.type === "flowchart") {
-              // For flowchart, use the question_ids array
-              componentQuestionIds = component.question_ids || [];
-            }
+            const componentQuestionIds = getQuestionIdsForComponent(
+              component,
+              questions
+            );
 
             // Filter questions for this component
             const componentQuestions = questions.filter((q) =>
@@ -1451,6 +1489,24 @@ const VisualStructureRenderer = ({
                     onAnswerChange={onAnswerChange}
                   />
                 )}
+                {![
+                  "table",
+                  "notes",
+                  "map_labeling",
+                  "map_labelling",
+                  "multiple_choice_block",
+                  "matching_table",
+                  "matching_list",
+                  "flowchart",
+                ].includes(component.type) &&
+                  componentQuestions.map((question) => (
+                    <StandaloneQuestionRenderer
+                      key={question.id}
+                      question={question}
+                      answer={answers[question.id]}
+                      onAnswerChange={onAnswerChange}
+                    />
+                  ))}
               </div>
             );
           })}
