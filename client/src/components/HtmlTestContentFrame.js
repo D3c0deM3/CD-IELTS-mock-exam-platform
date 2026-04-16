@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import "./HtmlTestContentFrame.css";
 
-const PART_SELECTOR = "section[id^='part'], .section, [data-part], [data-part-number]";
+const PART_SELECTOR =
+  "section[id^='part'], .section, [data-part], [data-part-number], [data-task], [data-task-number]";
 const ANSWER_SELECTOR = "input, textarea, select";
 
 const parseQuestionRange = (value) => {
@@ -97,7 +98,11 @@ const buildPartGroups = (doc, sectionType) => {
       nodes: [node],
       part_number:
         Number.parseInt(
-          node.dataset?.part || node.dataset?.partNumber || "",
+          node.dataset?.part ||
+            node.dataset?.partNumber ||
+            node.dataset?.task ||
+            node.dataset?.taskNumber ||
+            "",
           10
         ) || index + 1,
       label: getNodePartLabel(node, index, sectionType),

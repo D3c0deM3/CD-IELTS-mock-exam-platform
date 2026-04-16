@@ -115,6 +115,11 @@
   padding: 24px;
 }
 
+.writing-html-frame-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
 [data-theme="dark"] .graph-column {
   background: #1a1a1a;
   border-right: 1px solid #373737;

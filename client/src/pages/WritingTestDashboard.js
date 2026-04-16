@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import HtmlTestContentFrame from "../components/HtmlTestContentFrame";
 import API_CONFIG from "../config/api";
 import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
@@ -563,6 +564,7 @@ const WritingTestDashboard = () => {
     "writing_timer"
   ); // 60 minutes
   const [testData, setTestData] = useState(null);
+  const [htmlTasks, setHtmlTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
@@ -780,8 +782,26 @@ const WritingTestDashboard = () => {
 
         try {
           const response = await apiClient.get(
-            `/api/materials/sets/${testMaterialsId}/content`
+            `/api/materials/sets/${testMaterialsId}/content?section_type=writing`
           );
+          if (
+            response?.content_format === "html" &&
+            response?.content_html &&
+            response?.content_html_type === "writing"
+          ) {
+            setLoadError("");
+            setTestData({
+              type: "writing",
+              format: "html",
+              html: response.content_html,
+              tasks: [
+                { task_number: 1, title: "Task 1" },
+                { task_number: 2, title: "Task 2" },
+              ],
+            });
+            return;
+          }
+
           if (response?.content?.sections) {
             selectedTestData = normalizeTestContent(response.content);
           } else {
@@ -817,6 +837,7 @@ const WritingTestDashboard = () => {
         setLoadError("");
         setTestData({
           type: "writing",
+          format: "json",
           tasks: writingSection.tasks,
         });
       } catch (error) {
@@ -856,6 +877,17 @@ const WritingTestDashboard = () => {
       [taskNumber]: value,
     }));
   };
+
+  const handleHtmlTasksChange = useCallback((parts) => {
+    if (!parts || parts.length === 0) return;
+
+    setHtmlTasks(
+      parts.map((part, index) => ({
+        task_number: part.part_number || index + 1,
+        title: part.label || `Task ${part.part_number || index + 1}`,
+      }))
+    );
+  }, []);
 
   // ==================== SUBMIT TEST HANDLER ====================
   const handleSubmitTest = useCallback(() => {
@@ -977,7 +1009,12 @@ const WritingTestDashboard = () => {
   }
 
   // ==================== ERROR STATE ====================
-  if (!testData || !testData.tasks || testData.tasks.length === 0) {
+  if (
+    !testData ||
+    (testData.format === "html"
+      ? !testData.html
+      : !testData.tasks || testData.tasks.length === 0)
+  ) {
     return (
       <div className="writing-test-dashboard" data-theme={theme}>
         <div className="error-screen">
@@ -987,8 +1024,11 @@ const WritingTestDashboard = () => {
     );
   }
 
-  const currentTask = testData.tasks[currentTaskIndex];
-  const taskWordCounts = testData.tasks.map((task) => ({
+  const isHtmlMode = testData.format === "html";
+  const writingTasks =
+    isHtmlMode && htmlTasks.length > 0 ? htmlTasks : testData.tasks;
+  const currentTask = writingTasks[currentTaskIndex] || writingTasks[0];
+  const taskWordCounts = writingTasks.map((task) => ({
     taskNumber: task.task_number,
     words: (answers[task.task_number] || "")
       .split(/\s+/)
@@ -1028,6 +1068,18 @@ const WritingTestDashboard = () => {
       <div className="writing-content">
         {/* LEFT COLUMN - GRAPH/TOPIC */}
         <div className="graph-column">
+          {isHtmlMode ? (
+            <div className="writing-html-frame-wrap">
+              <HtmlTestContentFrame
+                html={testData.html}
+                sectionType="writing"
+                currentPartIndex={currentTaskIndex}
+                answers={{}}
+                onAnswersChange={() => {}}
+                onPartsChange={handleHtmlTasksChange}
+              />
+            </div>
+          ) : (
             <div className="essay-topic-wrapper">
               <h2 className="topic-title">
                 {currentTask.title || `Task ${currentTask.task_number || ''}`}
@@ -1073,6 +1125,7 @@ const WritingTestDashboard = () => {
                 )}
               </div>
             </div>
+          )}
           </div>
 
           {/* RIGHT COLUMN - ESSAY WRITING BOX */}
@@ -1088,7 +1141,7 @@ const WritingTestDashboard = () => {
       {/* ==================== BOTTOM BAR ==================== */}
       <div className="writing-bottom-bar">
         <div className="tasks-navigation">
-          {testData.tasks.map((task, index) => (
+          {writingTasks.map((task, index) => (
             <button
               key={index}
               className={`task-button ${

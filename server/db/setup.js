@@ -307,9 +307,10 @@ const setupDatabase = async () => {
         name VARCHAR(255) NOT NULL,
         content_json LONGTEXT,
         content_html LONGTEXT,
-        content_html_type ENUM('listening', 'reading') DEFAULT NULL,
+        content_html_type ENUM('listening', 'reading', 'writing') DEFAULT NULL,
         content_html_listening LONGTEXT,
         content_html_reading LONGTEXT,
+        content_html_writing LONGTEXT,
         answer_key_json LONGTEXT,
         audio_file_name VARCHAR(255),
         audio_file_path VARCHAR(500),
@@ -328,10 +329,11 @@ const setupDatabase = async () => {
       { name: "content_html", type: "LONGTEXT" },
       {
         name: "content_html_type",
-        type: "ENUM('listening', 'reading') DEFAULT NULL",
+        type: "ENUM('listening', 'reading', 'writing') DEFAULT NULL",
       },
       { name: "content_html_listening", type: "LONGTEXT" },
       { name: "content_html_reading", type: "LONGTEXT" },
+      { name: "content_html_writing", type: "LONGTEXT" },
     ];
 
     for (const column of materialSetColumns) {
@@ -343,6 +345,17 @@ const setupDatabase = async () => {
         if (err.code !== "ER_DUP_FIELDNAME") {
           throw err;
         }
+      }
+    }
+
+    try {
+      await connection.execute(`
+        ALTER TABLE test_material_sets
+        MODIFY COLUMN content_html_type ENUM('listening', 'reading', 'writing') DEFAULT NULL
+      `);
+    } catch (err) {
+      if (err.code !== "ER_BAD_FIELD_ERROR") {
+        throw err;
       }
     }
 

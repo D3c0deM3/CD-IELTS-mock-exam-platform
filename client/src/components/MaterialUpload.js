@@ -89,6 +89,7 @@ const MaterialUpload = ({ initialTestId }) => {
   const [contentJson, setContentJson] = useState("");
   const [contentHtmlListening, setContentHtmlListening] = useState("");
   const [contentHtmlReading, setContentHtmlReading] = useState("");
+  const [contentHtmlWriting, setContentHtmlWriting] = useState("");
   const [contentHtmlType, setContentHtmlType] = useState("listening");
   const [answerJson, setAnswerJson] = useState("");
   const [audioFile, setAudioFile] = useState(null);
@@ -119,10 +120,16 @@ const MaterialUpload = ({ initialTestId }) => {
     [imageAssets]
   );
   const contentHtml =
-    contentHtmlType === "reading" ? contentHtmlReading : contentHtmlListening;
+    contentHtmlType === "reading"
+      ? contentHtmlReading
+      : contentHtmlType === "writing"
+      ? contentHtmlWriting
+      : contentHtmlListening;
   const setActiveContentHtml = (value) => {
     if (contentHtmlType === "reading") {
       setContentHtmlReading(value);
+    } else if (contentHtmlType === "writing") {
+      setContentHtmlWriting(value);
     } else {
       setContentHtmlListening(value);
     }
@@ -168,6 +175,7 @@ const MaterialUpload = ({ initialTestId }) => {
       setContentJson("");
       setContentHtmlListening("");
       setContentHtmlReading("");
+      setContentHtmlWriting("");
       setContentHtmlType("listening");
       setAnswerJson("");
       setAudioMeta(null);
@@ -189,6 +197,7 @@ const MaterialUpload = ({ initialTestId }) => {
       setContentJson("");
       setContentHtmlListening("");
       setContentHtmlReading("");
+      setContentHtmlWriting("");
       setContentHtmlType("listening");
       setAnswerJson("");
       setAudioMeta(null);
@@ -230,6 +239,12 @@ const MaterialUpload = ({ initialTestId }) => {
         setContentHtmlReading(
           response.content_html_reading ||
             (response.content_html_type === "reading"
+              ? response.content_html || ""
+              : "")
+        );
+        setContentHtmlWriting(
+          response.content_html_writing ||
+            (response.content_html_type === "writing"
               ? response.content_html || ""
               : "")
         );
@@ -587,6 +602,7 @@ const MaterialUpload = ({ initialTestId }) => {
       setContentJson("");
       setContentHtmlListening("");
       setContentHtmlReading("");
+      setContentHtmlWriting("");
       setContentHtmlType("listening");
       setAnswerJson("");
       setAudioMeta(null);
@@ -663,12 +679,24 @@ const MaterialUpload = ({ initialTestId }) => {
                   {materialSets.map((set) => (
                     <option key={set.id} value={set.id}>
                       {set.name}
-                      {set.has_listening_html && set.has_reading_html
-                        ? " (listening + reading HTML)"
+                      {[
+                        set.has_listening_html ? "listening" : "",
+                        set.has_reading_html ? "reading" : "",
+                        set.has_writing_html ? "writing" : "",
+                      ].filter(Boolean).length > 1
+                        ? ` (${[
+                            set.has_listening_html ? "listening" : "",
+                            set.has_reading_html ? "reading" : "",
+                            set.has_writing_html ? "writing" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" + ")} HTML)`
                         : set.has_listening_html
                         ? " (listening HTML)"
                         : set.has_reading_html
                         ? " (reading HTML)"
+                        : set.has_writing_html
+                        ? " (writing HTML)"
                         : set.has_html
                         ? ` (${set.content_html_type || "html"} HTML)`
                         : ""}
@@ -851,6 +879,7 @@ const MaterialUpload = ({ initialTestId }) => {
                 >
                   <option value="listening">Listening</option>
                   <option value="reading">Reading</option>
+                  <option value="writing">Writing</option>
                 </select>
               </div>
 
