@@ -118,6 +118,61 @@ const buildPartGroups = (doc, sectionType) => {
   ];
 };
 
+const getPlatformContentCss = (sectionType) => {
+  const sharedCss = `
+    html,
+    body {
+      width: 100% !important;
+      min-height: 100% !important;
+      margin: 0 !important;
+    }
+  `;
+
+  if (sectionType === "listening") {
+    return `
+      ${sharedCss}
+      body {
+        background: #ffffff !important;
+        overflow: auto !important;
+      }
+      .wrap {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+      }
+      .card {
+        width: 100% !important;
+        min-height: 100% !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+      .section {
+        padding: 22px 32px 42px !important;
+      }
+      .instructions {
+        max-width: none !important;
+        border-radius: 8px !important;
+        margin-bottom: 18px !important;
+      }
+      .subhead {
+        margin-top: 22px !important;
+      }
+      .line {
+        font-size: 16px !important;
+        line-height: 1.85 !important;
+        margin: 8px 0 !important;
+      }
+      .blank {
+        height: 34px !important;
+        max-width: min(180px, 45vw) !important;
+      }
+    `;
+  }
+
+  return sharedCss;
+};
+
 const HtmlTestContentFrame = ({
   html,
   sectionType,
@@ -278,6 +333,7 @@ const HtmlTestContentFrame = ({
 
     const controlStyle = doc.createElement("style");
     controlStyle.textContent = `
+      ${getPlatformContentCss(sectionType)}
       .footer-nav,
       [data-platform-control],
       #prevBtn,

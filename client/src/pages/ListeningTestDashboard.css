@@ -366,9 +366,18 @@
   gap: 24px;
 }
 
+.test-container.html-content-mode {
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+  min-height: 0;
+}
+
 .visual-structure-container.html-content-mode {
-  height: calc(100vh - 260px);
-  min-height: 420px;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  gap: 0;
 }
 
 .test-container::-webkit-scrollbar {

@@ -2817,19 +2817,18 @@ const ListeningTestDashboard = () => {
       )}
 
       {/* ==================== MAIN CONTENT ==================== */}
-      <div className="test-container">
+      <div className={`test-container ${isHtmlMode ? "html-content-mode" : ""}`}>
         {/* Part Header */}
-        <div className="part-header">
-          <h1 className="part-title">Listening</h1>
-          <p className="part-subtitle">
-            {isHtmlMode && htmlQuestionIds.length === 0
-              ? "Questions"
-              : `Questions ${currentPart.questions[0]?.id || 1} - ${
-                  currentPart.questions[currentPart.questions.length - 1]?.id ||
-                  10
-                }`}
-          </p>
-        </div>
+        {!isHtmlMode && (
+          <div className="part-header">
+            <h1 className="part-title">Listening</h1>
+            <p className="part-subtitle">
+              Questions {currentPart.questions[0]?.id || 1} -{" "}
+              {currentPart.questions[currentPart.questions.length - 1]?.id ||
+                10}
+            </p>
+          </div>
+        )}
 
         {/* Visual Structure Renderer - Instructions moved inside components */}
         <div
@@ -2861,31 +2860,33 @@ const ListeningTestDashboard = () => {
         </div>
 
         {/* Navigation Buttons */}
-        <div className="navigation-buttons">
-          <button
-            className="nav-button prev-button"
-            onClick={() =>
-              setCurrentPartIndex(Math.max(0, currentPartIndex - 1))
-            }
-            disabled={currentPartIndex === 0 || listeningParts.length <= 1}
-          >
-            ← Previous Part
-          </button>
-          <button
-            className="nav-button next-button"
-            onClick={() =>
-              setCurrentPartIndex(
-                Math.min(listeningParts.length - 1, currentPartIndex + 1)
-              )
-            }
-            disabled={
-              listeningParts.length <= 1 ||
-              currentPartIndex === listeningParts.length - 1
-            }
-          >
-            Next Part →
-          </button>
-        </div>
+        {!isHtmlMode && (
+          <div className="navigation-buttons">
+            <button
+              className="nav-button prev-button"
+              onClick={() =>
+                setCurrentPartIndex(Math.max(0, currentPartIndex - 1))
+              }
+              disabled={currentPartIndex === 0 || listeningParts.length <= 1}
+            >
+              ← Previous Part
+            </button>
+            <button
+              className="nav-button next-button"
+              onClick={() =>
+                setCurrentPartIndex(
+                  Math.min(listeningParts.length - 1, currentPartIndex + 1)
+                )
+              }
+              disabled={
+                listeningParts.length <= 1 ||
+                currentPartIndex === listeningParts.length - 1
+              }
+            >
+              Next Part →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}
