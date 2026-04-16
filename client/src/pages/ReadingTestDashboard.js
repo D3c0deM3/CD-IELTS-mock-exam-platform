@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import HtmlTestContentFrame from "../components/HtmlTestContentFrame";
 import API_CONFIG from "../config/api";
 import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
@@ -814,6 +815,8 @@ const ReadingTestDashboard = () => {
     "reading_timer"
   ); // 60 minutes
   const [testData, setTestData] = useState(null);
+  const [htmlPassages, setHtmlPassages] = useState([]);
+  const [htmlQuestionIds, setHtmlQuestionIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [currentPassageIndex, setCurrentPassageIndex] = useState(0);
@@ -1033,8 +1036,23 @@ const ReadingTestDashboard = () => {
 
         try {
           const response = await apiClient.get(
-            `/api/materials/sets/${testMaterialsId}/content`
+            `/api/materials/sets/${testMaterialsId}/content?section_type=reading`
           );
+          if (
+            response?.content_format === "html" &&
+            response?.content_html &&
+            response?.content_html_type === "reading"
+          ) {
+            setLoadError("");
+            setTestData({
+              type: "reading",
+              format: "html",
+              html: response.content_html,
+              passages: [],
+            });
+            return;
+          }
+
           if (response?.content?.sections) {
             selectedTestData = normalizeTestContent(response.content);
           } else {
@@ -1070,6 +1088,7 @@ const ReadingTestDashboard = () => {
         setLoadError("");
         setTestData({
           type: "reading",
+          format: "json",
           passages: readingSection.passages,
         });
       } catch (error) {
@@ -1109,6 +1128,29 @@ const ReadingTestDashboard = () => {
       [questionId]: value,
     }));
   };
+
+  const handleHtmlAnswersChange = useCallback(
+    (nextHtmlAnswers, questionIds) => {
+      setAnswers((prev) => {
+        const next = { ...prev };
+        questionIds.forEach((questionId) => {
+          const value = nextHtmlAnswers[questionId];
+          if (value === undefined || value === null || value === "") {
+            delete next[questionId];
+          } else {
+            next[questionId] = value;
+          }
+        });
+        return next;
+      });
+    },
+    [setAnswers]
+  );
+
+  const handleHtmlPartsChange = useCallback((parts, questionIds) => {
+    setHtmlPassages(parts);
+    setHtmlQuestionIds(questionIds);
+  }, []);
 
   // ==================== TEXT HIGHLIGHTING HANDLERS ====================
   const handleContextMenu = (e) => {
@@ -1289,10 +1331,12 @@ const ReadingTestDashboard = () => {
     console.log("Reading test submitted with answers:", answers);
 
     const totalQuestions =
-      testData?.passages.reduce(
-        (sum, passage) => sum + passage.questions.length,
-        0
-      ) || 0;
+      testData?.format === "html"
+        ? htmlQuestionIds.length
+        : testData?.passages.reduce(
+            (sum, passage) => sum + passage.questions.length,
+            0
+          ) || 0;
     const answeredQuestions = Object.keys(answers).length;
 
     console.log(
@@ -1373,7 +1417,12 @@ const ReadingTestDashboard = () => {
   }
 
   // ==================== ERROR STATE ====================
-  if (!testData || !testData.passages || testData.passages.length === 0) {
+  if (
+    !testData ||
+    (testData.format === "html"
+      ? !testData.html
+      : !testData.passages || testData.passages.length === 0)
+  ) {
     return (
       <div className="reading-test-dashboard" data-theme={theme}>
         <div className="error-screen">
@@ -1383,7 +1432,24 @@ const ReadingTestDashboard = () => {
     );
   }
 
-  const currentPassage = testData.passages[currentPassageIndex];
+  const isHtmlMode = testData.format === "html";
+  const activeHtmlPassage = htmlPassages[currentPassageIndex] || {
+    part_number: currentPassageIndex + 1,
+    label: `Passage ${currentPassageIndex + 1}`,
+  };
+  const currentPassage = isHtmlMode
+    ? {
+        passage_number: activeHtmlPassage.part_number,
+        questions: htmlQuestionIds.map((id) => ({ id })),
+      }
+    : testData.passages[currentPassageIndex];
+  const readingPassages = isHtmlMode ? htmlPassages : testData.passages;
+  const totalQuestionCount = isHtmlMode
+    ? htmlQuestionIds.length
+    : testData.passages.reduce(
+        (sum, passage) => sum + passage.questions.length,
+        0
+      );
 
   // ==================== MAIN RENDER ====================
   return (
@@ -1440,35 +1506,48 @@ const ReadingTestDashboard = () => {
       </div>
 
       {/* ==================== MAIN CONTENT ==================== */}
-      <div className="reading-content">
-        {/* LEFT COLUMN - PASSAGE */}
-        <div className="passage-column">
-          <PassageRenderer
-            ref={passageContentRef}
-            passage={currentPassage}
-            highlights={
-              highlightsByPassage[`passage_${currentPassageIndex}`] || []
-            }
-            onContextMenu={handleContextMenu}
+      <div className={`reading-content ${isHtmlMode ? "html-content-mode" : ""}`}>
+        {isHtmlMode ? (
+          <HtmlTestContentFrame
+            html={testData.html}
+            sectionType="reading"
+            currentPartIndex={currentPassageIndex}
+            answers={answers}
+            onAnswersChange={handleHtmlAnswersChange}
+            onPartsChange={handleHtmlPartsChange}
           />
-        </div>
+        ) : (
+          <>
+            {/* LEFT COLUMN - PASSAGE */}
+            <div className="passage-column">
+              <PassageRenderer
+                ref={passageContentRef}
+                passage={currentPassage}
+                highlights={
+                  highlightsByPassage[`passage_${currentPassageIndex}`] || []
+                }
+                onContextMenu={handleContextMenu}
+              />
+            </div>
 
-        {/* RIGHT COLUMN - QUESTIONS */}
-        <div className="questions-column">
-          <div className="questions-wrapper">
-            <QuestionsRenderer
-              passage={currentPassage}
-              answers={answers}
-              onAnswerChange={handleAnswerChange}
-            />
-          </div>
-        </div>
+            {/* RIGHT COLUMN - QUESTIONS */}
+            <div className="questions-column">
+              <div className="questions-wrapper">
+                <QuestionsRenderer
+                  passage={currentPassage}
+                  answers={answers}
+                  onAnswerChange={handleAnswerChange}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ==================== BOTTOM BAR ==================== */}
       <div className="reading-bottom-bar">
         <div className="passages-navigation">
-          {testData.passages.map((passage, index) => (
+          {readingPassages.map((passage, index) => (
             <button
               key={index}
               className={`passage-button ${
@@ -1476,16 +1555,13 @@ const ReadingTestDashboard = () => {
               }`}
               onClick={() => setCurrentPassageIndex(index)}
             >
-              Passage {passage.passage_number}
+              Passage {passage.passage_number || passage.part_number || index + 1}
             </button>
           ))}
         </div>
         <div className="progress-info">
           Answered: {Object.keys(answers).length} /{" "}
-          {testData.passages.reduce(
-            (sum, passage) => sum + passage.questions.length,
-            0
-          )}
+          {totalQuestionCount}
         </div>
         <button
           className="submit-button-bottom"
@@ -1506,7 +1582,7 @@ const ReadingTestDashboard = () => {
             <div className="modal-body">
               <p className="answered-summary">
                 You have answered <strong>{Object.keys(answers).length}</strong>{" "}
-                out of <strong>40</strong> questions.
+                out of <strong>{totalQuestionCount || 40}</strong> questions.
               </p>
               <p className="warning-message">
                 Once you submit, you cannot return to modify your answers.

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
+import HtmlTestContentFrame from "../components/HtmlTestContentFrame";
 import API_CONFIG from "../config/api";
 import audioService from "../services/audioService";
 import { apiClient } from "../services/api";
@@ -1854,6 +1855,8 @@ const ListeningTestDashboard = () => {
     "listening_timer"
   );
   const [testData, setTestData] = useState(null);
+  const [htmlParts, setHtmlParts] = useState([]);
+  const [htmlQuestionIds, setHtmlQuestionIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [audioLoaded, setAudioLoaded] = useState(false);
@@ -2249,7 +2252,9 @@ const ListeningTestDashboard = () => {
 
     // Calculate score
     const totalQuestions =
-      testData?.parts.reduce((sum, part) => sum + part.questions.length, 0) ||
+      testData?.format === "html"
+        ? htmlQuestionIds.length
+        : testData?.parts.reduce((sum, part) => sum + part.questions.length, 0) ||
       0;
     const answeredQuestions = Object.keys(answers).length;
 
@@ -2367,8 +2372,23 @@ const ListeningTestDashboard = () => {
 
         try {
           const response = await apiClient.get(
-            `/api/materials/sets/${testMaterialsId}/content`
+            `/api/materials/sets/${testMaterialsId}/content?section_type=listening`
           );
+          if (
+            response?.content_format === "html" &&
+            response?.content_html &&
+            response?.content_html_type === "listening"
+          ) {
+            setLoadError("");
+            setTestData({
+              type: "listening",
+              format: "html",
+              html: response.content_html,
+              parts: [],
+            });
+            return;
+          }
+
           if (response?.content?.sections) {
             selectedTestData = normalizeTestContent(response.content);
           } else {
@@ -2404,6 +2424,7 @@ const ListeningTestDashboard = () => {
         setLoadError("");
         setTestData({
           type: "listening",
+          format: "json",
           parts: listeningSection.parts,
         });
       } catch (error) {
@@ -2425,6 +2446,29 @@ const ListeningTestDashboard = () => {
       [questionId]: value,
     }));
   };
+
+  const handleHtmlAnswersChange = useCallback(
+    (nextHtmlAnswers, questionIds) => {
+      setAnswers((prev) => {
+        const next = { ...prev };
+        questionIds.forEach((questionId) => {
+          const value = nextHtmlAnswers[questionId];
+          if (value === undefined || value === null || value === "") {
+            delete next[questionId];
+          } else {
+            next[questionId] = value;
+          }
+        });
+        return next;
+      });
+    },
+    [setAnswers]
+  );
+
+  const handleHtmlPartsChange = useCallback((parts, questionIds) => {
+    setHtmlParts(parts);
+    setHtmlQuestionIds(questionIds);
+  }, []);
 
   // ==================== VOLUME CHANGE HANDLER ====================
   const handleVolumeChange = (e) => {
@@ -2651,7 +2695,12 @@ const ListeningTestDashboard = () => {
   }
 
   // ==================== ERROR STATE ====================
-  if (!testData || !testData.parts || testData.parts.length === 0) {
+  if (
+    !testData ||
+    (testData.format === "html"
+      ? !testData.html
+      : !testData.parts || testData.parts.length === 0)
+  ) {
     return (
       <div className="listening-test-dashboard" data-theme={theme}>
         <div className="error-screen">
@@ -2661,7 +2710,22 @@ const ListeningTestDashboard = () => {
     );
   }
 
-  const currentPart = testData.parts[currentPartIndex];
+  const isHtmlMode = testData.format === "html";
+  const activeHtmlPart = htmlParts[currentPartIndex] || {
+    part_number: currentPartIndex + 1,
+    label: `Part ${currentPartIndex + 1}`,
+  };
+  const currentPart = isHtmlMode
+    ? {
+        title: activeHtmlPart.label,
+        part_number: activeHtmlPart.part_number,
+        questions: htmlQuestionIds.map((id) => ({ id })),
+      }
+    : testData.parts[currentPartIndex];
+  const listeningParts = isHtmlMode ? htmlParts : testData.parts;
+  const totalQuestionCount = isHtmlMode
+    ? htmlQuestionIds.length
+    : testData.parts.reduce((sum, part) => sum + part.questions.length, 0);
 
   // ==================== MAIN RENDER ====================
   return (
@@ -2694,7 +2758,9 @@ const ListeningTestDashboard = () => {
         <div className="test-title">
           <h1>IELTS Listening Test</h1>
           <p>
-            {currentPart.title} - Part {currentPart.part_number}
+            {isHtmlMode
+              ? activeHtmlPart.label
+              : `${currentPart.title} - Part ${currentPart.part_number}`}
           </p>
         </div>
         <div className="test-controls">
@@ -2756,22 +2822,42 @@ const ListeningTestDashboard = () => {
         <div className="part-header">
           <h1 className="part-title">Listening</h1>
           <p className="part-subtitle">
-            Questions {currentPart.questions[0]?.id || 1} -{" "}
-            {currentPart.questions[currentPart.questions.length - 1]?.id || 10}
+            {isHtmlMode && htmlQuestionIds.length === 0
+              ? "Questions"
+              : `Questions ${currentPart.questions[0]?.id || 1} - ${
+                  currentPart.questions[currentPart.questions.length - 1]?.id ||
+                  10
+                }`}
           </p>
         </div>
 
         {/* Visual Structure Renderer - Instructions moved inside components */}
-        <div ref={visualStructureRef} className="visual-structure-container">
-          <VisualStructureRenderer
-            visualStructure={currentPart.visual_structure}
-            questions={currentPart.questions}
-            answers={answers}
-            onAnswerChange={handleAnswerChange}
-            partNumber={currentPart.part_number}
-            partInstructions={currentPart.instructions}
-            partContext={currentPart.context}
-          />
+        <div
+          ref={visualStructureRef}
+          className={`visual-structure-container ${
+            isHtmlMode ? "html-content-mode" : ""
+          }`}
+        >
+          {isHtmlMode ? (
+            <HtmlTestContentFrame
+              html={testData.html}
+              sectionType="listening"
+              currentPartIndex={currentPartIndex}
+              answers={answers}
+              onAnswersChange={handleHtmlAnswersChange}
+              onPartsChange={handleHtmlPartsChange}
+            />
+          ) : (
+            <VisualStructureRenderer
+              visualStructure={currentPart.visual_structure}
+              questions={currentPart.questions}
+              answers={answers}
+              onAnswerChange={handleAnswerChange}
+              partNumber={currentPart.part_number}
+              partInstructions={currentPart.instructions}
+              partContext={currentPart.context}
+            />
+          )}
         </div>
 
         {/* Navigation Buttons */}
@@ -2781,7 +2867,7 @@ const ListeningTestDashboard = () => {
             onClick={() =>
               setCurrentPartIndex(Math.max(0, currentPartIndex - 1))
             }
-            disabled={currentPartIndex === 0}
+            disabled={currentPartIndex === 0 || listeningParts.length <= 1}
           >
             ← Previous Part
           </button>
@@ -2789,10 +2875,13 @@ const ListeningTestDashboard = () => {
             className="nav-button next-button"
             onClick={() =>
               setCurrentPartIndex(
-                Math.min(testData.parts.length - 1, currentPartIndex + 1)
+                Math.min(listeningParts.length - 1, currentPartIndex + 1)
               )
             }
-            disabled={currentPartIndex === testData.parts.length - 1}
+            disabled={
+              listeningParts.length <= 1 ||
+              currentPartIndex === listeningParts.length - 1
+            }
           >
             Next Part →
           </button>
@@ -2802,7 +2891,7 @@ const ListeningTestDashboard = () => {
       {/* ==================== BOTTOM NAVIGATION ==================== */}
       <div className="test-bottom-nav">
         <div className="parts-navigation">
-          {testData.parts.map((part, index) => (
+          {listeningParts.map((part, index) => (
             <button
               key={index}
               className={`part-button ${
@@ -2816,7 +2905,7 @@ const ListeningTestDashboard = () => {
         </div>
         <div className="progress-info">
           Answered: {Object.keys(answers).length} /{" "}
-          {testData.parts.reduce((sum, part) => sum + part.questions.length, 0)}
+          {totalQuestionCount}
         </div>
         <button
           className="submit-button-bottom"
@@ -2843,10 +2932,7 @@ const ListeningTestDashboard = () => {
                 <p>
                   <strong>Answered Questions:</strong>{" "}
                   {Object.keys(answers).length} /{" "}
-                  {testData.parts.reduce(
-                    (sum, part) => sum + part.questions.length,
-                    0
-                  )}
+                  {totalQuestionCount}
                 </p>
               </div>
               <p className="modal-warning">

@@ -65,6 +65,10 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.material-html-type {
+  max-width: 260px;
+}
+
 .material-set-row {
   display: flex;
   gap: 10px;

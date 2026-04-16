@@ -45,6 +45,23 @@ const answersSample = `{
   }
 }`;
 
+const htmlSample = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>IELTS Listening Content</title>
+  <style>
+    .section { display: none; }
+    .section.active { display: block; }
+  </style>
+</head>
+<body>
+  <section id="part1" class="section active">
+    <p>Question <input data-q="1" /></p>
+  </section>
+</body>
+</html>`;
+
 const mergeSlots = (...slotGroups) => {
   const slotsByKey = new Map();
 
@@ -70,6 +87,9 @@ const MaterialUpload = ({ initialTestId }) => {
   const [selectedSetId, setSelectedSetId] = useState("");
   const [setName, setSetName] = useState("");
   const [contentJson, setContentJson] = useState("");
+  const [contentHtmlListening, setContentHtmlListening] = useState("");
+  const [contentHtmlReading, setContentHtmlReading] = useState("");
+  const [contentHtmlType, setContentHtmlType] = useState("listening");
   const [answerJson, setAnswerJson] = useState("");
   const [audioFile, setAudioFile] = useState(null);
   const [audioMeta, setAudioMeta] = useState(null);
@@ -98,6 +118,15 @@ const MaterialUpload = ({ initialTestId }) => {
       ),
     [imageAssets]
   );
+  const contentHtml =
+    contentHtmlType === "reading" ? contentHtmlReading : contentHtmlListening;
+  const setActiveContentHtml = (value) => {
+    if (contentHtmlType === "reading") {
+      setContentHtmlReading(value);
+    } else {
+      setContentHtmlListening(value);
+    }
+  };
 
   const refreshSets = async (testId) => {
     if (!testId) return;
@@ -137,6 +166,9 @@ const MaterialUpload = ({ initialTestId }) => {
       setSelectedSetId("");
       setSetName("");
       setContentJson("");
+      setContentHtmlListening("");
+      setContentHtmlReading("");
+      setContentHtmlType("listening");
       setAnswerJson("");
       setAudioMeta(null);
       setAudioFile(null);
@@ -155,6 +187,9 @@ const MaterialUpload = ({ initialTestId }) => {
     if (!selectedSetId) {
       setSetName("");
       setContentJson("");
+      setContentHtmlListening("");
+      setContentHtmlReading("");
+      setContentHtmlType("listening");
       setAnswerJson("");
       setAudioMeta(null);
       setAudioFile(null);
@@ -185,6 +220,20 @@ const MaterialUpload = ({ initialTestId }) => {
         } else {
           setContentJson("");
         }
+
+        setContentHtmlListening(
+          response.content_html_listening ||
+            (response.content_html_type === "listening"
+              ? response.content_html || ""
+              : "")
+        );
+        setContentHtmlReading(
+          response.content_html_reading ||
+            (response.content_html_type === "reading"
+              ? response.content_html || ""
+              : "")
+        );
+        setContentHtmlType(response.content_html_type || "listening");
 
         if (response.answer_key_json) {
           try {
@@ -240,6 +289,25 @@ const MaterialUpload = ({ initialTestId }) => {
     reader.readAsText(file);
   };
 
+  const handleHtmlFile = (file) => {
+    if (!file) return;
+    clearMessages();
+
+    const isHtmlFile =
+      file.type === "text/html" || file.name.toLowerCase().endsWith(".html");
+
+    if (!isHtmlFile) {
+      setError("Only HTML files are supported.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setActiveContentHtml(String(reader.result || ""));
+    };
+    reader.readAsText(file);
+  };
+
   const validateContent = (jsonText) => {
     const parsed = JSON.parse(jsonText);
     const hasSections = Array.isArray(parsed.sections);
@@ -250,6 +318,25 @@ const MaterialUpload = ({ initialTestId }) => {
       );
     }
     return parsed;
+  };
+
+  const validateHtmlContent = (htmlText) => {
+    const trimmed = htmlText.trim();
+    if (!trimmed) {
+      throw new Error("Content HTML is required.");
+    }
+
+    if (!contentHtmlType) {
+      throw new Error("Choose whether this HTML is for Listening or Reading.");
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(trimmed, "text/html");
+    if (doc.querySelector("parsererror")) {
+      throw new Error("Invalid HTML file.");
+    }
+
+    return trimmed;
   };
 
   const validateAnswers = (jsonText) => {
@@ -310,6 +397,28 @@ const MaterialUpload = ({ initialTestId }) => {
       setSuccess("Content saved successfully.");
     } catch (err) {
       setError(err.message || "Failed to save content.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveHtmlContent = async () => {
+    clearMessages();
+    if (!contentHtml.trim()) {
+      setError("Content HTML is required.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const validatedHtml = validateHtmlContent(contentHtml);
+      await upsertSet({
+        content_html: validatedHtml,
+        content_html_type: contentHtmlType,
+      });
+      setSuccess("HTML content saved successfully.");
+    } catch (err) {
+      setError(err.message || "Failed to save HTML content.");
     } finally {
       setIsSaving(false);
     }
@@ -476,6 +585,9 @@ const MaterialUpload = ({ initialTestId }) => {
       setSelectedSetId("");
       setSetName("");
       setContentJson("");
+      setContentHtmlListening("");
+      setContentHtmlReading("");
+      setContentHtmlType("listening");
       setAnswerJson("");
       setAudioMeta(null);
       setAudioFile(null);
@@ -551,6 +663,15 @@ const MaterialUpload = ({ initialTestId }) => {
                   {materialSets.map((set) => (
                     <option key={set.id} value={set.id}>
                       {set.name}
+                      {set.has_listening_html && set.has_reading_html
+                        ? " (listening + reading HTML)"
+                        : set.has_listening_html
+                        ? " (listening HTML)"
+                        : set.has_reading_html
+                        ? " (reading HTML)"
+                        : set.has_html
+                        ? ` (${set.content_html_type || "html"} HTML)`
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -593,6 +714,13 @@ const MaterialUpload = ({ initialTestId }) => {
             onClick={() => setActiveTab("answers")}
           >
             Answer Keys JSON
+          </button>
+          <button
+            type="button"
+            className={activeTab === "html" ? "active" : ""}
+            onClick={() => setActiveTab("html")}
+          >
+            Content HTML
           </button>
           <button
             type="button"
@@ -688,6 +816,58 @@ const MaterialUpload = ({ initialTestId }) => {
                 disabled={!canSave || isSaving}
               >
                 {isSaving ? "Saving..." : "Save Answer Keys"}
+              </button>
+            </div>
+          )}
+
+          {activeTab === "html" && (
+            <div className="material-panel__section">
+              <div className="material-panel__row">
+                <div>
+                  <h3>Content HTML</h3>
+                  <p>
+                    Upload a ready-made IELTS content page. The test dashboard
+                    keeps its timer, navigation, submit flow, and answer
+                    checking.
+                  </p>
+                </div>
+                <label className="material-file">
+                  Load HTML file
+                  <input
+                    type="file"
+                    accept=".html,text/html"
+                    onChange={(e) => handleHtmlFile(e.target.files[0])}
+                  />
+                </label>
+              </div>
+
+              <div className="material-field material-html-type">
+                <label htmlFor="html-type">HTML Section</label>
+                <select
+                  id="html-type"
+                  value={contentHtmlType}
+                  onChange={(e) => setContentHtmlType(e.target.value)}
+                  disabled={!selectedTest}
+                >
+                  <option value="listening">Listening</option>
+                  <option value="reading">Reading</option>
+                </select>
+              </div>
+
+              <textarea
+                value={contentHtml}
+                onChange={(e) => setActiveContentHtml(e.target.value)}
+                placeholder={htmlSample}
+                rows={14}
+                disabled={!selectedTest}
+              />
+
+              <button
+                type="button"
+                onClick={handleSaveHtmlContent}
+                disabled={!canSave || isSaving}
+              >
+                {isSaving ? "Saving..." : "Save HTML Content"}
               </button>
             </div>
           )}

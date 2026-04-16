@@ -109,6 +109,44 @@ const normalizeJsonInput = (value) => {
   throw new Error("Invalid JSON input");
 };
 
+const normalizeHtmlInput = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error("Invalid HTML input");
+  }
+
+  return value;
+};
+
+const normalizeHtmlType = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const normalized = String(value).toLowerCase();
+  if (!["listening", "reading"].includes(normalized)) {
+    throw new Error("Invalid HTML section type");
+  }
+
+  return normalized;
+};
+
+const getHtmlColumnForType = (type) =>
+  type === "reading" ? "content_html_reading" : "content_html_listening";
+
+const getHtmlContentForType = (row, type) => {
+  if (!type) return null;
+
+  const typedContent = row[getHtmlColumnForType(type)];
+  if (typedContent) return typedContent;
+
+  if (row.content_html_type === type) return row.content_html;
+  return null;
+};
+
 const IMAGE_MIME_TYPES = [
   "image/png",
   "image/jpeg",
@@ -547,9 +585,13 @@ router.get("/sets", authMiddleware, ensureAdmin, async (req, res) => {
         ms.name,
         ms.audio_file_url,
         ms.audio_file_size,
+        ms.content_html_type,
         ms.updated_at,
         (SELECT COUNT(*) FROM test_material_set_images mi WHERE mi.set_id = ms.id) AS image_count,
-        (ms.content_json IS NOT NULL AND ms.content_json <> '') AS has_content,
+        ((ms.content_json IS NOT NULL AND ms.content_json <> '') OR (ms.content_html IS NOT NULL AND ms.content_html <> '') OR (ms.content_html_listening IS NOT NULL AND ms.content_html_listening <> '') OR (ms.content_html_reading IS NOT NULL AND ms.content_html_reading <> '')) AS has_content,
+        ((ms.content_html IS NOT NULL AND ms.content_html <> '') OR (ms.content_html_listening IS NOT NULL AND ms.content_html_listening <> '') OR (ms.content_html_reading IS NOT NULL AND ms.content_html_reading <> '')) AS has_html,
+        (ms.content_html_listening IS NOT NULL AND ms.content_html_listening <> '') AS has_listening_html,
+        (ms.content_html_reading IS NOT NULL AND ms.content_html_reading <> '') AS has_reading_html,
         (ms.answer_key_json IS NOT NULL AND ms.answer_key_json <> '') AS has_answers
       FROM test_material_sets ms
       JOIN tests t ON ms.test_id = t.id
@@ -583,6 +625,10 @@ router.get("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
         t.name AS test_name,
         ms.name,
         ms.content_json,
+        ms.content_html,
+        ms.content_html_type,
+        ms.content_html_listening,
+        ms.content_html_reading,
         ms.answer_key_json,
         ms.audio_file_name,
         ms.audio_file_url,
@@ -626,14 +672,43 @@ router.get("/sets/:setId/content", authMiddleware, async (req, res) => {
   const { setId } = req.params;
 
   try {
+    const requestedSectionType = normalizeHtmlType(req.query.section_type);
     const [rows] = await db.execute(
-      "SELECT content_json FROM test_material_sets WHERE id = ?",
+      "SELECT content_json, content_html, content_html_type, content_html_listening, content_html_reading FROM test_material_sets WHERE id = ?",
       [setId]
     );
 
-    if (rows.length === 0 || !rows[0].content_json) {
+    if (
+      rows.length === 0 ||
+      (!rows[0].content_json &&
+        !rows[0].content_html &&
+        !rows[0].content_html_listening &&
+        !rows[0].content_html_reading)
+    ) {
       return res.status(404).json({ error: "Content not found" });
     }
+
+      const htmlContent = getHtmlContentForType(rows[0], requestedSectionType);
+      if (
+        requestedSectionType &&
+        htmlContent
+      ) {
+        return res.json({
+          content_format: "html",
+          content_html: htmlContent,
+          content_html_type: requestedSectionType,
+          content: null,
+          image_assets: [],
+        });
+      }
+
+      if (!rows[0].content_json) {
+        return res.status(404).json({
+          error: requestedSectionType
+            ? `No ${requestedSectionType} content found`
+            : "Content not found",
+        });
+      }
 
       const imageAssets = await listImageAssets(setId);
       let content = injectImageAssetsIntoContent(
@@ -789,9 +864,17 @@ router.get("/sets/:setId/content", authMiddleware, async (req, res) => {
         content.sections = normalizedSections;
       }
 
-      res.json({ content, image_assets: imageAssets });
+      res.json({
+        content_format: "json",
+        content,
+        image_assets: imageAssets,
+        content_html_type: rows[0].content_html_type,
+      });
   } catch (err) {
     console.error("Error fetching content JSON:", err);
+    if (err.message === "Invalid HTML section type") {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -843,20 +926,27 @@ router.get("/sets/:setId/audio", authMiddleware, async (req, res) => {
 
 // POST /api/materials/sets - Create material set (admin)
 router.post("/sets", authMiddleware, ensureAdmin, async (req, res) => {
-  const { test_id, name, content_json, answer_key_json } = req.body;
+  const { test_id, name, content_json, content_html, content_html_type, answer_key_json } = req.body;
 
   if (!test_id || !name) {
     return res.status(400).json({ error: "test_id and name are required" });
   }
 
   let contentJsonValue = null;
+  let contentHtmlValue = null;
+  let contentHtmlTypeValue = null;
   let answersJsonValue = null;
 
   try {
     contentJsonValue = normalizeJsonInput(content_json);
+    contentHtmlValue = normalizeHtmlInput(content_html);
+    contentHtmlTypeValue = normalizeHtmlType(content_html_type);
+    if (contentHtmlValue && !contentHtmlTypeValue) {
+      throw new Error("HTML section type is required");
+    }
     answersJsonValue = normalizeJsonInput(answer_key_json);
   } catch (err) {
-    return res.status(400).json({ error: "Invalid JSON format" });
+    return res.status(400).json({ error: err.message || "Invalid material format" });
   }
 
   try {
@@ -871,16 +961,32 @@ router.post("/sets", authMiddleware, ensureAdmin, async (req, res) => {
 
     const [result] = await db.execute(
       `INSERT INTO test_material_sets
-       (test_id, name, content_json, answer_key_json, uploaded_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      [test_id, name, contentJsonValue, answersJsonValue, req.user.id]
+       (test_id, name, content_json, content_html, content_html_type, content_html_listening, content_html_reading, answer_key_json, uploaded_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        test_id,
+        name,
+        contentJsonValue,
+        contentHtmlValue,
+        contentHtmlValue ? contentHtmlTypeValue : null,
+        contentHtmlValue && contentHtmlTypeValue === "listening"
+          ? contentHtmlValue
+          : null,
+        contentHtmlValue && contentHtmlTypeValue === "reading"
+          ? contentHtmlValue
+          : null,
+        answersJsonValue,
+        req.user.id,
+      ]
     );
 
     res.json({
       id: result.insertId,
       test_id,
       name,
-      has_content: Boolean(contentJsonValue),
+      has_content: Boolean(contentJsonValue || contentHtmlValue),
+      has_html: Boolean(contentHtmlValue),
+      content_html_type: contentHtmlValue ? contentHtmlTypeValue : null,
       has_answers: Boolean(answersJsonValue),
       image_slots: contentJsonValue
         ? extractImageSlots(JSON.parse(contentJsonValue))
@@ -895,7 +1001,7 @@ router.post("/sets", authMiddleware, ensureAdmin, async (req, res) => {
 // PUT /api/materials/sets/:setId - Update material set (admin)
 router.put("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
   const { setId } = req.params;
-  const { name, content_json, answer_key_json } = req.body;
+  const { name, content_json, content_html, content_html_type, answer_key_json } = req.body;
 
   const updates = [];
   const params = [];
@@ -915,6 +1021,30 @@ router.put("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
       }
     }
 
+    if (content_html !== undefined) {
+      if (content_html === "" || content_html === null) {
+        updates.push("content_html = NULL");
+        updates.push("content_html_type = NULL");
+      } else {
+        const normalizedHtml = normalizeHtmlInput(content_html);
+        const normalizedHtmlType = normalizeHtmlType(content_html_type);
+        if (!normalizedHtmlType) {
+          throw new Error("HTML section type is required");
+        }
+        const typedHtmlColumn = getHtmlColumnForType(normalizedHtmlType);
+        updates.push("content_html = ?");
+        params.push(normalizedHtml);
+        updates.push("content_html_type = ?");
+        params.push(normalizedHtmlType);
+        updates.push(`${typedHtmlColumn} = ?`);
+        params.push(normalizedHtml);
+      }
+    } else if (content_html_type !== undefined) {
+      const normalizedHtmlType = normalizeHtmlType(content_html_type);
+      updates.push("content_html_type = ?");
+      params.push(normalizedHtmlType);
+    }
+
     if (answer_key_json !== undefined) {
       if (answer_key_json === "" || answer_key_json === null) {
         updates.push("answer_key_json = NULL");
@@ -924,7 +1054,7 @@ router.put("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
       }
     }
   } catch (err) {
-    return res.status(400).json({ error: "Invalid JSON format" });
+    return res.status(400).json({ error: err.message || "Invalid material format" });
   }
 
   if (updates.length === 0) {

@@ -306,6 +306,10 @@ const setupDatabase = async () => {
         test_id INT NOT NULL,
         name VARCHAR(255) NOT NULL,
         content_json LONGTEXT,
+        content_html LONGTEXT,
+        content_html_type ENUM('listening', 'reading') DEFAULT NULL,
+        content_html_listening LONGTEXT,
+        content_html_reading LONGTEXT,
         answer_key_json LONGTEXT,
         audio_file_name VARCHAR(255),
         audio_file_path VARCHAR(500),
@@ -319,6 +323,28 @@ const setupDatabase = async () => {
         KEY idx_test_material_set (test_id)
       )
     `);
+
+    const materialSetColumns = [
+      { name: "content_html", type: "LONGTEXT" },
+      {
+        name: "content_html_type",
+        type: "ENUM('listening', 'reading') DEFAULT NULL",
+      },
+      { name: "content_html_listening", type: "LONGTEXT" },
+      { name: "content_html_reading", type: "LONGTEXT" },
+    ];
+
+    for (const column of materialSetColumns) {
+      try {
+        await connection.execute(`
+          ALTER TABLE test_material_sets ADD COLUMN ${column.name} ${column.type}
+        `);
+      } catch (err) {
+        if (err.code !== "ER_DUP_FIELDNAME") {
+          throw err;
+        }
+      }
+    }
 
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS test_material_set_images (

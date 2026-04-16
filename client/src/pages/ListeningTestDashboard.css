@@ -366,6 +366,11 @@
   gap: 24px;
 }
 
+.visual-structure-container.html-content-mode {
+  height: calc(100vh - 260px);
+  min-height: 420px;
+}
+
 .test-container::-webkit-scrollbar {
   width: 8px;
 }
