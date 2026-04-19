@@ -2120,27 +2120,24 @@ const ListeningTestDashboard = () => {
           participant
         );
 
-        // First, ensure audio is preloaded (in case it wasn't preloaded in starter)
-        let duration = audioService.getAudioDuration();
-        let audio = audioService.getAudioElement();
-
-        if (!audio || !duration) {
-          console.log("🔄 Audio not cached, preloading now...");
-          try {
-            const result = await audioService.preloadAudio(testMaterialsId);
-            duration = result.duration;
-            audio = result.audio;
-            console.log(
-              `✓ Audio preloaded in dashboard. Duration: ${duration.toFixed(
-                2
-              )}s`
-            );
-          } catch (preloadErr) {
-            console.error("✗ Failed to preload audio:", preloadErr);
-            setAudioPlaybackError(preloadErr.message || "Audio could not be loaded.");
-            setAudioLoaded(true);
-            return;
-          }
+        // Always ask the service for the selected material set. It will reuse
+        // the cache only when it belongs to the same set.
+        let duration = 0;
+        let audio = null;
+        try {
+          const result = await audioService.preloadAudio(testMaterialsId);
+          duration = result.duration;
+          audio = result.audio;
+          console.log(
+            `✓ Audio ready in dashboard. Duration: ${duration.toFixed(2)}s`
+          );
+        } catch (preloadErr) {
+          console.error("✗ Failed to preload audio:", preloadErr);
+          setAudioPlaybackError(
+            preloadErr.message || "Audio could not be loaded."
+          );
+          setAudioLoaded(true);
+          return;
         }
 
         // Validate audio and duration
@@ -2482,17 +2479,14 @@ const ListeningTestDashboard = () => {
 
   const handleManualAudioStart = async () => {
     try {
-      let audio = audioService.getAudioElement();
-      if (!audio) {
-        const participant = JSON.parse(
-          localStorage.getItem("currentParticipant") || "{}"
-        );
-        const testMaterialsId = Number(participant.test_materials_id) || null;
-        const result = await audioService.preloadAudio(testMaterialsId);
-        audio = result.audio;
-        setAudioDuration(result.duration);
-        setDuration(result.duration);
-      }
+      const participant = JSON.parse(
+        localStorage.getItem("currentParticipant") || "{}"
+      );
+      const testMaterialsId = Number(participant.test_materials_id) || null;
+      const result = await audioService.preloadAudio(testMaterialsId);
+      const audio = result.audio;
+      setAudioDuration(result.duration);
+      setDuration(result.duration);
 
       audioRef.current = audio;
       await audioService.playAudio();

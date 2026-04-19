@@ -15,6 +15,7 @@ let audioDuration = null;
 let isPreloading = false;
 let preloadPromise = null;
 let currentTestId = null;
+let currentAudioUrl = null;
 
 /**
  * Get the audio file URL for a specific test
@@ -63,13 +64,18 @@ const getAudioCandidatesForTest = async (testMaterialsId) => {
   if (remoteAudioUrl) candidates.push(remoteAudioUrl);
   if (bundledAudioUrl) candidates.push(bundledAudioUrl);
 
-  // Last-resort local fallbacks keep the test usable if an uploaded audio URL is
-  // stale or the static upload is temporarily unavailable in development.
-  [listeningAudio, listeningAudio3].forEach((url) => {
-    if (url && !candidates.includes(url)) candidates.push(url);
-  });
-
   return candidates;
+};
+
+const disposeCachedAudio = () => {
+  if (audioCache) {
+    audioCache.pause();
+    audioCache.src = "";
+  }
+
+  audioCache = null;
+  audioDuration = null;
+  currentAudioUrl = null;
 };
 
 const loadAudioElement = ({ audioUrl, test }) =>
@@ -160,6 +166,10 @@ export const preloadAudio = async (testMaterialsId) => {
     };
   }
 
+  if (audioCache && currentTestId !== test) {
+    disposeCachedAudio();
+  }
+
   isPreloading = true;
   currentTestId = test;
 
@@ -201,6 +211,7 @@ export const preloadAudio = async (testMaterialsId) => {
       const { audio, audioUrl } = loadedResult;
       audioDuration = loadedResult.duration;
       audioCache = audio;
+      currentAudioUrl = audioUrl;
       isPreloading = false;
 
       Object.defineProperty(audio, "controls", {
@@ -327,16 +338,19 @@ export const getAudioElement = () => {
   return audioCache;
 };
 
+export const getCurrentTestId = () => {
+  return currentTestId;
+};
+
+export const getCurrentAudioUrl = () => {
+  return currentAudioUrl;
+};
+
 /**
  * Clear audio cache
  */
 export const clearAudioCache = () => {
-  if (audioCache) {
-    audioCache.pause();
-    audioCache.src = "";
-  }
-  audioCache = null;
-  audioDuration = null;
+  disposeCachedAudio();
   currentTestId = null;
   isPreloading = false;
   preloadPromise = null;
@@ -349,6 +363,8 @@ export default {
   stopAudio,
   pauseAudio,
   getAudioElement,
+  getCurrentTestId,
+  getCurrentAudioUrl,
   setVolume,
   getVolume,
   clearAudioCache,
