@@ -176,10 +176,11 @@ function PendingScreen() {
       try {
         const testSessionService =
           require("../services/testSessionService").default;
-        // Get user's full name from localStorage
+        const participantData = localStorage.getItem("currentParticipant");
+        const participant = participantData ? JSON.parse(participantData) : null;
         const userData = localStorage.getItem("user");
         const user = userData ? JSON.parse(userData) : null;
-        const fullName = user?.full_name;
+        const fullName = participant?.full_name || user?.full_name;
 
         const response = await testSessionService.canStartTest(
           idCode,

@@ -558,7 +558,13 @@ const CenterDashboard = () => {
       setLoading(true);
       const response = await centerService.saveAndEndSession(selectedSession.id);
       fetchSessionDashboard(selectedSession.id);
-      alert(`Session completed! ${response.saved_count} results saved.`);
+      alert(
+        `Session completed! ${response.saved_count} account results saved.${
+          response.guest_results_retained
+            ? ` ${response.guest_results_retained} guest result(s) remain in session management.`
+            : ""
+        }`
+      );
     } catch (err) {
       setError(err.response?.data?.error || "Failed to save session");
     } finally {

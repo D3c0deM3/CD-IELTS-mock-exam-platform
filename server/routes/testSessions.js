@@ -12,6 +12,7 @@ const {
   resolveSessionMaterialSetId,
   sanitizeSessionNotes,
 } = require("../utils/testMaterialSets");
+const { generateUniqueParticipantCode } = require("../utils/codeGenerator");
 
 /**
  * POST /api/test-sessions/register-students
@@ -80,7 +81,7 @@ router.post("/register-students", authMiddleware, async (req, res) => {
 router.get("/available", authMiddleware, async (req, res) => {
   try {
     const [sessions] = await db.execute(
-      `SELECT 
+      `SELECT
         ts.id,
         ts.test_id,
         t.name as test_name,
@@ -110,7 +111,7 @@ router.get("/available", authMiddleware, async (req, res) => {
 router.get("/my-registrations", authMiddleware, async (req, res) => {
   try {
     const [registrations] = await db.execute(
-      `SELECT 
+      `SELECT
         ts.id as session_id,
         ts.test_id,
         t.name as test_name,
@@ -247,7 +248,7 @@ router.get("/:id", authMiddleware, async (req, res) => {
 
   try {
     const [sessions] = await db.execute(
-      `SELECT 
+      `SELECT
         ts.id,
         ts.test_id,
         ts.test_materials_id,
@@ -278,6 +279,194 @@ router.get("/:id", authMiddleware, async (req, res) => {
 });
 
 /**
+ * GET /api/test-sessions/guest-access/:code
+ * Public endpoint: Validate a guest access code before asking for a name
+ */
+router.get("/guest-access/:code", async (req, res) => {
+  const code = (req.params.code || "").trim().toUpperCase();
+
+  if (!code) {
+    return res.status(400).json({ error: "Guest access code is required" });
+  }
+
+  try {
+    const [sessionRows] = await db.execute(
+      `SELECT
+        ts.id,
+        ts.test_id,
+        ts.test_materials_id,
+        ts.session_date,
+        ts.location,
+        ts.status,
+        ts.max_capacity,
+        ts.guest_access_enabled,
+        ts.admin_notes,
+        t.name as test_name,
+        (SELECT COUNT(*) FROM test_participants WHERE session_id = ts.id) as registered_count
+       FROM test_sessions ts
+       JOIN tests t ON ts.test_id = t.id
+       WHERE ts.guest_access_code = ?`,
+      [code]
+    );
+
+    if (sessionRows.length === 0 || !sessionRows[0].guest_access_enabled) {
+      return res.status(404).json({ error: "Guest access code not found" });
+    }
+
+    const session = sessionRows[0];
+    if (session.status === "completed" || session.status === "cancelled") {
+      return res.status(403).json({
+        error: `This guest session is ${session.status} and no longer accepts entries.`,
+      });
+    }
+
+    if (
+      session.max_capacity &&
+      Number(session.registered_count) >= Number(session.max_capacity)
+    ) {
+      return res.status(409).json({ error: "This session is full" });
+    }
+
+    const test_materials_id = await resolveSessionMaterialSetId({
+      testId: session.test_id,
+      testMaterialsId: session.test_materials_id,
+      adminNotes: session.admin_notes,
+    });
+
+    if (!test_materials_id) {
+      return res.status(409).json({
+        error:
+          "This session does not have test content attached yet. Please contact the administrator.",
+      });
+    }
+
+    res.json({
+      requires_name: true,
+      session: {
+        id: session.id,
+        test_id: session.test_id,
+        test_name: session.test_name,
+        session_date: session.session_date,
+        location: session.location,
+        status: session.status,
+      },
+    });
+  } catch (err) {
+    console.error("Guest access validation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /api/test-sessions/guest-access/:code/claim
+ * Public endpoint: Create a one-session guest participant from a valid code
+ */
+router.post("/guest-access/:code/claim", async (req, res) => {
+  const code = (req.params.code || "").trim().toUpperCase();
+  const fullName = (req.body.full_name || "").trim();
+
+  if (!code) {
+    return res.status(400).json({ error: "Guest access code is required" });
+  }
+
+  if (fullName.length < 2) {
+    return res.status(400).json({ error: "Please enter your full name" });
+  }
+
+  try {
+    const [sessionRows] = await db.execute(
+      `SELECT
+        ts.id,
+        ts.test_id,
+        ts.test_materials_id,
+        ts.session_date,
+        ts.location,
+        ts.status,
+        ts.max_capacity,
+        ts.guest_access_enabled,
+        ts.test_started_at,
+        ts.admin_notes,
+        t.name as test_name,
+        (SELECT COUNT(*) FROM test_participants WHERE session_id = ts.id) as registered_count
+       FROM test_sessions ts
+       JOIN tests t ON ts.test_id = t.id
+       WHERE ts.guest_access_code = ?`,
+      [code]
+    );
+
+    if (sessionRows.length === 0 || !sessionRows[0].guest_access_enabled) {
+      return res.status(404).json({ error: "Guest access code not found" });
+    }
+
+    const session = sessionRows[0];
+    if (session.status === "completed" || session.status === "cancelled") {
+      return res.status(403).json({
+        error: `This guest session is ${session.status} and no longer accepts entries.`,
+      });
+    }
+
+    if (
+      session.max_capacity &&
+      Number(session.registered_count) >= Number(session.max_capacity)
+    ) {
+      return res.status(409).json({ error: "This session is full" });
+    }
+
+    const test_materials_id = await resolveSessionMaterialSetId({
+      testId: session.test_id,
+      testMaterialsId: session.test_materials_id,
+      adminNotes: session.admin_notes,
+    });
+
+    if (!test_materials_id) {
+      return res.status(409).json({
+        error:
+          "This session does not have test content attached yet. Please contact the administrator.",
+      });
+    }
+
+    const participant_id_code = await generateUniqueParticipantCode(db);
+    const testStarted = Boolean(session.test_started_at);
+    const [result] = await db.execute(
+      `INSERT INTO test_participants
+       (session_id, participant_id_code, full_name, phone_number, has_entered_startscreen, entered_at, participant_status, status_updated_at, test_started, test_started_at, test_status, current_screen)
+       VALUES (?, ?, ?, NULL, 1, NOW(), 'in_progress', NOW(), ?, ?, ?, ?)`,
+      [
+        session.id,
+        participant_id_code,
+        fullName,
+        testStarted ? 1 : 0,
+        testStarted ? session.test_started_at : null,
+        testStarted ? "in_progress" : "not_started",
+        testStarted ? "listening" : "not_started",
+      ]
+    );
+
+    res.status(201).json({
+      message: "Guest check-in successful",
+      participant: {
+        id: result.insertId,
+        participant_id_code,
+        full_name: fullName,
+        phone_number: null,
+        session_id: session.id,
+        test_id: session.test_id,
+        test_name: session.test_name,
+        test_materials_id,
+        listening_score: null,
+        reading_score: null,
+        writing_score: null,
+        speaking_score: null,
+        is_guest: true,
+      },
+    });
+  } catch (err) {
+    console.error("Guest check-in error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
  * POST /api/test-sessions/check-in-participant
  * Participant enters their ID code on the start screen
  * Verifies the ID belongs to the user logged in on this device
@@ -292,7 +481,7 @@ router.post("/check-in-participant", async (req, res) => {
   try {
     // Find participant by ID code
     const [participantRows] = await db.execute(
-      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.participant_status, ts.test_id, ts.test_materials_id, t.name as test_name, ts.admin_notes
+      `SELECT tp.id, tp.session_id, tp.participant_id_code, tp.full_name, tp.listening_score, tp.reading_score, tp.writing_score, tp.speaking_score, tp.participant_status, ts.test_id, ts.test_materials_id, ts.test_started_at, t.name as test_name, ts.admin_notes
        FROM test_participants tp
        JOIN test_sessions ts ON tp.session_id = ts.id
        JOIN tests t ON ts.test_id = t.id
@@ -329,10 +518,28 @@ router.post("/check-in-participant", async (req, res) => {
       });
     }
 
+    const testStarted = Boolean(participant.test_started_at);
+
     // Update check-in status and mark as in_progress
     await db.execute(
-      "UPDATE test_participants SET has_entered_startscreen = 1, entered_at = NOW(), participant_status = 'in_progress', status_updated_at = NOW() WHERE id = ?",
-      [participant.id]
+      `UPDATE test_participants
+       SET has_entered_startscreen = 1,
+           entered_at = NOW(),
+           participant_status = 'in_progress',
+           status_updated_at = NOW(),
+           test_started = CASE WHEN ? THEN 1 ELSE test_started END,
+           test_started_at = CASE WHEN ? THEN ? ELSE test_started_at END,
+           test_status = CASE WHEN ? THEN 'in_progress' ELSE test_status END,
+           current_screen = CASE WHEN ? THEN 'listening' ELSE current_screen END
+       WHERE id = ?`,
+      [
+        testStarted,
+        testStarted,
+        participant.test_started_at,
+        testStarted,
+        testStarted,
+        participant.id,
+      ]
     );
 
     const test_materials_id = await resolveSessionMaterialSetId({

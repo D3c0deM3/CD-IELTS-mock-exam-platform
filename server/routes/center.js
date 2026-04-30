@@ -7,6 +7,7 @@ const {
   getValidatedMaterialSetIdForTest,
   sanitizeSessionNotes,
 } = require("../utils/testMaterialSets");
+const { generateUniqueParticipantCode } = require("../utils/codeGenerator");
 
 // Middleware to check for center role
 const centerMiddleware = async (req, res, next) => {
@@ -604,9 +605,7 @@ router.post("/sessions/:id/register-participant", async (req, res) => {
       return res.status(400).json({ error: "This participant is already registered for this session" });
     }
 
-    // Generate ID code
-    const nextNumber = (countRows[0].count + 1).toString().padStart(3, "0");
-    const participant_id_code = `P${session_id}${nextNumber}`;
+    const participant_id_code = await generateUniqueParticipantCode(db);
 
     const [result] = await db.execute(
       "INSERT INTO test_participants (session_id, participant_id_code, full_name, phone_number) VALUES (?, ?, ?, ?)",
@@ -1056,10 +1055,16 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
     }
 
     let savedCount = 0;
+    let guestResultsRetained = 0;
     const errors = [];
 
     for (const participant of participants) {
       try {
+        if (!participant.phone_number) {
+          guestResultsRetained += 1;
+          continue;
+        }
+
         const [userRows] = await db.execute(
           "SELECT id FROM users WHERE phone_number = ?",
           [participant.phone_number]
@@ -1107,6 +1112,7 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
     res.json({
       message: "Session saved and ended",
       saved_count: savedCount,
+      guest_results_retained: guestResultsRetained,
       total_participants: participants.length,
       errors: errors.length > 0 ? errors : undefined,
     });

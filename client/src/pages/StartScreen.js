@@ -8,9 +8,12 @@ import "./StartScreen.css";
 function StartScreen() {
   const navigate = useNavigate();
   const [idCode, setIdCode] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [pendingGuestSession, setPendingGuestSession] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [isNameFocused, setIsNameFocused] = useState(false);
 
   // Add theme effect from localStorage
   useEffect(() => {
@@ -24,7 +27,12 @@ function StartScreen() {
     e.preventDefault();
 
     if (!idCode.trim()) {
-      setError("Please enter your candidate ID");
+      setError("Please enter your candidate ID or guest access code");
+      return;
+    }
+
+    if (pendingGuestSession && guestName.trim().length < 2) {
+      setError("Please enter your full name");
       return;
     }
 
@@ -32,47 +40,69 @@ function StartScreen() {
     setError("");
 
     try {
-      // Get user's full name from localStorage (automatically)
       const userData = localStorage.getItem("user");
+
+      if (pendingGuestSession) {
+        const response = await testSessionService.claimGuestAccessCode(
+          idCode.trim().toUpperCase(),
+          guestName.trim()
+        );
+
+        if (response?.participant) {
+          localStorage.setItem(
+            "currentParticipant",
+            JSON.stringify(response.participant)
+          );
+          localStorage.setItem("ielts_mock_user_id", response.participant.participant_id_code);
+          localStorage.setItem("ielts_mock_start_time", new Date().toISOString());
+          navigate("/pending", {
+            state: { idCode: response.participant.participant_id_code },
+          });
+        }
+        return;
+      }
+
       if (!userData) {
-        setError("Please log in first before entering a test session");
-        setIsLoading(false);
+        const response = await testSessionService.validateGuestAccessCode(
+          idCode.trim().toUpperCase()
+        );
+        setPendingGuestSession(response.session);
+        setError("");
         return;
       }
 
       const user = JSON.parse(userData);
       const fullName = user.full_name;
 
-      // Call backend to validate participant ID matches this user's name
-      const response = await testSessionService.checkInParticipant(
-        idCode.trim(),
-        fullName
-      );
-
-      // Store participant data in localStorage for use throughout the test
-      // Note: apiClient already returns response.data, so response is the data object
-      console.log("Check-in response:", response);
-
-      if (response?.participant) {
-        console.log("Storing participant data:", response.participant);
-        localStorage.setItem(
-          "currentParticipant",
-          JSON.stringify(response.participant)
+      try {
+        const response = await testSessionService.checkInParticipant(
+          idCode.trim(),
+          fullName
         );
-      } else {
-        console.warn("No participant data found in response");
+
+        if (response?.participant) {
+          localStorage.setItem(
+            "currentParticipant",
+            JSON.stringify(response.participant)
+          );
+        }
+
+        localStorage.setItem("ielts_mock_user_id", idCode.trim());
+        localStorage.setItem("ielts_mock_start_time", new Date().toISOString());
+        navigate("/pending", { state: { idCode: idCode.trim() } });
+      } catch (registeredErr) {
+        if (registeredErr.response?.status === 404) {
+          const response = await testSessionService.validateGuestAccessCode(
+            idCode.trim().toUpperCase()
+          );
+          setPendingGuestSession(response.session);
+          setError("");
+          return;
+        }
+
+        throw registeredErr;
       }
-
-      // Store ID in localStorage
-      localStorage.setItem("ielts_mock_user_id", idCode.trim());
-      localStorage.setItem("ielts_mock_start_time", new Date().toISOString());
-
-      // Redirect to pending screen where rules and test start is controlled by admin
-      navigate("/pending", { state: { idCode: idCode.trim() } });
-
-      console.log("Participant checked in:", idCode.trim());
     } catch (err) {
-      // Display backend error message
       const errorMessage =
         err.response?.data?.error || "Failed to check in. Please try again.";
       setError(errorMessage);
@@ -85,6 +115,8 @@ function StartScreen() {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setIdCode(value);
+    setPendingGuestSession(null);
+    setGuestName("");
     if (error) setError("");
   };
 
@@ -105,7 +137,11 @@ function StartScreen() {
           <div className="form-card">
             <div className="form-header">
               <h2>Start Your Test</h2>
-              <p>Enter your candidate ID to begin</p>
+              <p>
+                {pendingGuestSession
+                  ? `Guest access for ${pendingGuestSession.test_name}`
+                  : "Enter your candidate ID or guest access code"}
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="compact-form">
@@ -113,7 +149,7 @@ function StartScreen() {
                 <label htmlFor="idCode">
                   Candidate ID
                   <span className="label-hint">
-                    (as provided by the test center)
+                    (or guest access code)
                   </span>
                 </label>
 
@@ -154,9 +190,35 @@ function StartScreen() {
                     onBlur={() => setIsFocused(false)}
                     placeholder="Enter your candidate ID"
                     autoComplete="off"
-                    disabled={isLoading}
+                    disabled={isLoading || Boolean(pendingGuestSession)}
                   />
                 </div>
+              </div>
+
+              {pendingGuestSession && (
+                <div className="input-group">
+                  <label htmlFor="guestName">Full Name</label>
+
+                  <div
+                    className={`input-wrapper ${
+                      isNameFocused ? "focused" : ""
+                    } ${error ? "error" : ""}`}
+                  >
+                    <input
+                      id="guestName"
+                      type="text"
+                      value={guestName}
+                      onChange={(e) => {
+                        setGuestName(e.target.value);
+                        if (error) setError("");
+                      }}
+                      onFocus={() => setIsNameFocused(true)}
+                      onBlur={() => setIsNameFocused(false)}
+                      placeholder="Enter your full name"
+                      autoComplete="name"
+                      disabled={isLoading}
+                    />
+                  </div>
 
                 {error && (
                   <div className="error-message">
@@ -185,20 +247,52 @@ function StartScreen() {
                   </div>
                 )}
               </div>
+              )}
+
+              {!pendingGuestSession && error && (
+                <div className="error-message">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="error-icon"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M12 8V12"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <circle cx="12" cy="16" r="1" fill="currentColor" />
+                  </svg>
+                  <span>{error}</span>
+                </div>
+              )}
 
               <button
                 type="submit"
                 className={`submit-btn ${isLoading ? "loading" : ""}`}
-                disabled={isLoading || !idCode.trim()}
+                disabled={
+                  isLoading ||
+                  !idCode.trim() ||
+                  (pendingGuestSession && guestName.trim().length < 2)
+                }
               >
                 {isLoading ? (
                   <>
                     <span className="spinner"></span>
-                    Starting...
+                    Checking...
                   </>
                 ) : (
                   <>
-                    Start Practice Test
+                    {pendingGuestSession ? "Enter Waiting Room" : "Continue"}
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"

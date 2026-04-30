@@ -7,6 +7,10 @@ const {
   getValidatedMaterialSetIdForTest,
   sanitizeSessionNotes,
 } = require("../utils/testMaterialSets");
+const {
+  generateUniqueGuestAccessCode,
+  generateUniqueParticipantCode,
+} = require("../utils/codeGenerator");
 
 // Middleware to check for admin role
 const adminMiddleware = async (req, res, next) => {
@@ -556,6 +560,8 @@ router.get("/sessions", async (req, res) => {
         ts.location,
         ts.status,
         ts.max_capacity,
+        ts.guest_access_code,
+        ts.guest_access_enabled,
         (SELECT COUNT(*) FROM test_participants WHERE session_id = ts.id) as registered_count,
         ts.created_at
       FROM test_sessions ts
@@ -592,6 +598,59 @@ router.patch("/sessions/:id/status", async (req, res) => {
     }
 
     res.json({ message: `Session status updated to ${status}` });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/admin/sessions/:id/guest-code - Generate or regenerate a guest access code
+router.post("/sessions/:id/guest-code", async (req, res) => {
+  const { id: session_id } = req.params;
+
+  try {
+    const [sessionRows] = await db.execute(
+      "SELECT id FROM test_sessions WHERE id = ?",
+      [session_id]
+    );
+
+    if (sessionRows.length === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const guestAccessCode = await generateUniqueGuestAccessCode(db);
+
+    await db.execute(
+      "UPDATE test_sessions SET guest_access_code = ?, guest_access_enabled = 1, updated_at = NOW() WHERE id = ?",
+      [guestAccessCode, session_id]
+    );
+
+    res.json({
+      message: "Guest access code generated",
+      guest_access_code: guestAccessCode,
+      guest_access_enabled: true,
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/admin/sessions/:id/guest-code - Disable guest access for a session
+router.delete("/sessions/:id/guest-code", async (req, res) => {
+  const { id: session_id } = req.params;
+
+  try {
+    const [result] = await db.execute(
+      "UPDATE test_sessions SET guest_access_code = NULL, guest_access_enabled = 0, updated_at = NOW() WHERE id = ?",
+      [session_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.json({ message: "Guest access disabled" });
   } catch (err) {
     console.error("DB error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -679,14 +738,7 @@ router.post("/sessions/:id/register-participant", async (req, res) => {
       });
     }
 
-    // Generate unique participant ID code
-    const [existingCount] = await db.execute(
-      "SELECT COUNT(*) as count FROM test_participants WHERE session_id = ?",
-      [session_id]
-    );
-
-    const nextNumber = (existingCount[0].count + 1).toString().padStart(3, "0");
-    const participant_id_code = `P${session_id}${nextNumber}`;
+    const participant_id_code = await generateUniqueParticipantCode(db);
 
     const [result] = await db.execute(
       "INSERT INTO test_participants (session_id, participant_id_code, full_name, phone_number) VALUES (?, ?, ?, ?)",
@@ -745,16 +797,7 @@ router.post("/sessions/:id/register-participants", async (req, res) => {
       }
 
       try {
-        // Generate unique participant ID code (e.g., SESS001, SESS002, etc.)
-        const [existingCount] = await db.execute(
-          "SELECT COUNT(*) as count FROM test_participants WHERE session_id = ?",
-          [session_id]
-        );
-
-        const nextNumber = (existingCount[0].count + 1)
-          .toString()
-          .padStart(3, "0");
-        const participant_id_code = `P${session_id}${nextNumber}`;
+        const participant_id_code = await generateUniqueParticipantCode(db);
 
         const [result] = await db.execute(
           "INSERT INTO test_participants (session_id, participant_id_code, full_name, phone_number) VALUES (?, ?, ?, ?)",
@@ -797,6 +840,7 @@ router.get("/sessions/:id/participants", async (req, res) => {
         participant_id_code,
         full_name,
         phone_number,
+        CASE WHEN phone_number IS NULL OR phone_number = '' THEN 1 ELSE 0 END AS is_guest,
         listening_score,
         reading_score,
         writing_score,
@@ -1198,6 +1242,8 @@ router.get("/sessions/:id/dashboard", async (req, res) => {
         ts.location,
         ts.status,
         ts.max_capacity,
+        ts.guest_access_code,
+        ts.guest_access_enabled,
         ts.test_started_at,
         ts.test_end_at
       FROM test_sessions ts
@@ -1234,6 +1280,7 @@ router.get("/sessions/:id/dashboard", async (req, res) => {
         participant_id_code,
         full_name,
         phone_number,
+        CASE WHEN phone_number IS NULL OR phone_number = '' THEN 1 ELSE 0 END AS is_guest,
         has_entered_startscreen,
         entered_at,
         test_started,
@@ -1387,11 +1434,17 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
     }
 
     let savedCount = 0;
+    let guestResultsRetained = 0;
     const errors = [];
 
     // Save results for each participant with all four scores
     for (const participant of participants) {
       try {
+        if (!participant.phone_number) {
+          guestResultsRetained += 1;
+          continue;
+        }
+
         // Get user_id from phone number
         const [userRows] = await db.execute(
           "SELECT id FROM users WHERE phone_number = ?",
@@ -1473,6 +1526,7 @@ router.post("/sessions/:id/save-and-end", async (req, res) => {
     res.json({
       message: "Session saved and ended successfully",
       saved_count: savedCount,
+      guest_results_retained: guestResultsRetained,
       total_participants: participants.length,
       errors: errors.length > 0 ? errors : undefined,
     });

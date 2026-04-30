@@ -14,6 +14,17 @@ const useActivityMonitor = (screenName, options = {}) => {
   const { heartbeatInterval = 15000, enabled = true } = options;
   const screenRef = useRef(screenName);
 
+  const getParticipantCode = useCallback(() => {
+    try {
+      const participant = JSON.parse(
+        localStorage.getItem("currentParticipant") || "{}"
+      );
+      return participant.participant_id_code || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   // Keep screen name current without re-running effects
   useEffect(() => {
     screenRef.current = screenName;
@@ -22,31 +33,38 @@ const useActivityMonitor = (screenName, options = {}) => {
   // Report current screen on mount / screen change
   useEffect(() => {
     if (!enabled) return;
-    activityService.reportScreenChange(screenName);
-  }, [screenName, enabled]);
+    const participantCode = getParticipantCode();
+    if (!participantCode) return;
+    activityService.reportScreenChange(participantCode, screenName);
+  }, [screenName, enabled, getParticipantCode]);
 
   // Heartbeat
   useEffect(() => {
     if (!enabled) return;
 
     const sendHeartbeat = () => {
-      activityService.reportActivity(screenRef.current);
+      const participantCode = getParticipantCode();
+      if (participantCode) {
+        activityService.reportActivity(participantCode, screenRef.current);
+      }
     };
 
     sendHeartbeat(); // immediate first heartbeat
     const timer = setInterval(sendHeartbeat, heartbeatInterval);
     return () => clearInterval(timer);
-  }, [heartbeatInterval, enabled]);
+  }, [heartbeatInterval, enabled, getParticipantCode]);
 
   // Tab visibility changes
   const handleVisibilityChange = useCallback(() => {
     if (!enabled) return;
+    const participantCode = getParticipantCode();
+    if (!participantCode) return;
     if (document.hidden) {
-      activityService.reportTabSwitch(screenRef.current);
+      activityService.reportTabSwitch(participantCode);
     } else {
-      activityService.reportFocusGained(screenRef.current);
+      activityService.reportFocusGained(participantCode);
     }
-  }, [enabled]);
+  }, [enabled, getParticipantCode]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -60,10 +78,16 @@ const useActivityMonitor = (screenName, options = {}) => {
     if (!enabled) return;
 
     const handleBlur = () => {
-      activityService.reportFocusLost(screenRef.current);
+      const participantCode = getParticipantCode();
+      if (participantCode) {
+        activityService.reportFocusLost(participantCode);
+      }
     };
     const handleFocus = () => {
-      activityService.reportFocusGained(screenRef.current);
+      const participantCode = getParticipantCode();
+      if (participantCode) {
+        activityService.reportFocusGained(participantCode);
+      }
     };
 
     window.addEventListener("blur", handleBlur);
@@ -72,7 +96,7 @@ const useActivityMonitor = (screenName, options = {}) => {
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [enabled]);
+  }, [enabled, getParticipantCode]);
 };
 
 export default useActivityMonitor;

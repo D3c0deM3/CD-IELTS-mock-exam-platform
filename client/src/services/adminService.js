@@ -82,6 +82,14 @@ const updateSessionStatus = (id, status) => {
   return apiClient.patch(`${API_URL}/sessions/${id}/status`, { status });
 };
 
+const generateGuestCode = (session_id) => {
+  return apiClient.post(`${API_URL}/sessions/${session_id}/guest-code`, {});
+};
+
+const disableGuestCode = (session_id) => {
+  return apiClient.delete(`${API_URL}/sessions/${session_id}/guest-code`);
+};
+
 // ==================== TEST PARTICIPANT MANAGEMENT ====================
 
 // Register single participant
@@ -244,6 +252,8 @@ const adminService = {
   getSessions,
   deleteSession,
   updateSessionStatus,
+  generateGuestCode,
+  disableGuestCode,
   // Participant Management
   registerParticipant,
   registerParticipants,
@@ -262,6 +272,8 @@ const adminService = {
   getSessions,
   deleteSession,
   updateSessionStatus,
+  generateGuestCode,
+  disableGuestCode,
   startAllTests,
   pauseParticipantTest,
   restartParticipantTest,

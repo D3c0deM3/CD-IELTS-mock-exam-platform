@@ -123,6 +123,8 @@ const setupDatabase = async () => {
         location VARCHAR(255) NOT NULL,
         max_capacity INT,
         status ENUM('scheduled', 'ongoing', 'completed', 'cancelled') DEFAULT 'scheduled',
+        guest_access_code VARCHAR(32) UNIQUE,
+        guest_access_enabled BOOLEAN DEFAULT 0,
         admin_notes TEXT,
         created_by INT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -145,6 +147,33 @@ const setupDatabase = async () => {
     try {
       await connection.execute(`
         CREATE INDEX idx_test_sessions_materials ON test_sessions (test_materials_id)
+      `);
+    } catch (err) {
+      if (err.code !== "ER_DUP_KEYNAME") {
+        throw err;
+      }
+    }
+
+    const sessionGuestColumns = [
+      { name: "guest_access_code", type: "VARCHAR(32) UNIQUE" },
+      { name: "guest_access_enabled", type: "BOOLEAN DEFAULT 0" },
+    ];
+
+    for (const column of sessionGuestColumns) {
+      try {
+        await connection.execute(`
+          ALTER TABLE test_sessions ADD COLUMN ${column.name} ${column.type}
+        `);
+      } catch (err) {
+        if (err.code !== "ER_DUP_FIELDNAME") {
+          throw err;
+        }
+      }
+    }
+
+    try {
+      await connection.execute(`
+        CREATE INDEX idx_test_sessions_guest_access ON test_sessions (guest_access_code)
       `);
     } catch (err) {
       if (err.code !== "ER_DUP_KEYNAME") {

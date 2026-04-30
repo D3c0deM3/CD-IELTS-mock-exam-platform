@@ -429,6 +429,51 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleGenerateGuestCode = async (session) => {
+    try {
+      setLoading(true);
+      const response = await adminService.generateGuestCode(session.id);
+      await fetchSessions();
+      if (selectedSession?.id === session.id) {
+        setSelectedSession({
+          ...selectedSession,
+          guest_access_code: response.guest_access_code,
+          guest_access_enabled: response.guest_access_enabled,
+        });
+      }
+      alert(`Guest access code: ${response.guest_access_code}`);
+      setError("");
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to generate guest code");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisableGuestCode = async (session) => {
+    if (!window.confirm("Disable guest access for this session?")) return;
+
+    try {
+      setLoading(true);
+      await adminService.disableGuestCode(session.id);
+      await fetchSessions();
+      if (selectedSession?.id === session.id) {
+        setSelectedSession({
+          ...selectedSession,
+          guest_access_code: null,
+          guest_access_enabled: false,
+        });
+      }
+      setError("");
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to disable guest access");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Register Single Participant
   const handleRegisterParticipant = async (e) => {
     e.preventDefault();
@@ -727,7 +772,11 @@ const AdminDashboard = () => {
       const response = await adminService.saveAndEndSession(selectedSession.id);
       fetchSessionDashboard(selectedSession.id);
       alert(
-        `Session completed! ${response.saved_count} results saved to user dashboards.`
+        `Session completed! ${response.saved_count} account results saved to dashboards.${
+          response.guest_results_retained
+            ? ` ${response.guest_results_retained} guest result(s) remain in session management.`
+            : ""
+        }`
       );
       setError("");
     } catch (err) {
@@ -920,8 +969,39 @@ const AdminDashboard = () => {
                             <span className="badge badge-info">
                               {session.status}
                             </span>
+                            {session.guest_access_enabled &&
+                              session.guest_access_code && (
+                                <span className="badge badge-success">
+                                  Guest: {session.guest_access_code}
+                                </span>
+                              )}
                           </div>
                         </div>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateGuestCode(session);
+                          }}
+                          style={{ marginLeft: "12px" }}
+                          title="Generate guest access code"
+                        >
+                          Guest Code
+                        </button>
+                        {session.guest_access_enabled &&
+                          session.guest_access_code && (
+                            <button
+                              className="btn btn-warning"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDisableGuestCode(session);
+                              }}
+                              style={{ marginLeft: "8px" }}
+                              title="Disable guest access"
+                            >
+                              Disable Guest
+                            </button>
+                          )}
                         <button
                           className="btn btn-danger"
                           onClick={(e) => {
@@ -1134,6 +1214,21 @@ const AdminDashboard = () => {
                   <div className="card-header">
                     <h3>Session Controls</h3>
                   </div>
+                  {dashboardStats.session.guest_access_enabled &&
+                    dashboardStats.session.guest_access_code && (
+                      <div
+                        style={{
+                          padding: "12px 16px 0",
+                          color: "var(--muted)",
+                          fontSize: "13px",
+                        }}
+                      >
+                        Guest access code:{" "}
+                        <strong style={{ color: "var(--text)" }}>
+                          {dashboardStats.session.guest_access_code}
+                        </strong>
+                      </div>
+                    )}
                   <div
                     style={{
                       padding: "12px 16px",
@@ -1221,7 +1316,17 @@ const AdminDashboard = () => {
                             <td>
                               <strong>{participant.participant_id_code}</strong>
                             </td>
-                            <td>{participant.full_name}</td>
+                            <td>
+                              {participant.full_name}
+                              {participant.is_guest ? (
+                                <span
+                                  className="badge badge-info"
+                                  style={{ marginLeft: "6px" }}
+                                >
+                                  Guest
+                                </span>
+                              ) : null}
+                            </td>
                             <td>{participant.phone_number || "—"}</td>
                             <td>
                               {participant.listening_score !== null &&

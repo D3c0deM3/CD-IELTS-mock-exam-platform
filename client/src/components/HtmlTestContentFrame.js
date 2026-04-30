@@ -4,6 +4,13 @@ import "./HtmlTestContentFrame.css";
 const PART_SELECTOR =
   "section[id^='part'], .section, [data-part], [data-part-number], [data-task], [data-task-number]";
 const ANSWER_SELECTOR = "input, textarea, select";
+const QUESTION_ID_ATTR = "data-platform-question-id";
+const HIGHLIGHT_SELECTOR = ".platform-text-highlight";
+const HIGHLIGHT_MENU_ID = "platform-highlight-menu";
+const ANSWER_CONTROL_TYPES_TO_SKIP = ["button", "submit", "reset", "hidden"];
+
+const isAnswerControl = (element) =>
+  element && !ANSWER_CONTROL_TYPES_TO_SKIP.includes(element.type);
 
 const parseQuestionRange = (value) => {
   const match = String(value || "").match(/(\d+)\s*[-–—]\s*(\d+)/);
@@ -20,6 +27,7 @@ const parseQuestionRange = (value) => {
 
 const extractQuestionId = (element) => {
   const directValue =
+    element.getAttribute(QUESTION_ID_ATTR) ||
     element.dataset?.q ||
     element.dataset?.answer ||
     element.dataset?.question ||
@@ -36,6 +44,74 @@ const extractQuestionId = (element) => {
 
   const questionId = Number.parseInt(match[1], 10);
   return Number.isFinite(questionId) ? questionId : null;
+};
+
+const extractQuestionIdFromText = (value) => {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  const patterns = [
+    /\bquestion\s*(?:number\s*)?([1-9]|[1-3]\d|40)\b/i,
+    /(?:^|[^\d])([1-9]|[1-3]\d|40)\s*[\).:]/,
+    /(?:^|[^\d])([1-9]|[1-3]\d|40)(?:\s*[-–—]\s*(?:[1-9]|[1-3]\d|40))?\s+(?:choose|complete|write|which|what|where|when|who|why|how|do|does|is|are|was|were)\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const questionId = Number.parseInt(match[1], 10);
+      if (Number.isFinite(questionId)) return questionId;
+    }
+  }
+
+  return null;
+};
+
+const findNearbyQuestionId = (element) => {
+  const labelId = element.getAttribute("aria-labelledby");
+  if (labelId) {
+    const labelText = labelId
+      .split(/\s+/)
+      .map((id) => element.ownerDocument.getElementById(id)?.textContent || "")
+      .join(" ");
+    const labelQuestionId = extractQuestionIdFromText(labelText);
+    if (labelQuestionId) return labelQuestionId;
+  }
+
+  if (element.id) {
+    const label = element.ownerDocument.querySelector(`label[for="${element.id}"]`);
+    const labelQuestionId = extractQuestionIdFromText(label?.textContent);
+    if (labelQuestionId) return labelQuestionId;
+  }
+
+  const closestQuestionNode = element.closest(
+    "[data-question-number], [data-question-id], [data-q], .question, .question-row, .question-item, li, tr, p"
+  );
+  const closestQuestionId =
+    Number.parseInt(
+      closestQuestionNode?.dataset?.questionNumber ||
+        closestQuestionNode?.dataset?.questionId ||
+        closestQuestionNode?.dataset?.q ||
+        "",
+      10
+    ) || extractQuestionIdFromText(closestQuestionNode?.textContent);
+
+  if (closestQuestionId) return closestQuestionId;
+
+  let previous = element.previousSibling;
+  let hops = 0;
+  while (previous && hops < 6) {
+    const text =
+      previous.nodeType === Node.TEXT_NODE
+        ? previous.textContent
+        : previous.textContent;
+    const questionId = extractQuestionIdFromText(text);
+    if (questionId) return questionId;
+    previous = previous.previousSibling;
+    hops += 1;
+  }
+
+  return null;
 };
 
 const getRangeValue = (element) =>
@@ -125,6 +201,49 @@ const getPlatformContentCss = (sectionType) => {
       width: 100% !important;
       min-height: 100% !important;
       margin: 0 !important;
+      box-sizing: border-box !important;
+      scroll-padding-bottom: 120px !important;
+    }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box !important;
+    }
+    body {
+      padding-bottom: 120px !important;
+    }
+    input:not([type="radio"]):not([type="checkbox"]),
+    textarea {
+      min-width: 58px;
+    }
+    .platform-text-highlight {
+      background: #fff176 !important;
+      color: inherit !important;
+      border-radius: 2px !important;
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.28) !important;
+      cursor: pointer !important;
+    }
+    #${HIGHLIGHT_MENU_ID} {
+      position: fixed !important;
+      z-index: 2147483647 !important;
+      display: none;
+      padding: 6px !important;
+      background: #ffffff !important;
+      border: 1px solid #d4d4d4 !important;
+      border-radius: 8px !important;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18) !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    }
+    #${HIGHLIGHT_MENU_ID} button {
+      border: 0 !important;
+      border-radius: 6px !important;
+      background: #dc2626 !important;
+      color: #ffffff !important;
+      cursor: pointer !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      padding: 7px 10px !important;
+      white-space: nowrap !important;
     }
   `;
 
@@ -148,7 +267,7 @@ const getPlatformContentCss = (sectionType) => {
         box-shadow: none !important;
       }
       .section {
-        padding: 22px 32px 42px !important;
+        padding: 22px 32px 120px !important;
       }
       .instructions {
         max-width: none !important;
@@ -186,10 +305,59 @@ const HtmlTestContentFrame = ({
   const partsRef = useRef([]);
   const questionIdsRef = useRef([]);
 
+  const prepareAnswerControls = useCallback((doc) => {
+    const elements = Array.from(doc.querySelectorAll(ANSWER_SELECTOR)).filter(
+      isAnswerControl
+    );
+    const assignedByName = new Map();
+    const usedIds = new Set();
+    let nextSequentialId = 1;
+
+    elements.forEach((element) => {
+      const range = parseQuestionRange(getRangeValue(element));
+      if (range) {
+        range.forEach((id) => usedIds.add(id));
+        return;
+      }
+
+      let questionId = extractQuestionId(element) || findNearbyQuestionId(element);
+
+      if (!questionId && ["radio", "checkbox"].includes(element.type) && element.name) {
+        questionId = assignedByName.get(element.name) || null;
+      }
+
+      if (!questionId) {
+        while (usedIds.has(nextSequentialId)) {
+          nextSequentialId += 1;
+        }
+        questionId = nextSequentialId;
+      }
+
+      if (["radio", "checkbox"].includes(element.type) && element.name) {
+        assignedByName.set(element.name, questionId);
+      }
+
+      element.setAttribute(QUESTION_ID_ATTR, String(questionId));
+      usedIds.add(questionId);
+      nextSequentialId = Math.max(nextSequentialId, questionId + 1);
+
+      if (
+        !element.getAttribute("placeholder") &&
+        (element.tagName === "TEXTAREA" ||
+          (element.tagName === "INPUT" &&
+            !["radio", "checkbox", "file", "range", "color"].includes(element.type)))
+      ) {
+        element.setAttribute("placeholder", `Question ${questionId}`);
+      }
+    });
+  }, []);
+
   const collectQuestionIds = useCallback((doc) => {
     const ids = new Set();
 
     doc.querySelectorAll(ANSWER_SELECTOR).forEach((element) => {
+      if (!isAnswerControl(element)) return;
+
       const range = parseQuestionRange(getRangeValue(element));
       if (range) {
         range.forEach((id) => ids.add(id));
@@ -210,9 +378,7 @@ const HtmlTestContentFrame = ({
     const checkboxGroups = new Map();
 
     doc.querySelectorAll(ANSWER_SELECTOR).forEach((element) => {
-      if (["button", "submit", "reset", "hidden"].includes(element.type)) {
-        return;
-      }
+      if (!isAnswerControl(element)) return;
 
       const range = parseQuestionRange(getRangeValue(element));
       if (range && element.type === "checkbox") {
@@ -270,9 +436,7 @@ const HtmlTestContentFrame = ({
 
   const applyAnswersToDocument = useCallback((doc, currentAnswers) => {
     doc.querySelectorAll(ANSWER_SELECTOR).forEach((element) => {
-      if (["button", "submit", "reset", "hidden"].includes(element.type)) {
-        return;
-      }
+      if (!isAnswerControl(element)) return;
 
       const range = parseQuestionRange(getRangeValue(element));
       if (range && element.type === "checkbox") {
@@ -324,6 +488,129 @@ const HtmlTestContentFrame = ({
     });
   }, [currentPartIndex]);
 
+  const setupHighlighting = useCallback((doc) => {
+    if (!["reading", "listening"].includes(sectionType)) {
+      return () => {};
+    }
+
+    const menu = doc.createElement("div");
+    menu.id = HIGHLIGHT_MENU_ID;
+    menu.innerHTML = `<button type="button">Remove highlight</button>`;
+    doc.body.appendChild(menu);
+
+    let activeHighlight = null;
+
+    const hideMenu = () => {
+      menu.style.display = "none";
+      activeHighlight = null;
+    };
+
+    const unwrapHighlight = (highlight) => {
+      const parent = highlight?.parentNode;
+      if (!parent) return;
+
+      while (highlight.firstChild) {
+        parent.insertBefore(highlight.firstChild, highlight);
+      }
+
+      parent.removeChild(highlight);
+      parent.normalize();
+      hideMenu();
+    };
+
+    const showMenu = (highlight, event) => {
+      activeHighlight = highlight;
+      menu.style.left = `${Math.max(
+        8,
+        Math.min(event.clientX, doc.documentElement.clientWidth - 160)
+      )}px`;
+      menu.style.top = `${Math.max(
+        8,
+        Math.min(event.clientY + 8, doc.documentElement.clientHeight - 46)
+      )}px`;
+      menu.style.display = "block";
+    };
+
+    const isSelectionInsideAnswer = (range) => {
+      const container =
+        range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+          ? range.commonAncestorContainer
+          : range.commonAncestorContainer.parentElement;
+      return Boolean(container?.closest("input, textarea, select, button"));
+    };
+
+    const wrapSelection = () => {
+      const selection = doc.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+      const range = selection.getRangeAt(0);
+      const selectedText = selection.toString().trim();
+      if (!selectedText || isSelectionInsideAnswer(range)) return;
+
+      const container =
+        range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+          ? range.commonAncestorContainer
+          : range.commonAncestorContainer.parentElement;
+
+      if (
+        !container ||
+        container.closest(`${HIGHLIGHT_SELECTOR}, input, textarea, select, button`)
+      ) {
+        return;
+      }
+
+      const highlight = doc.createElement("span");
+      highlight.className = "platform-text-highlight";
+      highlight.dataset.highlightId = `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}`;
+
+      try {
+        const contents = range.extractContents();
+        highlight.appendChild(contents);
+        range.insertNode(highlight);
+        selection.removeAllRanges();
+      } catch (error) {
+        selection.removeAllRanges();
+      }
+    };
+
+    const handleMouseUp = (event) => {
+      if (event.target.closest(`#${HIGHLIGHT_MENU_ID}`)) return;
+      window.setTimeout(wrapSelection, 0);
+    };
+
+    const handleClick = (event) => {
+      const highlight = event.target.closest(HIGHLIGHT_SELECTOR);
+      if (highlight) {
+        event.preventDefault();
+        event.stopPropagation();
+        showMenu(highlight, event);
+        return;
+      }
+
+      if (!event.target.closest(`#${HIGHLIGHT_MENU_ID}`)) {
+        hideMenu();
+      }
+    };
+
+    const handleRemove = (event) => {
+      event.preventDefault();
+      if (activeHighlight) unwrapHighlight(activeHighlight);
+    };
+
+    doc.addEventListener("mouseup", handleMouseUp);
+    doc.addEventListener("click", handleClick);
+    menu.querySelector("button")?.addEventListener("click", handleRemove);
+
+    return () => {
+      doc.removeEventListener("mouseup", handleMouseUp);
+      doc.removeEventListener("click", handleClick);
+      menu.querySelector("button")?.removeEventListener("click", handleRemove);
+      menu.remove();
+    };
+  }, [sectionType]);
+
   const handleLoad = useCallback(() => {
     const iframe = iframeRef.current;
     const doc = iframe?.contentDocument;
@@ -343,6 +630,7 @@ const HtmlTestContentFrame = ({
     `;
     doc.head.appendChild(controlStyle);
 
+    prepareAnswerControls(doc);
     partsRef.current = buildPartGroups(doc, sectionType);
 
     onPartsChange(
@@ -360,10 +648,12 @@ const HtmlTestContentFrame = ({
     doc.addEventListener("input", handleInput);
     doc.addEventListener("change", handleInput);
     collectAnswers(doc);
+    const cleanupHighlighting = setupHighlighting(doc);
 
     iframe._cleanupHtmlTestListeners = () => {
       doc.removeEventListener("input", handleInput);
       doc.removeEventListener("change", handleInput);
+      cleanupHighlighting?.();
     };
   }, [
     answers,
@@ -371,7 +661,9 @@ const HtmlTestContentFrame = ({
     collectAnswers,
     collectQuestionIds,
     onPartsChange,
+    prepareAnswerControls,
     sectionType,
+    setupHighlighting,
     syncCurrentPart,
   ]);
 

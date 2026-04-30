@@ -81,6 +81,29 @@ const testSessionService = {
   },
 
   /**
+   * Guest: Validate a guest access code before collecting name
+   */
+  validateGuestAccessCode: async (guest_access_code) => {
+    return await apiClient.get(
+      `${API_CONFIG.BASE_URL}/api/test-sessions/guest-access/${encodeURIComponent(
+        guest_access_code
+      )}`
+    );
+  },
+
+  /**
+   * Guest: Claim a guest spot in a session with name only
+   */
+  claimGuestAccessCode: async (guest_access_code, full_name) => {
+    return await apiClient.post(
+      `${API_CONFIG.BASE_URL}/api/test-sessions/guest-access/${encodeURIComponent(
+        guest_access_code
+      )}/claim`,
+      { full_name }
+    );
+  },
+
+  /**
    * Participant: Check if they can start the test
    */
   canStartTest: async (participant_id_code, full_name) => {
