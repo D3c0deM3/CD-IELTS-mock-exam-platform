@@ -294,6 +294,32 @@ const getQuestionTarget = (target) =>
   target?.querySelector?.(".body, .content, .questions-body, .questions-content") ||
   target;
 
+const getClassText = (node) =>
+  `${node?.className || ""} ${node?.id || ""}`.toLowerCase();
+
+const scoreQuestionPaneCandidate = (node, index, sourceIndex) => {
+  const classText = getClassText(node);
+  let score = 0;
+
+  if (/(question|answer|right)/.test(classText)) score += 8;
+  if (/(panel|pane|column|col|side|card)/.test(classText)) score += 3;
+  if ((node.textContent || "").trim().length === 0) score += 2;
+  if (index > sourceIndex) score += 2;
+
+  return score;
+};
+
+const scoreSourcePaneCandidate = (node) => {
+  const classText = getClassText(node);
+  let score = 0;
+
+  if (hasAnswerControls(node)) score += 6;
+  if (/(passage|left|content|body)/.test(classText)) score += 4;
+  if (/(panel|pane|column|col|side|card)/.test(classText)) score += 2;
+
+  return score;
+};
+
 const moveQuestionRun = (sourceInfo, target) => {
   if (!sourceInfo || !target) return false;
 
@@ -326,11 +352,35 @@ const findExistingTwoPaneLayout = (root) => {
         !child.matches(READING_QUESTION_BLOCK_SELECTOR)
     );
 
-    if (children.length !== 2) continue;
+    if (children.length < 2) continue;
 
-    const [first, second] = children;
-    if (hasAnswerControls(first) && !hasAnswerControls(second)) {
-      return { passagePane: first, questionPane: second, layoutNode: parent };
+    const sourceCandidates = children
+      .map((child, index) => ({ child, index, score: scoreSourcePaneCandidate(child) }))
+      .filter(({ child }) => hasAnswerControls(child))
+      .sort((left, right) => right.score - left.score);
+
+    for (const source of sourceCandidates) {
+      const target = children
+        .map((child, index) => ({
+          child,
+          index,
+          score: scoreQuestionPaneCandidate(child, index, source.index),
+        }))
+        .filter(
+          ({ child, index }) =>
+            index !== source.index &&
+            !hasAnswerControls(child) &&
+            !child.contains(source.child)
+        )
+        .sort((left, right) => right.score - left.score)[0];
+
+      if (target) {
+        return {
+          passagePane: source.child,
+          questionPane: target.child,
+          layoutNode: parent,
+        };
+      }
     }
   }
 
