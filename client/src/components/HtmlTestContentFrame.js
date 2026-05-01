@@ -357,6 +357,32 @@ const getPlatformContentCss = (sectionType) => {
     `;
   }
 
+  if (sectionType === "reading") {
+    return `
+      ${sharedCss}
+      body {
+        padding-bottom: 0 !important;
+        overflow: hidden !important;
+      }
+      .app {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        gap: 16px !important;
+        height: 100vh !important;
+        min-height: 0 !important;
+      }
+      .panel {
+        min-width: 0 !important;
+        min-height: 0 !important;
+      }
+      #passages,
+      #questions {
+        height: 100% !important;
+        overflow: auto !important;
+      }
+    `;
+  }
+
   return sharedCss;
 };
 
@@ -537,6 +563,17 @@ const HtmlTestContentFrame = ({
   }, []);
 
   const syncCurrentPart = useCallback(() => {
+    if (sectionType === "reading") {
+      const passageNumber = currentPartIndex + 1;
+      const frameWindow = docRef.current?.defaultView;
+
+      if (typeof frameWindow?.goToPassage === "function") {
+        frameWindow.goToPassage(passageNumber);
+      }
+
+      return;
+    }
+
     const parts = partsRef.current;
     if (
       !parts.length ||
@@ -554,7 +591,7 @@ const HtmlTestContentFrame = ({
         node.setAttribute("aria-hidden", isActive ? "false" : "true");
       });
     });
-  }, [currentPartIndex]);
+  }, [currentPartIndex, sectionType]);
 
   const setupHighlighting = useCallback((doc) => {
     if (!["reading", "listening"].includes(sectionType)) {
