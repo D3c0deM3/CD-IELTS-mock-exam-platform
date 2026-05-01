@@ -8,6 +8,10 @@ const QUESTION_ID_ATTR = "data-platform-question-id";
 const HIGHLIGHT_SELECTOR = ".platform-text-highlight";
 const HIGHLIGHT_MENU_ID = "platform-highlight-menu";
 const ANSWER_CONTROL_TYPES_TO_SKIP = ["button", "submit", "reset", "hidden"];
+const READING_QUESTION_BLOCK_SELECTOR =
+  ".qcard, .question-card, .question-item, .question-row, [data-question], [data-question-number], [data-q]";
+const READING_NON_CONTENT_SELECTOR =
+  "script, style, link, meta, noscript, template, audio, video, canvas";
 
 const isAnswerControl = (element) =>
   element && !ANSWER_CONTROL_TYPES_TO_SKIP.includes(element.type);
@@ -138,6 +142,38 @@ const getNodePartLabel = (node, index, sectionType) =>
   node.querySelector("h1,h2,h3")?.textContent?.trim() ||
   `${sectionType === "reading" ? "Passage" : "Part"} ${index + 1}`;
 
+const isIgnorableNode = (node) =>
+  !node ||
+  (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) ||
+  (node.nodeType === Node.ELEMENT_NODE &&
+    node.matches(READING_NON_CONTENT_SELECTOR));
+
+const getDetectedPartNodes = (doc) => {
+  const detectedParts = Array.from(doc.querySelectorAll(PART_SELECTOR));
+  return detectedParts.filter(
+    (node) => !detectedParts.some((part) => part !== node && part.contains(node))
+  );
+};
+
+const collectPartNodesUntilNextPart = (node, detectedPartSet) => {
+  const nodes = [node];
+  let sibling = node.nextSibling;
+
+  while (sibling) {
+    if (sibling.nodeType === Node.ELEMENT_NODE && detectedPartSet.has(sibling)) {
+      break;
+    }
+
+    if (!isIgnorableNode(sibling) && sibling.nodeType === Node.ELEMENT_NODE) {
+      nodes.push(sibling);
+    }
+
+    sibling = sibling.nextSibling;
+  }
+
+  return nodes;
+};
+
 const buildPartGroups = (doc, sectionType) => {
   const passageElements = Array.from(doc.querySelectorAll("[data-passage]"));
   const passageValues = [
@@ -168,10 +204,12 @@ const buildPartGroups = (doc, sectionType) => {
     });
   }
 
-  const detectedParts = Array.from(doc.querySelectorAll(PART_SELECTOR));
+  const detectedParts = getDetectedPartNodes(doc);
   if (detectedParts.length > 0) {
+    const detectedPartSet = new Set(detectedParts);
+
     return detectedParts.map((node, index) => ({
-      nodes: [node],
+      nodes: collectPartNodesUntilNextPart(node, detectedPartSet),
       part_number:
         Number.parseInt(
           node.dataset?.part ||
@@ -192,6 +230,155 @@ const buildPartGroups = (doc, sectionType) => {
       label: `${sectionType === "reading" ? "Passage" : "Part"} 1`,
     },
   ];
+};
+
+const hasAnswerControls = (node) =>
+  Boolean(
+    node?.querySelector?.(ANSWER_SELECTOR) &&
+      Array.from(node.querySelectorAll(ANSWER_SELECTOR)).some(isAnswerControl)
+  );
+
+const isReadingQuestionBoundary = (node) => {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+  if (node.matches(READING_QUESTION_BLOCK_SELECTOR)) return true;
+
+  const text = (node.textContent || "").replace(/\s+/g, " ").trim();
+  if (!text) return false;
+
+  if (
+    /\bquestions?\s+\d+\s*[-–—]\s*\d+/i.test(text) ||
+    /\bquestions?\s+\d+\b/i.test(text)
+  ) {
+    return true;
+  }
+
+  if (!hasAnswerControls(node)) return false;
+
+  return /\b(choose|complete|write|true|false|not given|yes|no|answer)\b/i.test(
+    text
+  );
+};
+
+const findQuestionRunContainer = (root) => {
+  if (!root?.querySelectorAll) return null;
+
+  const candidates = [
+    root,
+    ...Array.from(
+      root.querySelectorAll(
+        ".body, .content, .passage-content, .scroll, article, section, main, div"
+      )
+    ),
+  ];
+
+  return (
+    candidates
+      .map((candidate) => {
+        const children = Array.from(candidate.children || []).filter(
+          (child) => !child.matches(READING_NON_CONTENT_SELECTOR)
+        );
+        const boundaryIndex = children.findIndex(isReadingQuestionBoundary);
+        return { candidate, children, boundaryIndex };
+      })
+      .filter(({ boundaryIndex, children }) => boundaryIndex > 0 && children.length > 1)
+      .sort((left, right) => {
+        const leftControls = hasAnswerControls(left.candidate) ? 1 : 0;
+        const rightControls = hasAnswerControls(right.candidate) ? 1 : 0;
+        if (leftControls !== rightControls) return rightControls - leftControls;
+        return left.children.length - right.children.length;
+      })[0] || null
+  );
+};
+
+const getQuestionTarget = (target) =>
+  target?.querySelector?.(".body, .content, .questions-body, .questions-content") ||
+  target;
+
+const moveQuestionRun = (sourceInfo, target) => {
+  if (!sourceInfo || !target) return false;
+
+  const targetNode = getQuestionTarget(target);
+  if (!targetNode) return false;
+
+  sourceInfo.children.slice(sourceInfo.boundaryIndex).forEach((child) => {
+    targetNode.appendChild(child);
+  });
+
+  return true;
+};
+
+const findExistingTwoPaneLayout = (root) => {
+  if (!root?.querySelectorAll) return null;
+
+  const parents = [
+    root,
+    ...Array.from(
+      root.querySelectorAll(
+        ".wrap, .container, .reading-layout, .split, [class*='layout'], [class*='split']"
+      )
+    ),
+  ];
+
+  for (const parent of parents) {
+    const children = Array.from(parent.children || []).filter(
+      (child) =>
+        !child.matches(READING_NON_CONTENT_SELECTOR) &&
+        !child.matches(READING_QUESTION_BLOCK_SELECTOR)
+    );
+
+    if (children.length !== 2) continue;
+
+    const [first, second] = children;
+    if (hasAnswerControls(first) && !hasAnswerControls(second)) {
+      return { passagePane: first, questionPane: second, layoutNode: parent };
+    }
+  }
+
+  return null;
+};
+
+const createReadingSplitLayout = (doc, container, sourceInfo) => {
+  const shell = doc.createElement("div");
+  const passagePane = doc.createElement("div");
+  const questionPane = doc.createElement("div");
+
+  shell.className = "platform-reading-layout";
+  passagePane.className = "platform-reading-pane platform-reading-passage-pane";
+  questionPane.className = "platform-reading-pane platform-reading-question-pane";
+
+  const leftNodes = sourceInfo.children.slice(0, sourceInfo.boundaryIndex);
+  const rightNodes = sourceInfo.children.slice(sourceInfo.boundaryIndex);
+
+  leftNodes.forEach((child) => passagePane.appendChild(child));
+  rightNodes.forEach((child) => questionPane.appendChild(child));
+  shell.appendChild(passagePane);
+  shell.appendChild(questionPane);
+  container.appendChild(shell);
+};
+
+const normalizeReadingSplitLayout = (doc, parts) => {
+  parts.forEach((part) => {
+    part.nodes.forEach((node) => {
+      if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+      if (node.querySelector(".platform-reading-layout")) return;
+
+      const existingLayout = findExistingTwoPaneLayout(node);
+      if (existingLayout) {
+        const sourceInfo = findQuestionRunContainer(existingLayout.passagePane);
+        if (moveQuestionRun(sourceInfo, existingLayout.questionPane)) {
+          existingLayout.layoutNode.classList.add("platform-reading-existing-layout");
+          existingLayout.passagePane.classList.add("platform-reading-passage-pane");
+          existingLayout.questionPane.classList.add("platform-reading-question-pane");
+        }
+        return;
+      }
+
+      const sourceInfo = findQuestionRunContainer(node);
+      if (!sourceInfo) return;
+
+      createReadingSplitLayout(doc, sourceInfo.candidate, sourceInfo);
+    });
+  });
 };
 
 const normalizePartHierarchy = (doc, parts) => {
@@ -314,6 +501,86 @@ const getPlatformContentCss = (sectionType) => {
       .blank {
         height: 34px !important;
         max-width: min(180px, 45vw) !important;
+      }
+    `;
+  }
+
+  if (sectionType === "reading") {
+    return `
+      ${sharedCss}
+      html,
+      body {
+        height: 100% !important;
+        background: #f6f6f6 !important;
+        overflow: hidden !important;
+      }
+      body {
+        padding: 0 !important;
+      }
+      .section,
+      [data-passage],
+      [data-platform-part-root] {
+        height: 100% !important;
+        min-height: 0 !important;
+      }
+      .platform-reading-layout,
+      .platform-reading-existing-layout {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        gap: 16px !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        padding: 14px !important;
+        background: #f6f6f6 !important;
+      }
+      .platform-reading-pane,
+      .platform-reading-passage-pane,
+      .platform-reading-question-pane {
+        min-width: 0 !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        overflow: auto !important;
+        background: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 16px !important;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
+        padding: 22px !important;
+      }
+      .platform-reading-passage-pane::-webkit-scrollbar,
+      .platform-reading-question-pane::-webkit-scrollbar,
+      .platform-reading-pane::-webkit-scrollbar {
+        width: 10px !important;
+      }
+      .platform-reading-passage-pane::-webkit-scrollbar-track,
+      .platform-reading-question-pane::-webkit-scrollbar-track,
+      .platform-reading-pane::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
+      }
+      .platform-reading-passage-pane::-webkit-scrollbar-thumb,
+      .platform-reading-question-pane::-webkit-scrollbar-thumb,
+      .platform-reading-pane::-webkit-scrollbar-thumb {
+        background: #ef4444 !important;
+        border-radius: 8px !important;
+      }
+      @media (max-width: 900px) {
+        html,
+        body {
+          overflow: auto !important;
+        }
+        .platform-reading-layout,
+        .platform-reading-existing-layout {
+          display: flex !important;
+          flex-direction: column !important;
+          height: auto !important;
+          min-height: 100% !important;
+        }
+        .platform-reading-pane,
+        .platform-reading-passage-pane,
+        .platform-reading-question-pane {
+          height: auto !important;
+          max-height: none !important;
+        }
       }
     `;
   }
@@ -664,6 +931,9 @@ const HtmlTestContentFrame = ({
       doc,
       buildPartGroups(doc, sectionType)
     );
+    if (sectionType === "reading") {
+      normalizeReadingSplitLayout(doc, partsRef.current);
+    }
 
     onPartsChange(
       partsRef.current.map((part) => ({
