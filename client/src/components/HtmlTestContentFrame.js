@@ -8,8 +8,6 @@ const QUESTION_ID_ATTR = "data-platform-question-id";
 const HIGHLIGHT_SELECTOR = ".platform-text-highlight";
 const HIGHLIGHT_MENU_ID = "platform-highlight-menu";
 const ANSWER_CONTROL_TYPES_TO_SKIP = ["button", "submit", "reset", "hidden"];
-const READING_QUESTION_BLOCK_SELECTOR =
-  ".qcard, .question-card, .question-item, .question-row, [data-question], [data-question-number], [data-q]";
 const READING_NON_CONTENT_SELECTOR =
   "script, style, link, meta, noscript, template, audio, video, canvas";
 
@@ -232,205 +230,6 @@ const buildPartGroups = (doc, sectionType) => {
   ];
 };
 
-const hasAnswerControls = (node) =>
-  Boolean(
-    node?.querySelector?.(ANSWER_SELECTOR) &&
-      Array.from(node.querySelectorAll(ANSWER_SELECTOR)).some(isAnswerControl)
-  );
-
-const isReadingQuestionBoundary = (node) => {
-  if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
-  if (node.matches(READING_QUESTION_BLOCK_SELECTOR)) return true;
-
-  const text = (node.textContent || "").replace(/\s+/g, " ").trim();
-  if (!text) return false;
-
-  if (
-    /\bquestions?\s+\d+\s*[-–—]\s*\d+/i.test(text) ||
-    /\bquestions?\s+\d+\b/i.test(text)
-  ) {
-    return true;
-  }
-
-  if (!hasAnswerControls(node)) return false;
-
-  return /\b(choose|complete|write|true|false|not given|yes|no|answer)\b/i.test(
-    text
-  );
-};
-
-const findQuestionRunContainer = (root) => {
-  if (!root?.querySelectorAll) return null;
-
-  const candidates = [
-    root,
-    ...Array.from(
-      root.querySelectorAll(
-        ".body, .content, .passage-content, .scroll, article, section, main, div"
-      )
-    ),
-  ];
-
-  return (
-    candidates
-      .map((candidate) => {
-        const children = Array.from(candidate.children || []).filter(
-          (child) => !child.matches(READING_NON_CONTENT_SELECTOR)
-        );
-        const boundaryIndex = children.findIndex(isReadingQuestionBoundary);
-        return { candidate, children, boundaryIndex };
-      })
-      .filter(({ boundaryIndex, children }) => boundaryIndex > 0 && children.length > 1)
-      .sort((left, right) => {
-        const leftControls = hasAnswerControls(left.candidate) ? 1 : 0;
-        const rightControls = hasAnswerControls(right.candidate) ? 1 : 0;
-        if (leftControls !== rightControls) return rightControls - leftControls;
-        return left.children.length - right.children.length;
-      })[0] || null
-  );
-};
-
-const getQuestionTarget = (target) =>
-  target?.querySelector?.(".body, .content, .questions-body, .questions-content") ||
-  target;
-
-const getClassText = (node) =>
-  `${node?.className || ""} ${node?.id || ""}`.toLowerCase();
-
-const scoreQuestionPaneCandidate = (node, index, sourceIndex) => {
-  const classText = getClassText(node);
-  let score = 0;
-
-  if (/(question|answer|right)/.test(classText)) score += 8;
-  if (/(panel|pane|column|col|side|card)/.test(classText)) score += 3;
-  if ((node.textContent || "").trim().length === 0) score += 2;
-  if (index > sourceIndex) score += 2;
-
-  return score;
-};
-
-const scoreSourcePaneCandidate = (node) => {
-  const classText = getClassText(node);
-  let score = 0;
-
-  if (hasAnswerControls(node)) score += 6;
-  if (/(passage|left|content|body)/.test(classText)) score += 4;
-  if (/(panel|pane|column|col|side|card)/.test(classText)) score += 2;
-
-  return score;
-};
-
-const moveQuestionRun = (sourceInfo, target) => {
-  if (!sourceInfo || !target) return false;
-
-  const targetNode = getQuestionTarget(target);
-  if (!targetNode) return false;
-
-  sourceInfo.children.slice(sourceInfo.boundaryIndex).forEach((child) => {
-    targetNode.appendChild(child);
-  });
-
-  return true;
-};
-
-const findExistingTwoPaneLayout = (root) => {
-  if (!root?.querySelectorAll) return null;
-
-  const parents = [
-    root,
-    ...Array.from(
-      root.querySelectorAll(
-        ".wrap, .container, .reading-layout, .split, [class*='layout'], [class*='split']"
-      )
-    ),
-  ];
-
-  for (const parent of parents) {
-    const children = Array.from(parent.children || []).filter(
-      (child) =>
-        !child.matches(READING_NON_CONTENT_SELECTOR) &&
-        !child.matches(READING_QUESTION_BLOCK_SELECTOR)
-    );
-
-    if (children.length < 2) continue;
-
-    const sourceCandidates = children
-      .map((child, index) => ({ child, index, score: scoreSourcePaneCandidate(child) }))
-      .filter(({ child }) => hasAnswerControls(child))
-      .sort((left, right) => right.score - left.score);
-
-    for (const source of sourceCandidates) {
-      const target = children
-        .map((child, index) => ({
-          child,
-          index,
-          score: scoreQuestionPaneCandidate(child, index, source.index),
-        }))
-        .filter(
-          ({ child, index }) =>
-            index !== source.index &&
-            !hasAnswerControls(child) &&
-            !child.contains(source.child)
-        )
-        .sort((left, right) => right.score - left.score)[0];
-
-      if (target) {
-        return {
-          passagePane: source.child,
-          questionPane: target.child,
-          layoutNode: parent,
-        };
-      }
-    }
-  }
-
-  return null;
-};
-
-const createReadingSplitLayout = (doc, container, sourceInfo) => {
-  const shell = doc.createElement("div");
-  const passagePane = doc.createElement("div");
-  const questionPane = doc.createElement("div");
-
-  shell.className = "platform-reading-layout";
-  passagePane.className = "platform-reading-pane platform-reading-passage-pane";
-  questionPane.className = "platform-reading-pane platform-reading-question-pane";
-
-  const leftNodes = sourceInfo.children.slice(0, sourceInfo.boundaryIndex);
-  const rightNodes = sourceInfo.children.slice(sourceInfo.boundaryIndex);
-
-  leftNodes.forEach((child) => passagePane.appendChild(child));
-  rightNodes.forEach((child) => questionPane.appendChild(child));
-  shell.appendChild(passagePane);
-  shell.appendChild(questionPane);
-  container.appendChild(shell);
-};
-
-const normalizeReadingSplitLayout = (doc, parts) => {
-  parts.forEach((part) => {
-    part.nodes.forEach((node) => {
-      if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
-      if (node.querySelector(".platform-reading-layout")) return;
-
-      const existingLayout = findExistingTwoPaneLayout(node);
-      if (existingLayout) {
-        const sourceInfo = findQuestionRunContainer(existingLayout.passagePane);
-        if (moveQuestionRun(sourceInfo, existingLayout.questionPane)) {
-          existingLayout.layoutNode.classList.add("platform-reading-existing-layout");
-          existingLayout.passagePane.classList.add("platform-reading-passage-pane");
-          existingLayout.questionPane.classList.add("platform-reading-question-pane");
-        }
-        return;
-      }
-
-      const sourceInfo = findQuestionRunContainer(node);
-      if (!sourceInfo) return;
-
-      createReadingSplitLayout(doc, sourceInfo.candidate, sourceInfo);
-    });
-  });
-};
-
 const normalizePartHierarchy = (doc, parts) => {
   if (parts.length <= 1) return parts;
 
@@ -551,86 +350,6 @@ const getPlatformContentCss = (sectionType) => {
       .blank {
         height: 34px !important;
         max-width: min(180px, 45vw) !important;
-      }
-    `;
-  }
-
-  if (sectionType === "reading") {
-    return `
-      ${sharedCss}
-      html,
-      body {
-        height: 100% !important;
-        background: #f6f6f6 !important;
-        overflow: hidden !important;
-      }
-      body {
-        padding: 0 !important;
-      }
-      .section,
-      [data-passage],
-      [data-platform-part-root] {
-        height: 100% !important;
-        min-height: 0 !important;
-      }
-      .platform-reading-layout,
-      .platform-reading-existing-layout {
-        display: grid !important;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: 16px !important;
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        padding: 14px !important;
-        background: #f6f6f6 !important;
-      }
-      .platform-reading-pane,
-      .platform-reading-passage-pane,
-      .platform-reading-question-pane {
-        min-width: 0 !important;
-        min-height: 0 !important;
-        height: 100% !important;
-        overflow: auto !important;
-        background: #ffffff !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 16px !important;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
-        padding: 22px !important;
-      }
-      .platform-reading-passage-pane::-webkit-scrollbar,
-      .platform-reading-question-pane::-webkit-scrollbar,
-      .platform-reading-pane::-webkit-scrollbar {
-        width: 10px !important;
-      }
-      .platform-reading-passage-pane::-webkit-scrollbar-track,
-      .platform-reading-question-pane::-webkit-scrollbar-track,
-      .platform-reading-pane::-webkit-scrollbar-track {
-        background: #f1f1f1 !important;
-      }
-      .platform-reading-passage-pane::-webkit-scrollbar-thumb,
-      .platform-reading-question-pane::-webkit-scrollbar-thumb,
-      .platform-reading-pane::-webkit-scrollbar-thumb {
-        background: #ef4444 !important;
-        border-radius: 8px !important;
-      }
-      @media (max-width: 900px) {
-        html,
-        body {
-          overflow: auto !important;
-        }
-        .platform-reading-layout,
-        .platform-reading-existing-layout {
-          display: flex !important;
-          flex-direction: column !important;
-          height: auto !important;
-          min-height: 100% !important;
-        }
-        .platform-reading-pane,
-        .platform-reading-passage-pane,
-        .platform-reading-question-pane {
-          height: auto !important;
-          max-height: none !important;
-        }
       }
     `;
   }
@@ -981,9 +700,6 @@ const HtmlTestContentFrame = ({
       doc,
       buildPartGroups(doc, sectionType)
     );
-    if (sectionType === "reading") {
-      normalizeReadingSplitLayout(doc, partsRef.current);
-    }
 
     onPartsChange(
       partsRef.current.map((part) => ({
@@ -1043,7 +759,7 @@ const HtmlTestContentFrame = ({
       ref={iframeRef}
       className="html-test-content-frame"
       title={`${sectionType} test content`}
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-scripts"
       srcDoc={html}
       onLoad={handleLoad}
     />
