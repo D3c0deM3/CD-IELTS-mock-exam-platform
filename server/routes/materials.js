@@ -6,9 +6,68 @@ const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const db = require("../db");
 const authMiddleware = require("../middleware/auth");
+const { resolveSessionMaterialSetId } = require("../utils/testMaterialSets");
 const { PythonShell } = require("python-shell");
 // Store last conversion result for debugging
 let lastConversionResult = null;
+
+const getParticipantCodeFromRequest = (req) =>
+  (
+    req.query.participant_id_code ||
+    req.headers["x-participant-id-code"] ||
+    ""
+  )
+    .toString()
+    .trim();
+
+const allowParticipantMaterialRead = async (req, res, next) => {
+  const participantCode = getParticipantCodeFromRequest(req);
+
+  if (!participantCode) {
+    return authMiddleware(req, res, next);
+  }
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT
+        tp.id,
+        tp.participant_id_code,
+        tp.participant_status,
+        ts.test_id,
+        ts.test_materials_id,
+        ts.admin_notes
+       FROM test_participants tp
+       JOIN test_sessions ts ON tp.session_id = ts.id
+       WHERE tp.participant_id_code = ?
+       LIMIT 1`,
+      [participantCode]
+    );
+
+    if (rows.length === 0 || rows[0].participant_status === "expired") {
+      return res.status(403).json({ error: "Invalid participant access" });
+    }
+
+    const resolvedMaterialSetId = await resolveSessionMaterialSetId({
+      testId: rows[0].test_id,
+      testMaterialsId: rows[0].test_materials_id,
+      adminNotes: rows[0].admin_notes,
+    });
+
+    if (Number(resolvedMaterialSetId) !== Number(req.params.setId)) {
+      return res.status(403).json({ error: "Invalid participant access" });
+    }
+
+    req.participant = {
+      id: rows[0].id,
+      participant_id_code: rows[0].participant_id_code,
+    };
+
+    return next();
+  } catch (err) {
+    console.error("Participant material access error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 const ensureAdmin = async (req, res, next) => {
   try {
@@ -673,8 +732,8 @@ router.get("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
   }
 });
 
-// GET /api/materials/sets/:setId/content - Get content JSON (auth)
-router.get("/sets/:setId/content", authMiddleware, async (req, res) => {
+// GET /api/materials/sets/:setId/content - Get content JSON
+router.get("/sets/:setId/content", allowParticipantMaterialRead, async (req, res) => {
   const { setId } = req.params;
 
   try {
@@ -908,8 +967,8 @@ router.get("/sets/:setId/answers", authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/materials/sets/:setId/audio - Get audio metadata (auth)
-router.get("/sets/:setId/audio", authMiddleware, async (req, res) => {
+// GET /api/materials/sets/:setId/audio - Get audio metadata
+router.get("/sets/:setId/audio", allowParticipantMaterialRead, async (req, res) => {
   const { setId } = req.params;
 
   try {

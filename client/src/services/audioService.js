@@ -5,6 +5,7 @@
 
 import API_CONFIG from "../config/api";
 import { apiClient } from "./api";
+import { withParticipantAccess } from "../utils/participantAccess";
 
 // Import all available audio files
 import listeningAudio from "../pages/listening_test.mp3";
@@ -45,7 +46,7 @@ const resolveAudioUrl = (audioUrl) => {
 const getRemoteAudioUrl = async (testMaterialsId) => {
   try {
     const response = await apiClient.get(
-      `/api/materials/sets/${testMaterialsId}/audio`
+      withParticipantAccess(`/api/materials/sets/${testMaterialsId}/audio`)
     );
     if (response?.audio_file_url) {
       return resolveAudioUrl(response.audio_file_url);

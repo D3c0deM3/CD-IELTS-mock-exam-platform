@@ -10,6 +10,7 @@ import {
   GAP_PLACEHOLDER_REGEX,
   normalizeTestContent,
 } from "../utils/testContentNormalizer";
+import { withParticipantAccess } from "../utils/participantAccess";
 import "./ReadingTestDashboard.css";
 import useActivityMonitor from "../hooks/useActivityMonitor";
 import testDataJson2 from "./mock_2.json";
@@ -1036,7 +1037,9 @@ const ReadingTestDashboard = () => {
 
         try {
           const response = await apiClient.get(
-            `/api/materials/sets/${testMaterialsId}/content?section_type=reading`
+            withParticipantAccess(
+              `/api/materials/sets/${testMaterialsId}/content?section_type=reading`
+            )
           );
           if (
             response?.content_format === "html" &&

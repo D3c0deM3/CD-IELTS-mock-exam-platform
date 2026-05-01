@@ -7,6 +7,7 @@ import { apiClient } from "../services/api";
 import useAnswersWithStorage from "../hooks/useAnswersWithStorage";
 import useTimerWithStorage from "../hooks/useTimerWithStorage";
 import { normalizeTestContent } from "../utils/testContentNormalizer";
+import { withParticipantAccess } from "../utils/participantAccess";
 import "./WritingTestDashboard.css";
 import useActivityMonitor from "../hooks/useActivityMonitor";
 import testDataJson2 from "./mock_2.json";
@@ -782,7 +783,9 @@ const WritingTestDashboard = () => {
 
         try {
           const response = await apiClient.get(
-            `/api/materials/sets/${testMaterialsId}/content?section_type=writing`
+            withParticipantAccess(
+              `/api/materials/sets/${testMaterialsId}/content?section_type=writing`
+            )
           );
           if (
             response?.content_format === "html" &&

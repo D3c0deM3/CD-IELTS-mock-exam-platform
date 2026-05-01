@@ -194,6 +194,31 @@ const buildPartGroups = (doc, sectionType) => {
   ];
 };
 
+const normalizePartHierarchy = (doc, parts) => {
+  if (parts.length <= 1) return parts;
+
+  const firstNode = parts[0]?.nodes?.[0];
+  if (!firstNode || firstNode === doc.body || !firstNode.parentNode) {
+    return parts;
+  }
+
+  const root = doc.createElement("div");
+  root.setAttribute("data-platform-part-root", "true");
+  root.style.width = "100%";
+  root.style.minHeight = "100%";
+  firstNode.parentNode.insertBefore(root, firstNode);
+
+  parts.forEach((part) => {
+    part.nodes.forEach((node) => {
+      if (node && node.parentNode !== root) {
+        root.appendChild(node);
+      }
+    });
+  });
+
+  return parts;
+};
+
 const getPlatformContentCss = (sectionType) => {
   const sharedCss = `
     html,
@@ -208,6 +233,10 @@ const getPlatformContentCss = (sectionType) => {
     *::before,
     *::after {
       box-sizing: border-box !important;
+    }
+    [data-platform-part-root] {
+      width: 100% !important;
+      min-height: 100% !important;
     }
     body {
       padding-bottom: 120px !important;
@@ -631,7 +660,10 @@ const HtmlTestContentFrame = ({
     doc.head.appendChild(controlStyle);
 
     prepareAnswerControls(doc);
-    partsRef.current = buildPartGroups(doc, sectionType);
+    partsRef.current = normalizePartHierarchy(
+      doc,
+      buildPartGroups(doc, sectionType)
+    );
 
     onPartsChange(
       partsRef.current.map((part) => ({

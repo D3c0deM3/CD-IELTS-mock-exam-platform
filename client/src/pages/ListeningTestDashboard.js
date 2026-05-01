@@ -13,6 +13,7 @@ import {
   GAP_PLACEHOLDER_REGEX,
   normalizeTestContent,
 } from "../utils/testContentNormalizer";
+import { withParticipantAccess } from "../utils/participantAccess";
 import "./ListeningTestDashboard.css";
 import useActivityMonitor from "../hooks/useActivityMonitor";
 
@@ -2369,7 +2370,9 @@ const ListeningTestDashboard = () => {
 
         try {
           const response = await apiClient.get(
-            `/api/materials/sets/${testMaterialsId}/content?section_type=listening`
+            withParticipantAccess(
+              `/api/materials/sets/${testMaterialsId}/content?section_type=listening`
+            )
           );
           if (
             response?.content_format === "html" &&
