@@ -207,7 +207,10 @@ const buildPartGroups = (doc, sectionType) => {
     const detectedPartSet = new Set(detectedParts);
 
     return detectedParts.map((node, index) => ({
-      nodes: collectPartNodesUntilNextPart(node, detectedPartSet),
+      nodes:
+        sectionType === "listening"
+          ? collectPartNodesUntilNextPart(node, detectedPartSet)
+          : [node],
       part_number:
         Number.parseInt(
           node.dataset?.part ||
@@ -696,10 +699,11 @@ const HtmlTestContentFrame = ({
     doc.head.appendChild(controlStyle);
 
     prepareAnswerControls(doc);
-    partsRef.current = normalizePartHierarchy(
-      doc,
-      buildPartGroups(doc, sectionType)
-    );
+    const detectedParts = buildPartGroups(doc, sectionType);
+    partsRef.current =
+      sectionType === "listening"
+        ? normalizePartHierarchy(doc, detectedParts)
+        : detectedParts;
 
     onPartsChange(
       partsRef.current.map((part) => ({
@@ -759,7 +763,6 @@ const HtmlTestContentFrame = ({
       ref={iframeRef}
       className="html-test-content-frame"
       title={`${sectionType} test content`}
-      sandbox="allow-same-origin allow-scripts"
       srcDoc={html}
       onLoad={handleLoad}
     />
