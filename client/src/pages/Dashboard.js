@@ -174,7 +174,8 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token =
+        localStorage.getItem("accessToken") || localStorage.getItem("token");
 
       // Call logout endpoint to invalidate session
       if (token) {
@@ -188,24 +189,21 @@ const Dashboard = () => {
       }
 
       // Clear all user data from localStorage
+      localStorage.removeItem("accessToken");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("currentParticipant");
       localStorage.removeItem("ielts_mock_theme");
 
-      // Redirect to signup page
-      navigate("/");
-
-      // Force page refresh to ensure clean state
-      window.location.href = "/";
+      navigate("/login", { replace: true });
     } catch (err) {
       console.error("Error during logout:", err);
       // Still clear local data even if backend call fails
+      localStorage.removeItem("accessToken");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("currentParticipant");
-      navigate("/");
-      window.location.href = "/";
+      navigate("/login", { replace: true });
     }
   };
 
