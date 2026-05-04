@@ -481,12 +481,15 @@ const MaterialUpload = ({ initialTestId }) => {
       const formData = new FormData();
       formData.append("file", audioFile);
       const token = localStorage.getItem("accessToken");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
       const response = await axios.post(
         `${API_CONFIG.BASE_URL}/api/materials/sets/${targetSetId}/audio`,
         formData,
         {
           headers: {
-            Authorization: token ? `Bearer ${token}` : "",
+            ...headers,
+            "Content-Type": "multipart/form-data",
           },
         }
       );
@@ -553,12 +556,15 @@ const MaterialUpload = ({ initialTestId }) => {
       formData.append("context_label", slot.context_label || "Test Asset");
 
       const token = localStorage.getItem("accessToken");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const response = await axios.post(
         `${API_CONFIG.BASE_URL}/api/materials/sets/${targetSetId}/images`,
         formData,
         {
           headers: {
-            Authorization: token ? `Bearer ${token}` : "",
+            ...headers,
+            "Content-Type": "multipart/form-data",
           },
         }
       );
