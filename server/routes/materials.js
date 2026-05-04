@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const db = require("../db");
+const { uploadAudioToR2, deleteFromR2, isR2Key } = require("../utils/r2");
 const authMiddleware = require("../middleware/auth");
 const { resolveSessionMaterialSetId } = require("../utils/testMaterialSets");
 const { PythonShell } = require("python-shell");
@@ -113,22 +114,8 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
 });
 
-const audioStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../uploads/audio");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}_${uuidv4()}_${file.originalname}`;
-    cb(null, uniqueName);
-  },
-});
-
 const audioUpload = multer({
-  storage: audioStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
 });
 
@@ -1281,7 +1268,7 @@ router.post(
   }
 );
 
-// POST /api/materials/sets/:setId/audio - Upload audio file (admin)
+// POST /api/materials/sets/:setId/audio - Upload audio file to R2 (admin)
 router.post(
   "/sets/:setId/audio",
   authMiddleware,
@@ -1305,7 +1292,6 @@ router.post(
     ];
 
     if (!audioTypes.includes(req.file.mimetype)) {
-      fs.unlinkSync(req.file.path);
       return res.status(400).json({
         error: "Only audio files (MP3, WAV, OGG, M4A) are allowed",
       });
@@ -1318,34 +1304,37 @@ router.post(
       );
 
       if (existing.length === 0) {
-        fs.unlinkSync(req.file.path);
         return res.status(404).json({ error: "Material set not found" });
       }
 
-      if (existing[0].audio_file_path && fs.existsSync(existing[0].audio_file_path)) {
-        fs.unlinkSync(existing[0].audio_file_path);
+      // Delete the old audio file (R2 key or local path)
+      const oldPath = existing[0].audio_file_path;
+      if (oldPath) {
+        if (isR2Key(oldPath)) {
+          await deleteFromR2(oldPath);
+        } else if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
       }
 
-      const fileUrl = `/uploads/audio/${req.file.filename}`;
+      // Upload the new file to R2
+      const { key, publicUrl, fileName } = await uploadAudioToR2(req.file, setId);
 
       await db.execute(
         `UPDATE test_material_sets
          SET audio_file_name = ?, audio_file_path = ?, audio_file_url = ?, audio_file_size = ?, updated_at = NOW()
          WHERE id = ?`,
-        [req.file.originalname, req.file.path, fileUrl, req.file.size, setId]
+        [fileName, key, publicUrl, req.file.size, setId]
       );
 
       res.json({
         success: true,
-        audio_file_url: fileUrl,
-        audio_file_name: req.file.originalname,
+        audio_file_url: publicUrl,
+        audio_file_name: fileName,
         audio_file_size: req.file.size,
       });
     } catch (err) {
       console.error("Audio upload error:", err);
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
       res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -1366,8 +1355,14 @@ router.delete("/sets/:setId", authMiddleware, ensureAdmin, async (req, res) => {
     }
 
     const { test_id: testId, audio_file_path: audioPath } = rows[0];
-    if (audioPath && fs.existsSync(audioPath)) {
-      fs.unlinkSync(audioPath);
+
+    // Delete audio – R2 key or legacy local file
+    if (audioPath) {
+      if (isR2Key(audioPath)) {
+        await deleteFromR2(audioPath);
+      } else if (fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
+      }
     }
 
     const [imageRows] = await db.execute(
