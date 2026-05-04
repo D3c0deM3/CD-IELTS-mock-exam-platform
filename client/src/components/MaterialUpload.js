@@ -487,10 +487,7 @@ const MaterialUpload = ({ initialTestId }) => {
         `${API_CONFIG.BASE_URL}/api/materials/sets/${targetSetId}/audio`,
         formData,
         {
-          headers: {
-            ...headers,
-            "Content-Type": "multipart/form-data",
-          },
+          headers,
         }
       );
       setAudioMeta({
@@ -562,10 +559,7 @@ const MaterialUpload = ({ initialTestId }) => {
         `${API_CONFIG.BASE_URL}/api/materials/sets/${targetSetId}/images`,
         formData,
         {
-          headers: {
-            ...headers,
-            "Content-Type": "multipart/form-data",
-          },
+          headers,
         }
       );
 
